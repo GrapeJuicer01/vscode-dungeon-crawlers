@@ -1,0 +1,95 @@
+# CLAUDE.md: Pixel Agents
+
+Purpose: orientation for Claude Code and its subagents. Read this first. `SPEC.md` (if present) is the original brief and may be outdated: if it disagrees with `docs/`, the docs win. The core invariants below always win.
+Related: [team workflow](docs/engineering/team-workflow.md), [coding standards](docs/engineering/coding-standards.md), [testing strategy](docs/engineering/testing-strategy.md), [docs index](docs/index.md).
+
+## Project summary
+
+A VS Code extension that adds a bottom-panel Webview tab, "Pixel Agents". It renders an animated 2D pixel-art dungeon crawler. Each active Claude Code agent session is a hero who fights through 10 biomes against 50 enemy types while the agent works, and rests at a campfire while it is idle.
+
+## Core invariants (never violate; escalate to the human if a task seems to require it)
+
+Only the human may edit this section. No agent adds, removes, or weakens an invariant.
+
+1. **Heroes are invulnerable.** No HP, mana, damage intake, death, "downed", or "retreat when hurt" anywhere. No gauges on heroes. Enemy attacks are cosmetic only (flash, stagger, knockback). Only enemies have health.
+2. **Hero lifecycle comes ONLY from host agent-state events** (`spawned`, `working`, `idle`, `despawned`). No combat, boss, stage, or game-loop event may change a hero's state or despawn it.
+3. **The monitor is strictly read-only.** It never writes to, signals, kills, or sends input to any process or terminal. No protocol message may control, stop, or modify a real agent session. `focusAgent` only reveals a terminal.
+4. **A game crash must never affect agents.** The update loop is wrapped in try/catch. On webview reload the scene is rebuilt from the host's agent list.
+5. **No external image or audio files.** Sprites are procedural palette-indexed pixel maps in code. Audio is Web Audio.
+6. **No runtime dependencies.** esbuild and @types/vscode only. Dev-only tooling (ESLint, Prettier, markdownlint, a test runner, vsce) is allowed. Ask the human before adding anything else.
+7. **Transcript privacy.** The monitor reads transcripts only to extract session id, name, state, tool name, and timestamp. Transcript content is never stored, logged, or sent anywhere.
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `npm install` | install dependencies |
+| `npm run build` | bundle host (Node, CommonJS) and webview (browser, IIFE) |
+| `npm run watch` | rebuild on change |
+| `npm run package` | produce the `.vsix` with `vsce` |
+| `npm run lint` / `format` | ESLint / Prettier |
+| `npm run typecheck` | `tsc --noEmit`, strict |
+| `npm run test` | unit, structural, and bundle tests (`node:test`) |
+| `npm run test:integration` | run the extension in a downloaded VS Code (`@vscode/test-electron`, `--disable-extensions`); headless Linux needs `xvfb-run -a` |
+| `npm run docs:tables` | regenerate enemy and class tables in docs from source data (from H1) |
+| F5 | launch the Extension Development Host (`.vscode/launch.json`); for manual checks use `--disable-extensions` or a clean profile, since an unrelated marketplace extension is also named "Pixel Agents" |
+
+## Directory map
+
+```text
+src/extension.ts            activation, view provider; message routing (M2); commands, status bar (M7)
+src/monitor/                (M3) AgentMonitor + Transcript/Terminal/Simulator sources
+src/shared/protocol.ts      (M2) typed host <-> webview messages, shared by both bundles
+src/webview/                index.html.ts, main.ts; ui.ts (M7), audio.ts (M8)
+src/game/                   (M4) engine: Game, Renderer, Camera, Lighting, Pathfinding, Collision, Particles; Combat (E1)
+src/game/entities/          (M4) Hero, Campfire; 12 classes (H1-H3), Summon (H2), Enemy, Boss (E1)
+src/game/data/              (M4) stages; classes, classMap (H1); enemies, drops (E1); achievements (M7)
+src/game/sprites/           (M4) palettes, spriteTemplates (art), spriteFactory (renderer)
+scripts/                    (H1) generate-doc-tables.ts
+test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); support/ helpers;
+                            integration tests in a downloaded VS Code via @vscode/test-electron
+tools/                      (optional, none yet) dev-only sprite preview (never shipped)
+docs/                       architecture/ (incl. adr/, plans/) design/ engineering/ + index, glossary; development/ (M9)
+.claude/agents/             architect, developer, tester, reviewer, pixel-artist
+.github/                    workflows (ci, release), issue templates, PR template, CODEOWNERS
+.vscode/                    launch.json (F5), tasks.json, extensions.json, settings.json
+(root)                      package.json, esbuild.mjs, tsconfig.base/json/webview/tools, eslint.config.mjs,
+                            .prettierrc.json, .markdownlint-cli2.jsonc, .vscodeignore, .nvmrc, .editorconfig
+dist/, out/                 build and test output (git-ignored; only dist/*.js ships)
+.vscode-test/               VS Code downloaded by @vscode/test-electron (git-, package-, and lint-ignored)
+```
+
+## Code conventions
+
+- TypeScript strict. No `any` without a comment saying why. No placeholders, "TODO: implement", "TBD", or elided code.
+- Game content lives in typed data tables. The 50 enemies come from a compact table plus per-stage scaling formulas, not 50 hand-written objects. The enemy table is validated at startup (50 unique ids, 5 per stage, exactly one boss per stage).
+- Persisted progress (`globalState`) carries a schema version and migrations.
+- Every threshold is configurable under `contributes.configuration` (`pixelAgents.*`).
+- Ambiguity: pick a sensible default, state the assumption in a code comment or the relevant doc, continue.
+- Git: `main` default, trunk-based, short-lived `feat/*`, `fix/*`, `docs/*` branches, Conventional Commits.
+- Docs: Markdown in `docs/`. Every doc starts with a purpose line and links to related docs. Relative links, Mermaid for diagrams, text/ASCII wireframes instead of screenshots.
+
+## Who owns what
+
+| Agent | Writes | Never writes |
+|---|---|---|
+| architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
+| pixel-artist | `src/game/sprites/palettes.ts`, `src/game/sprites/spriteTemplates.ts` (and other template data files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
+| tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
+| reviewer | nothing (read-only) | everything |
+
+Agent definitions in `.claude/agents/` are owned by the human.
+
+## Definition of done
+
+- `npm run lint`, `typecheck`, `test`, and `build` pass; `npm run docs:tables` leaves no diff (from H1).
+- Invariants intact; the hero-invariant test passes.
+- Matching docs updated in the same change (protocol, data tables, classes, config), plus a `CHANGELOG.md` entry.
+- This file's directory map, commands, and ownership table still match the repo; the milestone is ticked off in `docs/engineering/roadmap.md` after its commit.
+- Reviewer verdict is Approve, with no open Critical findings.
+- Committed with a Conventional Commit message on a branch.
+
+## Handoffs
+
+Every agent ends its reply with a **Handoff** block: what was done, files touched, gate results, open issues, and who goes next.

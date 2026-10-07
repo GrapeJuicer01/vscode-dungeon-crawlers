@@ -1,0 +1,13 @@
+# CODEOWNERS for Pixel Agents.
+#
+# Assumption: comment-only until the human provides a GitHub handle and a remote exists.
+# Once a handle exists, uncomment the lines below and replace @OWNER with it.
+#
+# Invariant-critical paths (changes here need the project owner's review):
+#
+# /CLAUDE.md                      @OWNER
+# /.claude/agents/                @OWNER
+# /src/monitor/                   @OWNER
+# /src/shared/protocol.ts         @OWNER
+# /src/webview/index.html.ts      @OWNER
+# /docs/architecture/adr/         @OWNER

@@ -1,0 +1,66 @@
+{
+  "name": "pixel-agents",
+  "displayName": "Pixel Agents",
+  "description": "A pixel-art dungeon crawler in the bottom panel where each active Claude Code agent session is a hero. Observe only: it never controls your agents.",
+  "version": "0.0.1",
+  "publisher": "pixel-agents",
+  "license": "MIT",
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "pixelAgents",
+          "title": "Pixel Agents",
+          "icon": "$(flame)"
+        }
+      ]
+    },
+    "views": {
+      "pixelAgents": [
+        {
+          "type": "webview",
+          "id": "pixelAgents.view",
+          "name": "Pixel Agents"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "package": "vsce package --no-dependencies --allow-missing-repository --no-rewrite-relative-links",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.tools.json",
+    "lint": "eslint . --max-warnings 0 && prettier --check . && markdownlint-cli2",
+    "format": "prettier --write .",
+    "test": "node test/run.mjs",
+    "test:integration": "node test/integration/run.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "20.19.43",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "markdownlint-cli2": "0.23.3",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1"
+  }
+}

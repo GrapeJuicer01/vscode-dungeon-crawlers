@@ -1,0 +1,22 @@
+{
+  // markdownlint-cli2 configuration. See docs/engineering/coding-standards.md section 10.
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules/**",
+    "dist/**",
+    "out/**",
+    // VS Code builds downloaded by @vscode/test-electron for integration tests.
+    ".vscode-test/**",
+    // Agent definitions are human-owned; no agent can fix findings there.
+    ".claude/**",
+  ],
+  "config": {
+    // MD013 (line length): prose is not hard-wrapped; one paragraph per line.
+    "MD013": false,
+    // MD060 (table column style): tables use compact `|---|` delimiter rows, not aligned pipes.
+    "MD060": false,
+    // MD024 (duplicate headings): repeated sub-headings such as "Status" or "Added" are fine
+    // under different parents; only sibling duplicates are flagged.
+    "MD024": { "siblings_only": true },
+  },
+}

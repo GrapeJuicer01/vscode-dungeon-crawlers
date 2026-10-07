@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint (ESLint, Prettier, markdownlint)
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
+
+      # Downloads a VS Code build into .vscode-test/ and runs the extension inside it.
+      # xvfb-run provides the virtual display Electron needs on the headless Linux runner.
+      - name: Integration test (VS Code stable)
+        run: xvfb-run -a npm run test:integration
+
+      # engines.vscode is ^1.90.0, so also run against the oldest supported build.
+      - name: Integration test (VS Code 1.90.0, engines minimum)
+        run: xvfb-run -a npm run test:integration
+        env:
+          PIXEL_AGENTS_VSCODE_VERSION: '1.90.0'
+
+      - name: Check package contents
+        shell: bash
+        run: |
+          node esbuild.mjs --production
+          # vsce ls does not accept --allow-missing-repository; it never prompts for a repository.
+          npx vsce ls --no-dependencies > package-files.txt
+          echo "Files that would be packaged:"
+          cat package-files.txt
+          forbidden='^(src|test|docs|tools|scripts)/|\.(map|ts|png|gif|jpe?g|webp|bmp|ico|svg|wav|mp3|ogg|flac|m4a|aac|ttf|otf|woff2?)$'
+          if grep -E -i "$forbidden" package-files.txt; then
+            echo "::error::The package would include source, test, docs, sourcemap, or asset files (listed above)."
+            exit 1
+          fi
+
+      # vscode:prepublish runs the production build before packaging.
+      # No marketplace publish here: publishing needs explicit human approval.
+      - name: Package
+        run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pixel-agents-vsix
+          path: '*.vsix'
+          if-no-files-found: error

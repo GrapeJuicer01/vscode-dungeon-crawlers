@@ -28,26 +28,33 @@ Only the human may edit this section. No agent adds, removes, or weakens an inva
 | `npm run watch` | rebuild on change |
 | `npm run package` | produce the `.vsix` with `vsce` |
 | `npm run lint` / `format` | ESLint / Prettier |
-| `npm run typecheck` | `tsc --noEmit`, strict |
-| `npm run test` | unit, structural, and bundle tests (`node:test`) |
-| `npm run test:integration` | run the extension in a downloaded VS Code (`@vscode/test-electron`, `--disable-extensions`); headless Linux needs `xvfb-run -a` |
+| `npm run typecheck` | strict `tsc -p` over `tsconfig.json`, `tsconfig.webview.json`, `tsconfig.tools.json` |
+| `npm run test` | unit, structural, and bundle tests (`node:test`); run `build` first |
+| `npm run test:integration` | run the extension in a downloaded VS Code (`@vscode/test-electron`, `--disable-extensions`); run `build` first; headless Linux needs `xvfb-run -a` |
 | `npm run docs:tables` | regenerate enemy and class tables in docs from source data (from H1) |
 | F5 | launch the Extension Development Host (`.vscode/launch.json`); for manual checks use `--disable-extensions` or a clean profile, since an unrelated marketplace extension is also named "Pixel Agents" |
 
 ## Directory map
 
 ```text
-src/extension.ts            activation, view provider; message routing (M2); commands, status bar (M7)
+src/extension.ts            activation, view provider (thin vscode glue); output channel, bridge wiring (M2);
+                            commands, status bar (M7)
+src/host/                   (M2) vscode-free host logic, imports only src/shared/: webviewBridge.ts (M2),
+                            progress store (E1)
 src/monitor/                (M3) AgentMonitor + Transcript/Terminal/Simulator sources
-src/shared/protocol.ts      (M2) typed host <-> webview messages, shared by both bundles
-src/webview/                index.html.ts, main.ts; ui.ts (M7), audio.ts (M8)
+src/shared/                 (M2) both bundles, imports nothing outside src/shared/: protocol.ts (typed
+                            host <-> webview messages, validators, creators), assertNever.ts
+src/webview/                index.html.ts (host-side HTML + CSP builder), main.ts (boot; message pump M2);
+                            hostChannel.ts, hostMessages.ts, hostState.ts (M2); ui.ts (M7), audio.ts (M8)
 src/game/                   (M4) engine: Game, Renderer, Camera, Lighting, Pathfinding, Collision, Particles; Combat (E1)
 src/game/entities/          (M4) Hero, Campfire; 12 classes (H1-H3), Summon (H2), Enemy, Boss (E1)
 src/game/data/              (M4) stages; classes, classMap (H1); enemies, drops (E1); achievements (M7)
 src/game/sprites/           (M4) palettes, spriteTemplates (art), spriteFactory (renderer)
 scripts/                    (H1) generate-doc-tables.ts
-test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); support/ helpers;
-                            integration tests in a downloaded VS Code via @vscode/test-electron
+test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test);
+                            support/ helpers and fakes (fakeVscode, fakeDom)
+test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
+                            --disable-extensions); support/ in-host harness and providerSpy
 tools/                      (optional, none yet) dev-only sprite preview (never shipped)
 docs/                       architecture/ (incl. adr/, plans/) design/ engineering/ + index, glossary; development/ (M9)
 .claude/agents/             architect, developer, tester, reviewer, pixel-artist

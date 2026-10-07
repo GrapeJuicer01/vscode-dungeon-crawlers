@@ -112,8 +112,39 @@ export default defineConfig(
                 '**/webview',
                 '**/webview/**',
                 '**/extension',
+                '**/host',
+                '**/host/**',
               ],
-              message: 'src/shared/ imports nothing outside src/shared/.',
+              message: 'src/shared/ imports nothing outside src/shared/ (not even src/host/).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // src/host/**: vscode-free host logic (M2). Imports only src/shared/; vscode objects arrive as
+  // narrow interfaces from extension.ts. Assumption: Node built-ins are banned too, so it stays
+  // pure and testable; Node APIs belong in src/monitor/ or extension.ts.
+  {
+    files: ['src/host/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [VSCODE_PATH, ...NODE_BUILTIN_PATHS],
+          patterns: [
+            NODE_SCHEME_PATTERN,
+            {
+              group: [
+                '**/monitor',
+                '**/monitor/**',
+                '**/game',
+                '**/game/**',
+                '**/webview',
+                '**/webview/**',
+                '**/extension',
+              ],
+              message: 'src/host/ is vscode-free host logic and imports only src/shared/.',
             },
           ],
         },
@@ -150,9 +181,16 @@ export default defineConfig(
           patterns: [
             NODE_SCHEME_PATTERN,
             {
-              group: ['**/monitor', '**/monitor/**', '**/extension', '**/index.html'],
+              group: [
+                '**/monitor',
+                '**/monitor/**',
+                '**/extension',
+                '**/index.html',
+                '**/host',
+                '**/host/**',
+              ],
               message:
-                'Webview code must not import host code (extension.ts, monitor/, index.html.ts).',
+                'Webview code must not import host code (extension.ts, monitor/, host/, index.html.ts).',
             },
           ],
         },

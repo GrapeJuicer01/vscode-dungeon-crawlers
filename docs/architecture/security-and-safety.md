@@ -56,7 +56,7 @@ The webview runs our own bundle under a strict CSP, so it is not expected to be 
 | T2 | `focusAgent` used for more than reveal | handler calls only `revealAgentTerminal(id)`, only for a live, host-listed id; the bridge has no `vscode` access; reveal is `terminal.show()` | 3 | bridge tests (spy called once or not at all), grep for `sendText`, `sendSequence`, `executeCommand`, `child_process`, `process.kill` in `src/host/**` and `extension.ts` | M2, reveal wiring M3 |
 | T3 | Malformed or hostile webview payload crashes the host or smuggles data | total validators, exact keys, no inherited or symbol keys, length before regex, new object returned, try/catch around dispatch | 3, 4 | validator cases and seeded fuzz | M2 |
 | T4 | Transcript text leaks to the webview | `AgentInfo` has exactly five keys; creators copy only those; host validators reject extra keys; `id` and `toolName` patterns forbid spaces so free text cannot hide in them | 7 | allow-list tests, round-trip tests | M2 |
-| T5 | Transcript text leaks to logs | logs carry fixed reason strings and `error.name: message` from our own code only; never payloads, `event.data`, or transcript lines | 7 | log-content assertions in bridge tests; monitor privacy test | M2, M3 |
+| T5 | Transcript text leaks to logs | logs carry fixed reason strings and `error.name: message` from our own code only; never payloads, `event.data`, or transcript lines. Monitor-originated errors (transcript reading and parsing, including anything surfacing through `getAgents`) log only `error.name` or a fixed reason, never `message`, because messages can quote input (V8 `JSON.parse` `SyntaxError`) | 7 | log-content assertions in bridge tests; monitor privacy test feeds a malformed transcript line with a marker and asserts no log line contains it | M2, M3 |
 | T6 | Monitor writes to or signals a process or file | monitor uses only read APIs and watchers | 3 | grep test over `src/monitor/**` | M3 |
 | T7 | `transcriptPath` setting escapes its directory or follows symlinks | path containment and `realpath` check | 3, 7 | monitor tests | M3 |
 | T8 | Script injection into the webview | CSP `default-src 'none'; script-src 'nonce-<N>'; style-src 'nonce-<N>'; base-uri 'none'; form-action 'none'`; per-load random nonce; escaped script URI; no inline handlers | 4 | CSP builder tests | M1 |
@@ -83,12 +83,13 @@ The webview runs our own bundle under a strict CSP, so it is not expected to be 
 ## 5. Read-only and reveal-only guarantees
 
 - The only host API that touches a terminal is `Terminal.show()` (M3), reached only through `focusAgent` for a live agent.
-- No code under `src/monitor/**`, `src/host/**`, or the `focusAgent` path in `extension.ts` uses `sendText`, `sendSequence`, `executeCommand` with terminal commands, `child_process`, `process.kill`, `fs.write*`, `fs.append*`, `fs.unlink`, or `dispose()` on a terminal. Watcher disposal is the only allowed `dispose()`.
+- No code under `src/monitor/**`, `src/host/**`, or the `focusAgent` path in `extension.ts` uses `sendText`, `sendSequence`, `executeCommand` with terminal commands, `child_process`, `process.kill`, `fs.write*`, `fs.append*`, `fs.unlink`, or `dispose()` on a terminal. The only allowed `dispose()` calls are on disposables the extension itself created: its own event-listener subscriptions (for example the view's `onDidReceiveMessage`, `onDidChangeVisibility`, and `onDidDispose` listeners in `extension.ts`), its own registrations and output channel, and (from M3) its own file watchers and timers. Disposing, closing, or hiding a terminal, or anything else owned by an agent session, is never allowed.
 - `WebviewBridge` holds no `vscode` reference. Its single outward capability is the `revealAgentTerminal` callback, which `extension.ts` supplies; in M2 it is `null`.
+- No test-only control surface ships: no test command, exported test API, or environment switch. Tests observe the extension through public events (the integration provider spy subscribes to `onDidReceiveMessage`) and through fakes, never through a production hook that could become a control path.
 
 ## 6. Crash isolation
 
-- Host handlers never throw across `onDidReceiveMessage`.
+- Host handlers never throw across `onDidReceiveMessage`. The bridge's error logging and its `postMessage` rejection handler each wrap the logger call in their own try/catch, so even a throwing logger cannot escape as an exception or an unhandled rejection.
 - The webview catches errors in its message handler (M2) and its update loop (M4); errors are reported once per distinct message and never change hero state.
 - The webview is never a source of truth: `retainContextWhenHidden: false`, no `getState`/`setState`, and every load rebuilds from the host snapshot.
 
@@ -96,6 +97,7 @@ The webview runs our own bundle under a strict CSP, so it is not expected to be 
 
 - Does a new message cross B2 or B3? Follow [host-webview protocol section 10](host-webview-protocol.md#10-adding-or-changing-a-message).
 - Does any new field carry text that could come from a transcript? It must be one of the five allow-listed fields.
-- Does any new host code call a terminal, process, or file-write API? Reject unless it is watcher disposal or `Terminal.show()`.
+- Does any new host code call a terminal, process, or file-write API? Reject unless it is `Terminal.show()` or disposal of a disposable the extension itself created (listener, registration, output channel, watcher, timer); never a terminal or anything an agent session owns.
 - Does any new log line include a payload, path, or transcript text? Reject.
-- Does any new webview code render host text with `innerHTML`? Reject.
+- Does any new webview code render host text with `innerHTML`, `outerHTML`, `insertAdjacentHTML`, or `document.write`? Reject.
+- Does any new production code exist only to make a test easier (a command, export, or env flag)? Reject; observe through public events or fakes instead.

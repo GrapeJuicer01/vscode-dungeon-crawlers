@@ -9,15 +9,15 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 
 | Doc | Owner | Covers |
 |---|---|---|
-| [glossary](glossary.md) | architect | terms used across the docs (hero, agent session, host, webview, stage, gate, ...) |
+| [glossary](glossary.md) | architect | terms used across the docs (hero, agent session, host, webview, stage, gate, ...), including the protocol terms (bridge, mirror, snapshot, `ready`, allow-list creator) |
 
 ## Architecture (architect)
 
 | Doc | Covers |
 |---|---|
-| [overview](architecture/overview.md) | system context, containers, data flow, safety and security boundaries |
-| [host-webview protocol](architecture/host-webview-protocol.md) | message types, handshake, sequence diagrams (M2) |
-| [security and safety](architecture/security-and-safety.md) | threat model, CSP, validation, read-only guarantees (M2) |
+| [overview](architecture/overview.md) | system context, containers (incl. `src/host/` and the webview protocol modules), data flow, safety and security boundaries, current state |
+| [host-webview protocol](architecture/host-webview-protocol.md) | [M2] message catalog, field and validation rules, `WebviewBridge` states, `ready` handshake, a sequence diagram per flow, how to add a message |
+| [security and safety](architecture/security-and-safety.md) | [M2] threat model, trust boundaries B1-B4, CSP, validation, data inventory, read-only and reveal-only guarantees |
 | [agent detection](architecture/agent-detection.md) | planned [M3]: monitor sources and state machine |
 | [game engine](architecture/game-engine.md) | planned [M4]: loop, renderer, entities, crash isolation |
 | [data model](architecture/data-model.md) | planned [M4]: data tables, persisted progress, migrations |
@@ -27,7 +27,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | Plan | Milestone |
 |---|---|
 | [m1-scaffold](architecture/plans/m1-scaffold.md) | M1 Scaffold |
-| [m2-protocol](architecture/plans/m2-protocol.md) | M2 Protocol |
+| [m2-protocol](architecture/plans/m2-protocol.md) | M2 Protocol (refreshed against M1 as built; includes integration test notes) |
 
 ### ADRs
 
@@ -36,7 +36,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [0001](architecture/adr/0001-bottom-panel-webview.md) | bottom-panel webview view |
 | [0002](architecture/adr/0002-no-hero-health.md) | heroes have no health; state follows agent events only |
 | [0003](architecture/adr/0003-procedural-sprites.md) | procedural palette-indexed sprites, synthesized audio |
-| [0004](architecture/adr/0004-esbuild-two-bundles.md) | esbuild, two bundles (host CJS, webview IIFE) |
+| [0004](architecture/adr/0004-esbuild-two-bundles.md) | esbuild, two bundles (host CJS, webview IIFE); implementation notes for M1 and M2 (`src/host/`) |
 | 0005 | reserved: transcript watching (M3) |
 | [0006](architecture/adr/0006-node-test-runner.md) | `node:test` compiled by esbuild, no runner package; amended: integration tests via `@vscode/test-electron` |
 | [0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md) | allow-list protocol with exact-key validation and a pull handshake |
@@ -47,8 +47,8 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 |---|---|---|
 | [roadmap](engineering/roadmap.md) | architect | milestones, batches, gates, status |
 | [team workflow](engineering/team-workflow.md) | architect | agent loop, handoffs, ownership, autofix rule, escalation |
-| [coding standards](engineering/coding-standards.md) | architect | TypeScript, boundaries, errors, logging, lint, dependencies |
-| [testing strategy](engineering/testing-strategy.md) | tester | runner, suites, manual QA, benchmarks |
+| [coding standards](engineering/coding-standards.md) | architect | TypeScript, boundaries (incl. `src/host/`), errors and try/catch, logging channel, untrusted text, lint, dependencies |
+| [testing strategy](engineering/testing-strategy.md) | tester | unit runner, extension-host integration runner, suites, manual QA, benchmarks |
 
 ## Design
 

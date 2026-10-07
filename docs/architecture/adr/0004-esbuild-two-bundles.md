@@ -1,7 +1,7 @@
 # ADR 0004: Build with esbuild into two bundles (host CJS, webview IIFE)
 
 Purpose: records the build tool, the two-bundle split, and the import rules that keep the extension host and the webview from depending on each other.
-Related: [architecture overview](../overview.md), [coding standards](../../engineering/coding-standards.md#3-bundle-boundaries), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [ADR 0003 procedural sprites](0003-procedural-sprites.md), [host-webview protocol](../host-webview-protocol.md), [M1 plan](../plans/m1-scaffold.md).
+Related: [architecture overview](../overview.md), [coding standards](../../engineering/coding-standards.md#3-bundle-boundaries), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [ADR 0003 procedural sprites](0003-procedural-sprites.md), [host-webview protocol](../host-webview-protocol.md), [ADR 0007 allow-list protocol](0007-allow-list-protocol-pull-handshake.md), [M1 plan](../plans/m1-scaffold.md), [M2 plan](../plans/m2-protocol.md).
 
 ## Status
 
@@ -55,3 +55,13 @@ These notes make the decision concrete; they do not change it. Details are in th
 - The test runner is `node:test` with esbuild-compiled tests ([ADR 0006](0006-node-test-runner.md)).
 - `npm run package` is `vsce package --no-dependencies --allow-missing-repository --no-rewrite-relative-links` until a `repository` field exists; without one, `vsce` rejects the README's relative links. Both flags are removed once a repository URL exists.
 - CI's package-contents check runs `npx vsce ls --no-dependencies`; `vsce ls` in vsce 4.0.0 does not accept `--allow-missing-repository` and does not prompt for a repository.
+
+## Implementation notes (M2)
+
+These notes apply the decision to the M2 folders; they do not change it. Details are in the [M2 plan](../plans/m2-protocol.md).
+
+- **New host folder `src/host/`.** Vscode-free host logic (first file: `webviewBridge.ts`). It is host code in the sense of this ADR: bundled into `dist/extension.js` through `src/extension.ts`, added to `tsconfig.json` `include`, and never included by `tsconfig.webview.json`. It is stricter than other host code: it imports only `src/shared/**` (no `vscode`, no Node built-ins), so it typechecks and unit tests without a `vscode` stub ([ADR 0007](0007-allow-list-protocol-pull-handshake.md) consequences). ESLint gets a `src/host/**` boundary block, and `src/host/**` joins the ban lists of the `src/shared/**` block and the webview-and-game block.
+- **`src/shared/` gains its first files**: `protocol.ts` and `assertNever.ts`. Both bundles import them, and each bundle gets its own copy at build time; that duplication is small and expected.
+- **New webview modules** `hostChannel.ts`, `hostMessages.ts`, `hostState.ts` are webview-bundle files under the existing `src/webview/**` rule. They stay DOM-free so tests can import them; only `main.ts` touches the DOM and `acquireVsCodeApi`.
+- **Bundle checks.** `dist/webview.js` must not contain host-only code (`WebviewBridge`, `onDidReceiveMessage`), and `dist/extension.js` must not contain `acquireVsCodeApi`; the tester's bundle suite asserts this on the development build, where names are not minified.
+- **Unchanged**: entry points, formats, targets, externals, the CSP, and the sourcemap modes (external for the host, inline for the webview in development, none in production). The webview is still one IIFE loaded by one nonce-bearing script tag.

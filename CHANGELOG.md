@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Typed host/webview protocol with validated messages, `ready` handshake, reveal-only `focusAgent`. Exact-key validators in both directions, host-side creators that copy only the five allow-listed agent fields, and a "Pixel Agents" log output channel for dropped messages and bridge errors (no payloads are logged).
 - Extension scaffold: a "Pixel Agents" bottom-panel view container with one webview view (`pixelAgents.view`), activated only when the view is opened.
 - Webview HTML builder with a strict Content-Security-Policy (`default-src 'none'`, a per-load script and style nonce, `base-uri 'none'`, `form-action 'none'`); webview resources limited to `dist/`, command URIs and forms disabled.
 - Blank 320x180 canvas that stays integer-scaled and crisp across panel resizes and zoom levels, with crash-safe boot.

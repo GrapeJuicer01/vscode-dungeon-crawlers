@@ -1,7 +1,7 @@
 # Coding standards
 
 Purpose: the rules every line of Pixel Agents code follows: TypeScript settings, bundle boundaries, error handling, logging, performance, data tables, config, formatting, and commits. The linters enforce what they can; the reviewer checks the rest.
-Related: [CLAUDE.md](../../CLAUDE.md), [team workflow](team-workflow.md), [roadmap](roadmap.md), [testing strategy](testing-strategy.md), [architecture overview](../architecture/overview.md), [ADR 0004 esbuild two bundles](../architecture/adr/0004-esbuild-two-bundles.md), [ADR 0006 test runner](../architecture/adr/0006-node-test-runner.md), [M1 plan](../architecture/plans/m1-scaffold.md), [sprite spec](../design/sprite-spec.md).
+Related: [CLAUDE.md](../../CLAUDE.md), [team workflow](team-workflow.md), [roadmap](roadmap.md), [testing strategy](testing-strategy.md), [architecture overview](../architecture/overview.md), [host-webview protocol](../architecture/host-webview-protocol.md), [security and safety](../architecture/security-and-safety.md), [ADR 0004 esbuild two bundles](../architecture/adr/0004-esbuild-two-bundles.md), [ADR 0006 test runner](../architecture/adr/0006-node-test-runner.md), [ADR 0007 allow-list protocol](../architecture/adr/0007-allow-list-protocol-pull-handshake.md), [M1 plan](../architecture/plans/m1-scaffold.md), [M2 plan](../architecture/plans/m2-protocol.md), [sprite spec](../design/sprite-spec.md).
 
 ## 1. Precedence
 
@@ -16,10 +16,13 @@ The Core invariants in `CLAUDE.md` win over everything here. If a rule below wou
 - Discriminated unions for messages, states, and events. Every `switch` over a union ends with an exhaustiveness check:
 
   ```ts
-  function assertNever(x: never): never; // lives in src/shared/ from M2
+  // src/shared/assertNever.ts (from M2); the only definition, imported by both bundles
+  export function assertNever(value: never): never;
   ```
 
+  Import it from `src/shared/assertNever.ts`; never redefine it locally. It throws a `TypeError` whose message never includes the value (the value may be untrusted input). A `switch` over a raw, not-yet-validated string (for example inside a protocol parser) is the one exception: its `default` returns "invalid" instead, and exhaustiveness is proven by the protocol's compile-time proof types.
 - `readonly` on data-table rows and protocol message fields. Data tables are `as const satisfies` their row type.
+- **No optional properties in the protocol.** Messages, `AgentInfo`, and `ConfigSnapshot` in `src/shared/protocol.ts` have no `?:` properties; "absent" is `null` (for example `toolName: null`). This keeps exact-key validation and `exactOptionalPropertyTypes` simple ([host-webview protocol section 2](../architecture/host-webview-protocol.md#2-shared-types)).
 - Prefer `const` and pure functions. Classes are fine for entities and stateful engine parts.
 - No placeholders: no `TODO: implement`, `TBD`, `throw new Error('not implemented')`, or elided code.
 
@@ -29,12 +32,17 @@ Two bundles, three typecheck projects ([ADR 0004](../architecture/adr/0004-esbui
 
 | Area | Bundle | May import | Must not import |
 |---|---|---|---|
-| `src/shared/**` | both | nothing outside `src/shared/` | `vscode`, Node built-ins, any other `src/` folder |
-| `src/extension.ts`, `src/monitor/**` | host | `vscode`, `node:*`, `src/shared/**`, `src/webview/index.html.ts` | `src/game/**`, webview runtime files |
+| `src/shared/**` | both | nothing outside `src/shared/` | `vscode`, Node built-ins, any other `src/` folder (including `src/host/**`) |
+| `src/extension.ts`, `src/monitor/**` | host | `vscode`, `node:*`, `src/shared/**`, `src/host/**`, `src/webview/index.html.ts` | `src/game/**`, webview runtime files |
+| `src/host/**` (from M2) | host | `src/shared/**` only; `vscode` objects arrive as narrow interfaces (for example `WebviewPort`, `BridgeLogger`) passed in by `extension.ts` | `vscode`, Node built-ins, `src/monitor/**`, `src/game/**`, `src/webview/**`, `src/extension.ts` |
 | `src/webview/index.html.ts` | host | nothing (pure string builder) | `vscode`, `node:*`, DOM APIs |
-| `src/webview/**` (other files), `src/game/**` | webview | `src/shared/**`, each other | `vscode`, `node:*`, `src/monitor/**`, `src/extension.ts` |
+| `src/webview/**` (other files), `src/game/**` | webview | `src/shared/**`, each other | `vscode`, `node:*`, `src/monitor/**`, `src/host/**`, `src/extension.ts` |
+
+`src/host/` exists so host logic can be unit tested under `node:test` without a `vscode` stub ([ADR 0007](../architecture/adr/0007-allow-list-protocol-pull-handshake.md) consequences). `extension.ts` stays thin glue: it adapts `vscode` objects to the `src/host/` interfaces and wires events; decisions live in `src/host/`. Inside the webview bundle, modules that tests import (for example `hostChannel.ts`, `hostMessages.ts`, `hostState.ts`) stay DOM-free; only `main.ts` touches `window`, `document`, and `acquireVsCodeApi`.
 
 ESLint `no-restricted-imports` encodes this table. Typed linting lists `tsconfig.json`, `tsconfig.webview.json`, and `tsconfig.tools.json` explicitly in `parserOptions.project` (not `projectService`, which would map every file to the host project). The tsconfig `lib` and `types` settings back it up: the webview project has no Node or `vscode` types; the host project has no DOM.
+
+**Untrusted text in the webview.** Agent names and tool names come from the host but originate in user-controlled session data. Webview code renders any host-provided string only as canvas text (`fillText`) or through `textContent`; `innerHTML`, `outerHTML`, `insertAdjacentHTML`, and `document.write` are not used anywhere in `src/webview/**` or `src/game/**` ([security and safety T9](../architecture/security-and-safety.md#3-threats-and-controls); structural check from M7).
 
 ## 4. Naming and files
 
@@ -47,19 +55,22 @@ ESLint `no-restricted-imports` encodes this table. Typed linting lists `tsconfig
 ## 5. Errors and crash isolation
 
 - The webview update and render loop runs inside try/catch (from M4). A caught error is logged once per distinct message per session and the next frame proceeds. Errors never change hero state (Core invariants 2 and 4).
-- Host message handlers validate input first and return early on anything invalid. They never throw across the `onDidReceiveMessage` boundary.
-- Every `Promise` is awaited or explicitly marked with `void` and a `.catch`. Lint enforces `no-floating-promises` and `no-misused-promises`.
+- Host message handlers validate input first and return early on anything invalid. They never throw across the `onDidReceiveMessage` boundary: the whole dispatch (`WebviewBridge.handleMessage`, and every other entry point the host exposes to events, such as `postAgentState`) runs inside one `try/catch` that logs `error.name: error.message` and does not rethrow. Validators are total and never throw on their own; the `try/catch` covers dependencies and `assertNever`. The logging call inside a catch block, and inside a promise rejection handler, is itself wrapped in `try/catch` and a throwing logger is swallowed, so nothing escapes (as in `WebviewBridge`).
+- The webview's `message` listener body runs inside `try/catch` (from M2), like boot and the resize handler (M1). Every webview catch block reports through the single crash reporter in `main.ts` (`reportError`), which prints at most once per distinct message per page load and never prints `event.data` or a thrown non-Error value. Error detection is cross-realm (`instanceof Error`, or the built-in tag `[object Error]` with a string `message`); anything else prints the fixed `non-error thrown`.
+- Listeners before triggers: register `onDidReceiveMessage` before assigning `webview.html` (host) and the `message` listener before sending `ready` (webview), so no message can be missed.
+- Every `Promise` is awaited or explicitly marked with `void` and a `.catch` (for a `PromiseLike`/`Thenable`, which has no `.catch`, use `.then(undefined, onRejected)`; the handler must not throw). Lint enforces `no-floating-promises` and `no-misused-promises`.
 - Catch variables are `unknown`; narrow before use.
 
 ## 6. Logging and privacy
 
-- Host logs go to one `LogOutputChannel` named "Pixel Agents" (introduced when first needed). No `console.log` in host code. In the webview, `console.error` is allowed only in the crash handler.
+- Host logs go to one `LogOutputChannel` named "Pixel Agents", created once in `activate` with `vscode.window.createOutputChannel('Pixel Agents', { log: true })` (from M2) and pushed to `context.subscriptions`. Modules in `src/host/` and `src/monitor/` receive it as a narrow logger interface (for example `BridgeLogger` with `trace` and `error`), never the `vscode` object. Levels: `trace` for expected drops (invalid message, unknown agent, view gone), `error` for caught exceptions from our own code; no `info` noise on the normal path. Log messages are fixed reason strings plus, for errors, `error.name: error.message`; never a message payload. No `console.log` in host code. In the webview, `console.error` is allowed only in the crash handler.
 - Never log, store, or post transcript content. Allowed in logs: session id, name, state, tool name, timestamp, file counts, error class and message from our own code (Core invariant 7).
 - Never log absolute user paths beyond the configured transcript directory name.
 
 ## 7. Lifecycle and disposal
 
 - Everything with a `dispose()` (watchers, listeners, timers wrapped as disposables, the view provider registration) is pushed to `context.subscriptions` or to a parent's disposable list.
+- Only disposables the extension itself created are ever disposed (listeners, registrations, the output channel, watchers, timers; for example the provider's per-view listener list). Never dispose, close, or hide a terminal or anything owned by an agent session (Core invariant 3, [security and safety section 5](../architecture/security-and-safety.md#5-read-only-and-reveal-only-guarantees)).
 - `deactivate()` leaves no timer, watcher, or listener running.
 - The webview cancels its animation frame and listeners on `pagehide`.
 

@@ -1,13 +1,15 @@
 // Extension-host checks for the M1 F5 checklist (testing-strategy.md section 7): the clean
 // environment, the panel view contribution, lazy activation, the served HTML and CSP, and
 // hide/show cycles. Tests run in order; the activation tests rely on running first.
+// From M2, every show also waits for the new document's `ready` (the host-observable proof that
+// main.ts ran), so each cycle is a complete load; protocol.itest.ts checks the message details.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import * as vscode from 'vscode';
 import { buildCsp } from '../../../src/webview/index.html';
 import { delay, describe, it, waitFor } from '../support/harness';
-import { observed, type Resolution } from '../support/providerSpy';
+import { observed, readyCount, type Resolution } from '../support/providerSpy';
 
 const EXTENSION_ID = 'pixel-agents.pixel-agents';
 /** The unrelated marketplace extension with the same display name (M1 plan section 9). */
@@ -45,9 +47,16 @@ async function closePanel(resolution: Resolution): Promise<void> {
   await waitFor(() => !resolution.view.visible, 'view hidden after closing the panel');
 }
 
+/** Shows the view and waits until it is visible and its new document has sent `ready`. */
 async function focusView(): Promise<void> {
+  const before = observed.resolutions.at(-1);
+  const readiesBefore = before === undefined ? 0 : readyCount(before);
   await vscode.commands.executeCommand(FOCUS_COMMAND);
   await waitFor(() => latestResolution().view.visible, 'view visible after focus');
+  await waitFor(() => {
+    const latest = latestResolution();
+    return latest === before ? readyCount(latest) > readiesBefore : readyCount(latest) > 0;
+  }, 'a new ready after the view was shown (main.ts ran in the reloaded document)');
 }
 
 let commandsBeforeActivation: string[] = [];
@@ -99,6 +108,7 @@ describe('lazy activation', () => {
     await ours().activate();
     await waitFor(() => observed.resolutions.length > 0, 'resolveWebviewView called');
     await waitFor(() => latestResolution().html.length > 0, 'HTML set by the provider');
+    await waitFor(() => readyCount(latestResolution()) > 0, 'ready from the first document load');
     assert.equal(latestResolution().view.visible, true);
     assert.equal(latestResolution().view.viewType, VIEW_ID);
   });

@@ -1,27 +1,98 @@
 // Unit tests for src/extension.ts against the fake vscode module (test/support/fakeVscode.ts).
-// M1 plan section 3.1: register one webview view provider, lock down webview options, and set
-// HTML with a fresh nonce. No message channel, commands, or status bar in M1.
+// M1 plan section 3.1: one webview view provider, locked-down webview options, HTML with a fresh
+// nonce. M2 plan section 3.4 and test note 10: a "Pixel Agents" LogOutputChannel, three
+// subscriptions, and the view wired to the WebviewBridge (listener before html, ready answered
+// with config then agentList, hide and dispose handled, old view listeners dropped on re-resolve).
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import type * as vscode from 'vscode';
+import * as extension from '../../src/extension';
 import { activate, deactivate, PixelAgentsViewProvider, VIEW_TYPE } from '../../src/extension';
-import { FakeWebview, recorded, resetFakeVscode, Uri } from '../support/fakeVscode';
-import { readJson, asRecord } from '../support/repo';
+import { WebviewBridge } from '../../src/host/webviewBridge';
+import { parseHostMessage, PROTOCOL_VERSION } from '../../src/shared/protocol';
+import type { AgentInfo } from '../../src/shared/protocol';
+import {
+  FakeLogOutputChannel,
+  FakeWebview,
+  FakeWebviewView,
+  recorded,
+  resetFakeVscode,
+  Uri,
+} from '../support/fakeVscode';
+import { asRecord, readJson } from '../support/repo';
 
 const EXTENSION_URI = Uri.file('/ext');
 const NONCE_PATTERN = /^[A-Za-z0-9+/]{22,}={0,2}$/;
+const READY = { type: 'ready' } as const;
+const EXPECTED_ANSWER = [
+  { type: 'config', config: { protocolVersion: PROTOCOL_VERSION } },
+  { type: 'agentList', agents: [] },
+];
 
-function fakeContext(): { subscriptions: { dispose(): void }[] } {
-  return { subscriptions: [] };
+const SIM_AGENT: AgentInfo = {
+  id: 'sim-1',
+  name: 'Sim one',
+  state: 'working',
+  toolName: 'Bash',
+  timestamp: 1_700_000_000_000,
+};
+
+interface FakeContext {
+  readonly extensionUri: Uri;
+  subscriptions: { dispose(): void }[];
 }
 
-function resolveInto(webview: FakeWebview): void {
-  const provider = new PixelAgentsViewProvider(EXTENSION_URI as unknown as vscode.Uri);
+function fakeContext(): FakeContext {
+  return { extensionUri: EXTENSION_URI, subscriptions: [] };
+}
+
+function resolve(provider: PixelAgentsViewProvider, view: FakeWebviewView): void {
   provider.resolveWebviewView(
-    { webview } as unknown as vscode.WebviewView,
+    view as unknown as vscode.WebviewView,
     {} as vscode.WebviewViewResolveContext,
     {} as vscode.CancellationToken,
   );
+}
+
+/** A provider with its own bridge and a recording logger, for wiring tests. */
+function standaloneProvider(agents: readonly AgentInfo[] = []): {
+  provider: PixelAgentsViewProvider;
+  bridge: WebviewBridge;
+  log: FakeLogOutputChannel;
+} {
+  const log = new FakeLogOutputChannel('test');
+  const bridge = new WebviewBridge({
+    getAgents: () => agents,
+    getConfig: () => ({ protocolVersion: PROTOCOL_VERSION }),
+    revealAgentTerminal: null,
+    logger: log,
+  });
+  const provider = new PixelAgentsViewProvider(EXTENSION_URI as unknown as vscode.Uri, bridge);
+  return { provider, bridge, log };
+}
+
+function resolveInto(webview: FakeWebview): void {
+  resolve(standaloneProvider().provider, new FakeWebviewView(webview));
+}
+
+/** Activates with a fake context and returns the registered provider and the output channel. */
+function activated(): {
+  context: FakeContext;
+  provider: PixelAgentsViewProvider;
+  log: FakeLogOutputChannel;
+} {
+  const context = fakeContext();
+  activate(context as unknown as vscode.ExtensionContext);
+  const provider = recorded.registrations[0]?.provider;
+  assert.ok(provider instanceof PixelAgentsViewProvider, 'activate registers the provider');
+  const log = recorded.outputChannels[0]?.channel;
+  assert.ok(log !== undefined, 'activate creates the output channel');
+  return { context, provider, log };
+}
+
+/** Structured clone, as the real webview.postMessage applies, so deep equality is realm-free. */
+function posted(webview: FakeWebview): unknown[] {
+  return webview.postedMessages.map((message) => structuredClone(message));
 }
 
 function nonceOf(doc: string): string {
@@ -34,9 +105,7 @@ void describe('activate', () => {
   beforeEach(resetFakeVscode);
 
   void it('registers exactly one provider for the contributed view id', () => {
-    const context = fakeContext();
-    activate(context as unknown as vscode.ExtensionContext);
-
+    activated();
     assert.equal(recorded.registrations.length, 1);
     const registration = recorded.registrations[0];
     assert.equal(registration?.viewType, VIEW_TYPE);
@@ -49,22 +118,48 @@ void describe('activate', () => {
   });
 
   void it('does not retain the webview context when hidden', () => {
-    activate(fakeContext() as unknown as vscode.ExtensionContext);
+    activated();
     assert.deepEqual(recorded.registrations[0]?.options, {
       webviewOptions: { retainContextWhenHidden: false },
     });
   });
 
-  void it('hands the registration to context.subscriptions', () => {
-    const context = fakeContext();
-    activate(context as unknown as vscode.ExtensionContext);
-    assert.equal(context.subscriptions.length, 1);
-    assert.equal(context.subscriptions[0], recorded.registrations[0]?.disposable);
+  void it('creates exactly one "Pixel Agents" log output channel', () => {
+    activated();
+    assert.equal(recorded.outputChannels.length, 1);
+    assert.equal(recorded.outputChannels[0]?.name, 'Pixel Agents');
+    assert.deepEqual(recorded.outputChannels[0]?.options, { log: true });
   });
 
-  void it('touches no window API other than registerWebviewViewProvider (no status bar, terminals)', () => {
-    activate(fakeContext() as unknown as vscode.ExtensionContext);
-    assert.deepEqual([...new Set(recorded.windowAccesses)], ['registerWebviewViewProvider']);
+  void it('hands exactly three disposables to context.subscriptions: channel, provider, registration', () => {
+    const { context, provider, log } = activated();
+    assert.equal(context.subscriptions.length, 3);
+    const expected = [log, provider, recorded.registrations[0]?.disposable];
+    for (const disposable of expected) {
+      assert.ok(context.subscriptions.includes(disposable as { dispose(): void }));
+    }
+  });
+
+  void it('touches no window API other than createOutputChannel and registerWebviewViewProvider (no status bar, terminals)', () => {
+    activated();
+    assert.deepEqual(
+      [...new Set(recorded.windowAccesses)].sort(),
+      ['createOutputChannel', 'registerWebviewViewProvider'].sort(),
+    );
+  });
+
+  void it('logs nothing on activation', () => {
+    const { log } = activated();
+    assert.deepEqual(log.calls, []);
+  });
+
+  void it('returns nothing (no exported test API) and exports only the planned names', () => {
+    const result: unknown = activate(fakeContext() as unknown as vscode.ExtensionContext);
+    assert.equal(result, undefined);
+    assert.deepEqual(
+      Object.keys(extension).sort(),
+      ['PixelAgentsViewProvider', 'VIEW_TYPE', 'activate', 'deactivate'].sort(),
+    );
   });
 
   void it('deactivate does not throw', () => {
@@ -72,7 +167,7 @@ void describe('activate', () => {
   });
 });
 
-void describe('PixelAgentsViewProvider.resolveWebviewView', () => {
+void describe('PixelAgentsViewProvider.resolveWebviewView: options and HTML (M1)', () => {
   beforeEach(resetFakeVscode);
 
   void it('locks webview options to scripts only, rooted at dist/', () => {
@@ -114,11 +209,175 @@ void describe('PixelAgentsViewProvider.resolveWebviewView', () => {
     }
     assert.equal(nonces.size, 20);
   });
+});
 
-  void it('opens no message channel in M1 (no listener, no posted message)', () => {
+void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)', () => {
+  beforeEach(resetFakeVscode);
+
+  void it('registers exactly one message listener, before html is assigned (the first ready cannot be missed)', () => {
     const webview = new FakeWebview();
     resolveInto(webview);
-    assert.equal(webview.messageListeners.length, 0);
-    assert.equal(webview.postedMessages.length, 0);
+    assert.equal(webview.messages.listenerCount, 1);
+    assert.deepEqual(webview.messageListenersAtHtml, [1], 'html assigned once, after the listener');
+  });
+
+  void it('subscribes once each to visibility and dispose on the view', () => {
+    const view = new FakeWebviewView();
+    resolve(standaloneProvider().provider, view);
+    assert.equal(view.visibilityEvents.listenerCount, 1);
+    assert.equal(view.disposeEvents.listenerCount, 1);
+  });
+
+  void it('posts nothing until a message arrives', () => {
+    const view = new FakeWebviewView();
+    resolve(activated().provider, view);
+    assert.deepEqual(view.webview.postedMessages, []);
+  });
+
+  void it('answers ready with exactly config then an empty agentList (M2 deps from activate)', () => {
+    const view = new FakeWebviewView();
+    const { provider, log } = activated();
+    resolve(provider, view);
+    view.webview.deliver(READY);
+    assert.deepEqual(posted(view.webview), EXPECTED_ANSWER);
+    for (const message of view.webview.postedMessages) {
+      assert.notEqual(parseHostMessage(message), undefined, 'every post passes parseHostMessage');
+    }
+    assert.deepEqual(log.messages('error'), []);
+    assert.deepEqual(log.messages('trace'), [], 'a valid ready is not reported as dropped');
+  });
+
+  void it('answers every ready (idempotent, covers Reload Webviews)', () => {
+    const view = new FakeWebviewView();
+    resolve(activated().provider, view);
+    view.webview.deliver(READY);
+    view.webview.deliver(READY);
+    assert.deepEqual(posted(view.webview), [...EXPECTED_ANSWER, ...EXPECTED_ANSWER]);
+  });
+
+  void it('drops controlling or garbage messages without posting or throwing, and traces them to the channel', () => {
+    const view = new FakeWebviewView();
+    const { provider, log } = activated();
+    resolve(provider, view);
+    const garbage: unknown[] = [
+      { type: 'stopAgent', agentId: 'sim-1' },
+      { type: 'sendText', text: 'rm -rf SECRET-PAYLOAD' },
+      { type: 'ready', extra: 'SECRET-PAYLOAD' },
+      null,
+      undefined,
+      'ready',
+      42,
+      [],
+    ];
+    for (const message of garbage) {
+      assert.doesNotThrow(() => view.webview.deliver(message));
+    }
+    assert.deepEqual(view.webview.postedMessages, []);
+    assert.equal(log.messages('trace').length, garbage.length, 'one trace per dropped message');
+    assert.ok(log.calls.every((call) => !call.message.includes('SECRET-PAYLOAD')));
+  });
+
+  void it('drops focusAgent in M2 (no reveal capability): nothing posted, nothing thrown', () => {
+    const view = new FakeWebviewView();
+    const { provider, log } = activated();
+    resolve(provider, view);
+    view.webview.deliver(READY);
+    const before = view.webview.postedMessages.length;
+    assert.doesNotThrow(() => view.webview.deliver({ type: 'focusAgent', agentId: 'sim-1' }));
+    assert.equal(view.webview.postedMessages.length, before);
+    assert.deepEqual(log.messages('trace'), ['dropped focusAgent: reveal unavailable']);
+  });
+
+  void it('a hidden view drops pushes until the next ready, which re-posts the snapshot', () => {
+    const view = new FakeWebviewView();
+    const { provider, bridge } = standaloneProvider();
+    resolve(provider, view);
+    view.webview.deliver(READY);
+    assert.equal(bridge.state, 'ready');
+    view.setVisible(false);
+    assert.equal(bridge.state, 'loading');
+    bridge.postAgentState(SIM_AGENT);
+    assert.equal(view.webview.postedMessages.length, 2, 'no agentState while hidden');
+    view.setVisible(true);
+    assert.equal(bridge.state, 'loading', 'showing alone does not mark ready; the new ready does');
+    view.webview.deliver(READY);
+    assert.equal(bridge.state, 'ready');
+    assert.deepEqual(posted(view.webview), [...EXPECTED_ANSWER, ...EXPECTED_ANSWER]);
+  });
+
+  void it('after the view is disposed, a ready posts nothing and every listener is gone', () => {
+    const view = new FakeWebviewView();
+    const { provider, bridge } = standaloneProvider();
+    resolve(provider, view);
+    view.fireDispose();
+    assert.equal(bridge.state, 'detached');
+    assert.equal(view.liveListenerCount, 0);
+    assert.doesNotThrow(() => view.webview.deliver(READY));
+    assert.deepEqual(view.webview.postedMessages, []);
+  });
+
+  void it('resolving a second view disposes the first view’s three listeners', () => {
+    const first = new FakeWebviewView();
+    const second = new FakeWebviewView();
+    const { provider } = standaloneProvider();
+    resolve(provider, first);
+    assert.equal(first.liveListenerCount, 3);
+    resolve(provider, second);
+    assert.equal(first.liveListenerCount, 0);
+    assert.equal(second.liveListenerCount, 3);
+  });
+
+  void it('after a re-resolve, the first view’s messages, visibility, and dispose no longer affect the bridge', () => {
+    const first = new FakeWebviewView();
+    const second = new FakeWebviewView();
+    const { provider, bridge } = standaloneProvider();
+    resolve(provider, first);
+    resolve(provider, second);
+    second.webview.deliver(READY);
+    assert.equal(bridge.state, 'ready');
+
+    first.webview.deliver(READY);
+    first.setVisible(false);
+    first.fireDispose();
+    assert.equal(bridge.state, 'ready', 'stale view events must not hide or detach the bridge');
+    assert.deepEqual(first.webview.postedMessages, [], 'nothing is posted to the stale view');
+
+    bridge.postAgentState(SIM_AGENT);
+    assert.deepEqual(posted(second.webview), [
+      ...EXPECTED_ANSWER,
+      { type: 'agentState', agent: SIM_AGENT },
+    ]);
+  });
+
+  void it('provider.dispose() leaves no listener registered and detaches the bridge', () => {
+    const view = new FakeWebviewView();
+    const { provider, bridge } = standaloneProvider();
+    resolve(provider, view);
+    provider.dispose();
+    assert.equal(view.liveListenerCount, 0);
+    assert.equal(bridge.state, 'detached');
+    view.webview.deliver(READY);
+    assert.deepEqual(view.webview.postedMessages, []);
+  });
+
+  void it('a rejected webview.postMessage is absorbed (no throw, no unhandled rejection)', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const view = new FakeWebviewView();
+      const { provider, log } = standaloneProvider();
+      resolve(provider, view);
+      view.webview.postBehavior = 'reject';
+      assert.doesNotThrow(() => view.webview.deliver(READY));
+      await new Promise<void>((done) => setImmediate(done));
+      await new Promise<void>((done) => setImmediate(done));
+      assert.deepEqual(unhandled, []);
+      assert.deepEqual(log.messages('trace'), ['post failed: view gone', 'post failed: view gone']);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });

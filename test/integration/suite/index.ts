@@ -5,6 +5,8 @@
 import { runRegistered } from '../support/harness';
 import { installProviderSpy } from '../support/providerSpy';
 import './view.itest';
+// After view.itest: it relies on the hide/show cycles above having run.
+import './protocol.itest';
 
 export async function run(): Promise<void> {
   installProviderSpy();

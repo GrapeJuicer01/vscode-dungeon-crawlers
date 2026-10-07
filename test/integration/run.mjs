@@ -7,6 +7,8 @@
 // 3. Downloads VS Code into .vscode-test/ on first run (network needed) and launches it with
 //    --disable-extensions, a fresh temp user-data-dir and extensions-dir, and an empty temp
 //    workspace, so only the development build of Pixel Agents loads.
+//    Our extension's log level is trace, and the in-host suite gets the temp user-data-dir in
+//    PIXEL_AGENTS_IT_USER_DATA_DIR so it can read the "Pixel Agents" log channel's file.
 // 4. Exits 1 if the build is stale, the suite fails to compile, or any test fails.
 //
 // PIXEL_AGENTS_VSCODE_VERSION selects the VS Code build (default `stable`; for example `1.90.0`
@@ -22,6 +24,8 @@ const ROOT = process.cwd();
 const OUT_DIR = path.join(ROOT, 'out', 'integration');
 const ENTRY = path.join(ROOT, 'test', 'integration', 'suite', 'index.ts');
 const BUNDLES = ['dist/extension.js', 'dist/webview.js'];
+/** publisher.name from package.json, for the per-extension --log level. */
+const EXTENSION_ID = 'pixel-agents.pixel-agents';
 
 /** @param {string} dir @returns {number} newest mtime (ms) of any file under dir */
 function newestMtime(dir) {
@@ -79,7 +83,14 @@ async function main() {
         `--user-data-dir=${userDataDir}`,
         `--extensions-dir=${extensionsDir}`,
         '--disable-telemetry',
+        // Trace level for our extension's log channel, so protocol.itest.ts can assert that no
+        // "dropped webview message" trace or error line is written (M2 plan task 10).
+        '--log',
+        `${EXTENSION_ID}:trace`,
       ],
+      // Test-side only: tells the in-host suite where this run's logs are. Production code
+      // reads no environment variable (security-and-safety.md section 5).
+      extensionTestsEnv: { PIXEL_AGENTS_IT_USER_DATA_DIR: userDataDir },
     });
   } finally {
     await rm(temp, { recursive: true, force: true });

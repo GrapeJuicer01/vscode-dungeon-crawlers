@@ -50,10 +50,10 @@ Both `parseWebviewMessage` and `parseHostMessage` apply these rules. They return
 | Rule | Detail |
 |---|---|
 | Container | plain object: not `null`, not an array, prototype `Object.prototype` or `null` |
-| Keys | exactly the expected own string keys; no extra keys, no symbol keys, no inherited fields |
+| Keys | exactly the expected own string keys; no extra keys, no symbol keys, no inherited fields. Checked with `Object.getOwnPropertyNames` (not `Object.keys`), so a non-enumerable extra key is rejected too; `type` is read only as an own property |
 | `type` | one of the known strings for that direction, compared exactly (case-sensitive, no trimming) |
 | `id`, `agentId` | string, 1..128 chars, `/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/` |
-| `name` | string, 1..64 UTF-16 units, not blank after trim, no C0/C1 control characters, no bidi override or isolate characters (`U+202A..U+202E`, `U+2066..U+2069`) |
+| `name` | string, 1..64 UTF-16 units, not blank after trim, no C0/C1 control characters, no bidi override or isolate characters (`U+202A..U+202E`, `U+2066..U+2069`). Enforced by a `charCodeAt` loop over the UTF-16 units, not a regex, after the length check |
 | `state` | one of `AGENT_STATES` |
 | `toolName` | `null`, or string 1..128 chars matching `/^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,127}$/` (fits `Bash`, `Read`, `mcp__server__tool`; no spaces, so free text cannot ride in it) |
 | `timestamp` | epoch milliseconds, `Number.isSafeInteger` and `>= 0` |
@@ -65,7 +65,7 @@ Host-side creators (`toAgentInfo`, `createConfigMessage`, `createAgentListMessag
 
 ## 5. Bridge states (host)
 
-`WebviewBridge` (`src/host/webviewBridge.ts`) owns the host side. It imports nothing from `vscode`; `extension.ts` adapts the real webview to it.
+`WebviewBridge` (`src/host/webviewBridge.ts`) owns the host side. It imports nothing from `vscode` or Node built-ins (only `src/shared/**`, enforced by ESLint, [coding standards section 3](../engineering/coding-standards.md)); `extension.ts` adapts the real webview to it.
 
 ```mermaid
 stateDiagram-v2
@@ -112,6 +112,10 @@ sequenceDiagram
 
 Listeners are registered before `html` is set (host) and before `ready` is sent (webview), so neither the `ready` nor its answer can be missed.
 
+**Partial answer when a dependency throws.** The bridge sets `ready`, then builds and posts `config`, then calls `getAgents()` and posts `agentList`, all inside one try/catch. If `getAgents()` throws, `config` has already been posted, `agentList` is not, and exactly one `logger.error` line is written (`webview bridge error: <name>: <message>`); nothing is rethrown. The bridge stays `ready`, so later `agentState` pushes are still posted. The webview keeps its pre-`agentList` state (config applied, agent set as it was, empty on a fresh load) until the next `ready` answer or `agentState` push updates it. If `getConfig()` throws, nothing is posted and one error is logged. No retry is attempted; the next `ready` (show, reload) is the recovery point.
+
+`ready` is sent exactly once per webview document load and never skipped. Because it travels on the public `onDidReceiveMessage` event, it is also the host-observable proof that the webview script ran: the extension-host integration suite subscribes to the same event through its provider spy and counts one `ready` per load, with no production test hook ([M2 plan section 1.2](plans/m2-protocol.md#12-ready-is-the-observable-script-ran-signal)).
+
 ### 6.2 Hide and show
 
 ```mermaid
@@ -130,6 +134,8 @@ sequenceDiagram
   Note over B: ready
   B->>W: config, agentList (current truth)
 ```
+
+VS Code does not call `resolveWebviewView` again on re-show; it reloads the document from the same `html`. Each show therefore produces exactly one new `ready` on the same view.
 
 ### 6.3 Webview reload ("Developer: Reload Webviews" or a crash restart)
 
@@ -206,11 +212,12 @@ The webview side mirrors this: `handleHostMessage` returns `false` for an invali
 - `agentList` replaces the webview's agent set completely; it is the recovery point for any lost push.
 - `agentState` messages are posted in the order the monitor emits them. Delivery is best effort: a push may be dropped while hidden, while loading, or if `postMessage` fails. Correctness relies on the next snapshot, never on every push arriving.
 - The webview tolerates an `agentState` for an unknown id (a missed `spawned`): it inserts the agent. `despawned` removes it. Only these messages change the webview's agent set.
+- `HostStateMirror` keeps agents in insertion order: `agentList` order first, then new ids in arrival order. An `agentState` for an existing id updates it in place (`Map.set` keeps the original position), so a state change never reorders the roster. `agents()` returns a new array each call, so readers (the M4 `Game`) cannot mutate the mirror.
 
 ## 8. Error handling
 
-- Host: `WebviewBridge.handleMessage` and `postAgentState` never throw. Errors from its dependencies are logged once per occurrence as `error.name: error.message` to the "Pixel Agents" output channel; payloads are never logged.
-- Webview: the `message` listener body is wrapped in try/catch and reports through the single crash reporter (`console.error`, once per distinct message). `event.data` is never logged.
+- Host: `WebviewBridge.handleMessage` and `postAgentState` never throw. Errors from its dependencies are logged once per occurrence as `webview bridge error: <error.name>: <error.message>` (or `non-error thrown`) to the "Pixel Agents" output channel; payloads are never logged. The error logger and the `postMessage` rejection handler (`trace 'post failed: view gone'`) each wrap the logger call in their own try/catch and swallow a throwing logger, so nothing escapes as an exception or an unhandled rejection. See section 6.1 for the partial `ready` answer when `getAgents()` throws.
+- Webview: the `message` listener body is wrapped in try/catch and reports through the single crash reporter `reportError` in `main.ts`, which prints `Pixel Agents webview error: <message>` with `console.error`, at most once per distinct message per page load. `<message>` is `error.message` for any genuine Error, including one from another realm (another frame, or a `node:vm` test context): an `isError` check accepts `instanceof Error`, or an object whose built-in tag is `[object Error]` and whose `message` is a string. Any other thrown value prints the fixed string `non-error thrown`, never the value itself. `event.data` is never logged.
 - `assertNever` throws a `TypeError` that never includes the offending value.
 
 ## 9. Versioning

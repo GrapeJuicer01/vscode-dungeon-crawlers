@@ -14,6 +14,7 @@ Current state (0.0.1, scaffold): the panel tab opens and shows a blank, crisp, i
 Pixel Agents is a status display. It is built around a few promises:
 
 - **It never controls your agents.** The extension only observes Claude Code sessions. It never writes to, signals, stops, or sends input to any process or terminal. Clicking a hero only reveals that agent's terminal.
+- **The panel can only ask to show a terminal.** The only request the panel can send to VS Code is to reveal an agent's terminal; it can never ask VS Code to control, stop, or type into it.
 - **Heroes never die.** Heroes have no health, mana, or gauges, and nothing in the game can hurt, stop, or remove them. A hero's state follows its real agent session, and nothing else.
 - **Your transcripts stay private.** The extension reads Claude Code transcripts only to learn a session's id, name, state, current tool name, and timestamp. Transcript content is never stored, logged, or sent anywhere.
 - **Nothing extra ships.** No runtime dependencies, no image or audio files. Sprites are drawn from pixel maps in code, and sound is synthesized with Web Audio.

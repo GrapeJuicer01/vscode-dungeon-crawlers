@@ -1,6 +1,14 @@
-// Pixel Agents webview entry point. M1: sizes and clears a blank canvas and keeps it
-// integer-scaled. No messaging (M2) and no animation loop (M4), so it costs no CPU while shown.
-// These constants move to Renderer in M4.
+// Pixel Agents webview entry point. Sizes and clears a blank canvas and keeps it integer-scaled
+// (M1), then opens the host channel and sends `ready` on every document load (M2, ADR 0007).
+// Host state is mirrored but not drawn until M4. No animation loop yet (M4), so it costs no CPU
+// while shown. The canvas constants move to Renderer in M4.
+import { createHostChannel } from './hostChannel';
+import type { VsCodeWebviewApi } from './hostChannel';
+import { handleHostMessage } from './hostMessages';
+import { HostStateMirror } from './hostState';
+
+/** Injected by VS Code into the webview; may be called only once per document. */
+declare function acquireVsCodeApi(): VsCodeWebviewApi;
 
 const INTERNAL_WIDTH = 320;
 const INTERNAL_HEIGHT = 180;
@@ -26,8 +34,33 @@ function layout(canvas: HTMLCanvasElement): void {
   canvas.style.height = `${(INTERNAL_HEIGHT * scale) / dpr}px`;
 }
 
+/** Messages already printed in this page load; each distinct message is printed once. */
+const reportedErrors = new Set<string>();
+
+/**
+ * True for an Error from any realm. `instanceof Error` alone misses errors created in another
+ * realm (another frame, or a node:vm test context), which are still genuine Errors.
+ */
+function isError(value: unknown): value is Error {
+  return (
+    value instanceof Error ||
+    (typeof value === 'object' &&
+      value !== null &&
+      Object.prototype.toString.call(value) === '[object Error]' &&
+      typeof (value as { message?: unknown }).message === 'string')
+  );
+}
+
+/**
+ * The single crash reporter, used by every catch block. A non-Error value is never printed
+ * (it may be untrusted data), and neither is event.data.
+ */
 function reportError(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = isError(error) ? error.message : 'non-error thrown';
+  if (reportedErrors.has(message)) {
+    return;
+  }
+  reportedErrors.add(message);
   console.error(`Pixel Agents webview error: ${message}`);
 }
 
@@ -56,12 +89,29 @@ function boot(): void {
       reportError(error);
     }
   };
+  // Mirrors whatever the host sends; rebuilt from the host snapshot on every load (invariant 4).
+  const mirror = new HostStateMirror();
+  const onMessage = (event: MessageEvent<unknown>): void => {
+    try {
+      handleHostMessage(event.data, mirror);
+    } catch (error: unknown) {
+      reportError(error);
+    }
+  };
   const onPageHide = (): void => {
     window.removeEventListener('resize', onResize);
+    window.removeEventListener('message', onMessage);
     window.removeEventListener('pagehide', onPageHide);
   };
   window.addEventListener('resize', onResize);
   window.addEventListener('pagehide', onPageHide);
+  // Listener before `ready`, so the host's answer cannot be missed.
+  window.addEventListener('message', onMessage);
+
+  // Sent on every boot, never deferred or skipped: it is also the host-observable signal that
+  // this script ran (M2 plan section 1.2).
+  const channel = createHostChannel(acquireVsCodeApi());
+  channel.send({ type: 'ready' });
 }
 
 // The script tag is the last element in <body>, so the canvas already exists.

@@ -38,7 +38,30 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | data table | a typed, `readonly` table of game content under `src/game/data/` (enemies, stages, classes, drops, achievements). |
 | sprite template, palette | procedural pixel art: palette-indexed character maps in code, rasterized at runtime. No image files (Core invariant 5, [ADR 0003](architecture/adr/0003-procedural-sprites.md)). |
 | Extension Development Host | the second VS Code window F5 opens to run the extension under development. Use `--disable-extensions` or a clean profile so unrelated installed extensions do not load beside it. |
-| integration test | a test that runs the extension inside a downloaded VS Code via `@vscode/test-electron`, with `--disable-extensions` ([ADR 0006](architecture/adr/0006-node-test-runner.md)). |
+| integration test | a test that runs the extension inside a downloaded VS Code via `@vscode/test-electron`, with `--disable-extensions` ([ADR 0006](architecture/adr/0006-node-test-runner.md)). In-host suites are named `*.itest.ts`. |
+| provider spy | the integration-test helper that wraps `registerWebviewViewProvider` before activation to observe each `WebviewView` (and, from M2, the webview's messages) without any production hook ([testing strategy](engineering/testing-strategy.md#11-extension-host-integration-runner)). |
+
+## Protocol (M2)
+
+Full contract in [host-webview protocol](architecture/host-webview-protocol.md); rationale in [ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md).
+
+| Term | Meaning |
+|---|---|
+| `AgentInfo` | the only agent record on the wire: exactly `id`, `name`, `state`, `toolName`, `timestamp` (the allow-list, Core invariant 7). |
+| `ready` | the webview-to-host message `main.ts` sends once per document load (first open, every re-show, every reload) after registering its listener. Asks for snapshots; also the host-observable sign that the webview script ran. |
+| snapshot | a full-state message the host sends in answer to `ready`: `config` (a `ConfigSnapshot`), then `agentList`. Authoritative: it replaces whatever the webview had and recovers any lost push. |
+| push | an `agentState` message for one agent, sent only while the bridge is `ready`. Best effort; may be dropped while hidden or loading. |
+| `PROTOCOL_VERSION` | the protocol's version number (1), carried in `config`. A mismatch makes the message invalid; bumped on any breaking shape change. |
+| exact-key validation | the parsing rule on both sides: a plain object with exactly the expected own keys, a known `type`, bounded and pattern-checked fields, else dropped. Parsers never throw and return a new object. |
+| creator | a host-side function (`toAgentInfo`, `create*Message`) that builds outgoing messages by copying only allow-listed keys. The only way the host builds a message. |
+| `WebviewBridge` | the vscode-free host object in `src/host/webviewBridge.ts` that receives webview messages, answers `ready`, posts pushes, and handles `focusAgent`. |
+| bridge state | `detached` (no view), `loading` (view attached or hidden, waiting for `ready`; pushes dropped), `ready` (pushes posted). |
+| port | `WebviewPort`, the one-method interface (`postMessage`) through which the bridge posts; `extension.ts` adapts the real `vscode.Webview` to it. |
+| reveal capability | `revealAgentTerminal`, the bridge's only outward action: show a live agent's terminal. `null` in M2; wired to `Terminal.show()` in M3. |
+| `HostStateMirror` | the webview's in-memory copy of host state (config and agents), rebuilt from scratch on every load. The M4 `Game` reads it; the webview never writes state back. |
+| `assertNever` | the shared exhaustiveness guard in `src/shared/assertNever.ts` that ends every `switch` over a union; its error never includes the value. |
+| `src/host/` | host-bundle folder for vscode-free, unit-testable host logic; imports only `src/shared/` ([coding standards section 3](engineering/coding-standards.md#3-bundle-boundaries)). |
+| log channel | the single "Pixel Agents" `LogOutputChannel`; fixed reason strings at trace level for drops, `error.name: message` at error level; never payloads. |
 
 ## Process
 

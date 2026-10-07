@@ -1,4 +1,5 @@
-// Bundle boundary checks on the esbuild output (ADR 0004, M1 plan section 7.5).
+// Bundle boundary checks on the esbuild output (ADR 0004, M1 plan section 7.5, M2 plan test
+// note 9: the bridge stays in the host bundle and acquireVsCodeApi in the webview bundle).
 // Requires `npm run build` first; every gate run and CI builds before testing.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -73,5 +74,26 @@ void describe('build output', () => {
   void it('dist/extension.js requires only vscode and node: built-ins (nothing bundled as external)', () => {
     const external = requiresIn(host).filter((id) => id !== 'vscode' && !id.startsWith('node:'));
     assert.deepEqual(external, []);
+  });
+
+  void it('dist/webview.js contains no host-side protocol code (no WebviewBridge, no onDidReceiveMessage)', () => {
+    assert.ok(!webview.includes('WebviewBridge'));
+    assert.ok(!webview.includes('onDidReceiveMessage'));
+  });
+
+  void it('dist/webview.js contains the webview channel (acquireVsCodeApi) and the shared parser', () => {
+    assert.ok(webview.includes('acquireVsCodeApi'));
+    assert.ok(webview.includes('parseHostMessage'), 'development build keeps names');
+  });
+
+  void it('dist/extension.js contains no webview runtime (no acquireVsCodeApi, no HostStateMirror)', () => {
+    assert.ok(!host.includes('acquireVsCodeApi'));
+    assert.ok(!host.includes('HostStateMirror'));
+  });
+
+  void it('dist/extension.js wires the bridge (onDidReceiveMessage and createOutputChannel)', () => {
+    assert.ok(host.includes('onDidReceiveMessage'));
+    assert.ok(host.includes('createOutputChannel'));
+    assert.ok(host.includes('WebviewBridge'), 'development build keeps names');
   });
 });

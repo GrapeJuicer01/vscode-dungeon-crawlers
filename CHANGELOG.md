@@ -22,3 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - README, contributing guide, code of conduct, and MIT license.
 - `@vscode/test-electron` (dev-only, exact-pinned) for integration tests that run the extension inside a downloaded VS Code; CI and release run them under `xvfb-run` against VS Code stable and 1.90.0 (the `engines.vscode` minimum). The download cache `.vscode-test/` is ignored by git, packaging, Prettier, ESLint, and markdownlint.
 - Development webview builds use an inline sourcemap so DevTools works under the strict webview CSP; production builds have no sourcemaps.
+
+### Fixed
+
+- A hero that is exiting (victory or warp out) is now replaced by a fresh hero when its agent goes working or idle again, instead of lingering. The renderer's light pass is guarded: a throwing light path is reported once, then skipped after a limit, while entities, foreground, and particles keep drawing normally.

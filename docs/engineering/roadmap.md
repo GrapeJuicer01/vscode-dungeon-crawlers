@@ -85,7 +85,7 @@ Other orderings considered and kept:
 - **Art (batch A0)**: master palette (about 32 colors, 4 skin and 6 hair swaps); base hero body and default head layers with `idle`, `walk`, `attack` (3 frames, added in the M4 plan, decision H4-1), `sit`, `eat`, `sleep`, `polish`, `read`, `warmHands`, `victory`, plus a plain default weapon layer; campfire with 3-4 frame flame loop (two sizes) and ember spec; Stage 1 "The Forgotten Cellar" tile palette, floor and back-wall tiles, 6+ props (8 listed), parallax backdrop, dripping-water ambient. No hurt, downed, or death frames. The exact exports, sizes, and counts are in [M4 plan section 10](../architecture/plans/m4-engine.md#10-art-needs-batch-a0).
 - **Depends on**: M3 (agent events and simulator drive the scene), A0 art.
 - **Done when**: G1-G7 (G2 not yet applicable); **hero-invariant test** exists: only `spawned`, `working`, `idle`, `despawned` change hero state, and a thrown error inside the update loop does not change hero state or reach the host; **structural check**: `Hero` and its file contain no `hp`, `health`, `mana`, `dead`, `downed`, `retreat`, and no gauge is drawn on heroes; **crash isolation**: a forced exception in an entity is caught, logged without transcript content, and the next frame renders; webview reload rebuilds the same heroes from the host list; sprite templates pass the validator (row lengths, frame sizes, palette chars, 12-color limit); simulator with 8 heroes holds 60fps on the reference machine (measured as documented in testing strategy; the reference machine and panel size are [M4 decision H4-3](../architecture/plans/m4-engine.md#11-decisions-for-the-human)). Details: [M4 plan section 8](../architecture/plans/m4-engine.md#8-gates-for-m4).
-- Status: in progress
+- Status: done
 
 ### M5. Heroes (3 batches)
 
@@ -233,7 +233,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 1 | M1 scaffold | none | Ar, Dv, Te, Rv, Dv commit | done |
 | 2 | M2 protocol | none | Ar, Dv, (Ar), Te, Rv, Dv commit | done |
 | 3 | M3 monitor | none | Ar, Dv, (Ar), Te, Rv, Dv commit | done |
-| 4 | M4 engine | A0 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | in progress |
+| 4 | M4 engine | A0 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 5 | M5 heroes | H1 Warrior, Mage, Archer, Rogue | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

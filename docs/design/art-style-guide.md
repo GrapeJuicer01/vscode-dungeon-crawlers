@@ -138,6 +138,28 @@ Master characters, `idle` only, centre anchor, calm things the hero does (never 
 
 The Rogue purple in `dagger` and `smokePuff` is the master indigo `b` and slate `G`/`P`, so these read slate and purple without a new master color.
 
+### H2 classes and effects (batch A2)
+
+Delivered: Cleric, Paladin, Necromancer, Bard (`classTemplatesH2.ts`, `palettesH2.ts`). Same layers, eleven animations, 26 frames per layer, anchors, and canvas sizes as H1. Master stays at 33 colors (cap 48). Cleric and Paladin use one extra master character, `Y`, for glow sparkles (12 colors composited, the cap).
+
+| Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
+|---|---|---|---|---|---|---|
+| Cleric | gold `#e8a820` | cream white `#f3f0e6` | `#b7bcd6` | `#a8926c` | `#7a5634` | pale gold `#f6e49a` |
+| Paladin | soft white `#dde3f4` | gold `#f0b830` | `#b27a18` | `#c9ccd8` | `#8a5a2a` | pale glow `#fff1b0` |
+| Necromancer | sickly green `#8fe03c` | violet `#7a3fc0` | `#4b2480` | `#2d2238` | `#3a2a30` | bone `#e8e4c4` |
+| Bard | magenta `#e0409a` | teal `#20b4a6` | `#157d80` | `#5a3f86` | `#8a4e26` | gold `#f0cf72` |
+
+| Class | Head | Gear | Weapon | Cue |
+|---|---|---|---|---|
+| Cleric | wide flat-topped white mitre with a gold cross and band, gold ribbons behind (head 1 px lower) | white mantle, gold stole, robe with gold hem | flanged mace with a pale-gold head; gold glints on strike and ability | wide mitre, stole |
+| Paladin | gold winged helm, one white wing fanning up and back (head 1 px lower) | white cape behind, gold pauldron, tall kite shield with a gold cross (small buckler at rest) | glowing sword, gold sparks beside the blade | wing, tall shield |
+| Necromancer | deep violet hood drooping forward, shadowed brow (head 1 px down and forward) | hunched back hump, ragged hem with green trim, bone shoulder spike | skull staff, green eye glint and wisps on strike and ability | hump, skull on a staff |
+| Bard | wide-brim teal hat with a long magenta feather (head 1 px lower) | short cape, magenta sash, golden buckle | golden lute held at the hip; strummed across the body in attack and ability | big hat and feather, lute |
+
+Effects (master characters, `idle` only, centre anchor, at most 8 colors, calm and never damage taken): `buffSparkle` 16x16 3 frames (twinkling gold stars; any buff or ability), `note` 7x8 2 frames (pale-blue eighth note, Bard strike and ability), `healGlow` 24x12 3 frames (gold ring at the feet, Cleric ability), `holyBurst` 24x24 3 frames (gold-white cross, rays, thin ring, Paladin ability), `soulWisp` 10x7 3 frames (pale-blue wisp flying right, Necromancer strike and ability). No sickly-green or magenta effect exists because effects use master characters only; the wisp and note read pale blue.
+
+Summon: `skeleton` 16x20 (`summonTemplates.ts`, `idle` 2, `walk` 4, `attack` 3, `spawn` 3). Convention is a proposal pending architect review: see [sprite spec section 9](sprite-spec.md#9-summon-sprites-proposal-unreviewed-the-architect-must-ratify).
+
 Planned class list:
 
 | Class | Palette | Silhouette cues | Signature prop |

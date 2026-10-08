@@ -6,6 +6,10 @@
 import { CAMPFIRE } from './campfireTemplates';
 import { EFFECT_SPRITES } from './effectTemplates';
 import { CLASS_LAYERS } from './classTemplates';
+import { CLASS_LAYERS_H2 } from './classTemplatesH2';
+import { EFFECT_SPRITES_H2 } from './effectTemplatesH2';
+import { CLASS_PALETTES_H2 } from './palettesH2';
+import { SUMMON_SPRITES } from './summonTemplates';
 import { BASE_HERO } from './heroTemplates';
 import { FORGOTTEN_CELLAR } from './stage1Templates';
 import type { StageSprites } from './spriteTypes';
@@ -13,12 +17,17 @@ import type { StageSprites } from './spriteTypes';
 export type {
   CampfireSprites,
   ClassPaletteId,
+  ClassPaletteIdH2,
   EffectSpriteId,
+  EffectSpriteIdH2,
   HeroLayerSet,
   SpriteTemplate,
   StageSprites,
+  SummonSpriteId,
 } from './spriteTypes';
 export { BASE_HERO, CAMPFIRE, CLASS_LAYERS, EFFECT_SPRITES };
+// Batch H2 (new files; the developer merges these into the H1 tables when wiring).
+export { CLASS_LAYERS_H2, CLASS_PALETTES_H2, EFFECT_SPRITES_H2, SUMMON_SPRITES };
 
 /** Stage id -> sprites. Keys equal the ids in src/game/data/stages.ts and palettes.ts. */
 export const STAGE_SPRITES: Readonly<Record<string, StageSprites>> = {

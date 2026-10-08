@@ -46,3 +46,15 @@ export type EffectSpriteId = 'whirl' | 'orbBolt' | 'arcaneBurst' | 'arrow' | 'da
 
 /** The classes delivered by H1; H2 and H3 widen this to 12. */
 export type ClassPaletteId = 'warrior' | 'mage' | 'archer' | 'rogue';
+
+/** The classes delivered by batch H2. Kept as a separate union so H1's `Record<ClassPaletteId, ...>` still type-checks until the developer merges the two. */
+export type ClassPaletteIdH2 = 'cleric' | 'paladin' | 'necromancer' | 'bard';
+
+/** Effect sprite ids added by batch H2 (ids `effects/<name>`). Merge with `EffectSpriteId` when wiring. */
+export type EffectSpriteIdH2 = 'buffSparkle' | 'note' | 'healGlow' | 'holyBurst' | 'soulWisp';
+
+/**
+ * Summon sprite ids (proposal, UNREVIEWED; see docs/design/sprite-spec.md section 9). A summon is a
+ * cosmetic ally drawn from a single (non-layered) template with ids `summons/<name>`.
+ */
+export type SummonSpriteId = 'skeleton';

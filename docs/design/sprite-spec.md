@@ -48,6 +48,8 @@ export type Palette = Record<string, string>; // palette char -> color
 
 `CLASS_PALETTES` (A1-1) are partial palettes too, one per class (`warrior`, `mage`, `archer`, `rogue`), overriding only `a c d b k m` (accent, cloth, cloth shade, pants, boots, metal), never `o s h e w`. Resolution order for a hero bitmap is master, class, skin, hair, so skin and hair still recolor over a class. Class sprites are drawn with the same characters as the base hero; only the palette changes. Red stays on small parts (plume, trim, shield), never the whole body.
 
+H2 adds `CLASS_PALETTES_H2` (`palettesH2.ts`, keys `cleric`, `paladin`, `necromancer`, `bard`) under the same rules. It is a separate export so the H1 table stays untouched; the developer merges both into one `classPalettes` record when wiring H2. A composited H2 look uses at most 12 colors: the eleven hero characters plus `Y` (glow) for Cleric and Paladin.
+
 ## 5. Authoring guide
 
 1. Read the class or enemy entry in the [art style guide](art-style-guide.md) and write a one-line design note.
@@ -105,3 +107,24 @@ A template is valid when every row length equals `w`, every frame has `h` rows, 
 | `HERO_POSES`, `HERO_HEAD`, `HeroPose` | `heroTemplates.ts` | base pose data the class layers are derived from (art-internal; the engine does not import them) |
 
 Stage props are keyed by their short name (`barrel`, `crate`, `bonePile`, `puddle`, `cobweb`, `chains`, `torch`, `doorFrame`), while template ids are `forgotten-cellar/<name>` so the sprite cache never collides across stages.
+
+H2 exports (batch A2, new files so the H1 art files stay clean):
+
+| Export | File | Content |
+|---|---|---|
+| `CLASS_LAYERS_H2` | `classTemplatesH2.ts` | `Record<string, HeroLayerSet>`, keys `cleric`, `paladin`, `necromancer`, `bard`; same eleven animations, 26 frames per layer, same anchors and sizes as H1 |
+| `CLASS_PALETTES_H2`, `ClassPaletteIdH2` | `palettesH2.ts`, type in `spriteTypes.ts` | partial palettes over `a c d b k m` |
+| `EFFECT_SPRITES_H2`, `EffectSpriteIdH2` | `effectTemplatesH2.ts`, type in `spriteTypes.ts` | `buffSparkle`, `note`, `healGlow`, `holyBurst`, `soulWisp`; ids `effects/<name>`, `idle` only, centre anchor |
+| `SUMMON_SPRITES`, `SummonSpriteId` | `summonTemplates.ts`, type in `spriteTypes.ts` | `skeleton` (see section 9, unreviewed) |
+
+All are re-exported from `spriteTemplates.ts`. The H2 unions are separate from `ClassPaletteId` and `EffectSpriteId` on purpose: widening those would break the H1 `Record<...>` tables until the developer merges.
+
+## 9. Summon sprites (PROPOSAL, UNREVIEWED: the architect must ratify)
+
+A summon is a cosmetic ally a class may call (the Necromancer's skeleton). Nothing here changes who has health: only enemies do, and a summon has no gauge, no hurt, no death, and no downed art.
+
+- **Template**: one composite `SpriteTemplate` (not layered), id `summons/<name>`, 16x20 for a hero-sized ally, anchor `(8, 19)` like a hero, facing right, 1px `o` outline, at most 12 colors.
+- **Animations**: `idle` 2, `walk` 4, `attack` 3, `spawn` 3. `spawn` is the pop-in (rises from a dust mound, then settles); the engine plays it in reverse to despawn, so there is no separate despawn name. Names matching `hurt|downed|death|dead|die|dying` are forbidden, the same rule as heroes.
+- **Palette**: master characters only (`skeleton` uses `o m w G d a P`). Assumption: the engine may resolve `a d m` through the owner's class palette (for the Necromancer: green eye glint, purple scarf, bone-colored `m`); drawn with the master alone it is a cool-gray skeleton with a gold glint, still valid.
+- **Exports**: `SUMMON_SPRITES: Readonly<Record<SummonSpriteId, SpriteTemplate>>`. A new `ArtSet.summons` field and a validator pass (sizes, anchor, names, colors) are developer work.
+- **Open questions for the architect**: is `spawn` reversed acceptable for despawn; should summons ever be mirrored with the hero; does a summon count in the sprite cache budget.

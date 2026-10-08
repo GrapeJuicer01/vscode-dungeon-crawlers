@@ -99,7 +99,7 @@ Heroes are split into three batches of four classes, in style-guide table order,
 - **Art (batch H1)**: delivered in three steps: A1-1 an `ability` animation on the base hero, class palettes, and six effect sprites; A1-2 Warrior (red + steel, plumed helm, sword + round shield) and Mage (blue + gold, pointy hat, orb staff); A1-3 Archer (forest green + brown, hood, quiver, bow) and Rogue (slate + purple, hood + mask, twin daggers). Each class: head, gear, weapon layers over the shared body, eleven animations (attack stays 3 frames, `ability` 3 frames). Exact list in [H1 plan section 10](../architecture/plans/h1-classes.md#10-art-needs-batch-h1).
 - **Depends on**: M4, H1 art.
 - **Done when**: G1-G7; class-mapping tests: `classFor` is pure and total, covers all four classes over many ids, a hero's class stays the same across working/idle cycles, replacement, snapshot rebuild, and a fresh `Game` (reload); hero-invariant and structural checks extended to `ClassHero`, the effect pool, and the `ability` phase; each class reads by silhouette (reviewer eyeballs the dev preview or F5); class attacks and abilities with no enemies present never change hero state.
-- Status: todo
+- Status: in progress
 
 #### H2. Cleric, Paladin, Necromancer, Bard
 
@@ -235,7 +235,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 2 | M2 protocol | none | Ar, Dv, (Ar), Te, Rv, Dv commit | done |
 | 3 | M3 monitor | none | Ar, Dv, (Ar), Te, Rv, Dv commit | done |
 | 4 | M4 engine | A0 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 5 | M5 heroes | H1 Warrior, Mage, Archer, Rogue | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 5 | M5 heroes | H1 Warrior, Mage, Archer, Rogue | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | in progress |
 | 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

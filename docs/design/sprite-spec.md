@@ -36,13 +36,16 @@ export type Palette = Record<string, string>; // palette char -> color
 
 ## 3. Animation names
 
-- **Heroes:** the required set is `idle` 2, `walk` 4, `attack` 3, `sit` 2, `eat` 2, `sleep` 2, `polish` 2, `read` 2, `warmHands` 2, `victory` 2. `ability` (3 frames, class signature move) joins with H1 and is not part of A0. There are no hurt, downed, dying, or dead animations for heroes, and the validator rejects those names.
+- **Heroes:** the required set is eleven animations: `idle` 2, `walk` 4, `attack` 3, `ability` 3, `sit` 2, `eat` 2, `sleep` 2, `polish` 2, `read` 2, `warmHands` 2, `victory` 2 = 26 frames per layer. `ability` (the class signature move, added in A1-1) is a generic raise, thrust, recover pose on the base hero that the base hero never plays; the renderer times it 120/140/200 ms. There are no hurt, downed, dying, or dead animations for heroes, and the validator rejects those names.
+- **Effects** (`EFFECT_SPRITES`, A1-1) use `idle` only, with the anchor at the sprite centre (`floor(w/2)`, `floor(h/2)`), drawn with master characters (assumption: no class palette is applied to effects), at most 8 colors, no outline on the 24-wide ones.
 - **Everything that is not a hero** (campfire, tiles, props, backdrop; later enemies and bosses) uses the single animation name **`idle`**. A static sprite has one frame; a loop (flame, torch, ripple) has several. Enemy-only extras (`attack`, `hit`, `death`, `telegraph`) arrive with E1 and are listed in the style guide when added.
 - Heroes are layered: `body`, `head`, `gear`, `weapon`, composited in that order. All layers share the animation names and frame counts; a layer may hold all-transparent frames (the weapon layer is empty while resting, except `polish`). `gear` is `null` in the classless base hero.
 
 ## 4. Palette swaps are partial palettes
 
-`SKIN_TONES` (4) and `HAIR_COLORS` (6) are partial palettes: each holds only the characters it overrides (`s` for skin, `h` for hair), not a full copy. The factory resolves a character by looking in the swap first and the master palette second, after layers are composited, so a swap recolors every layer at once. Class accent colors will work the same way with `a` (and any further class characters). Index 0 of each list equals the master color.
+`SKIN_TONES` (4) and `HAIR_COLORS` (6) are partial palettes: each holds only the characters it overrides (`s` for skin, `h` for hair), not a full copy. The factory resolves a character by looking in the swap first and the master palette second, after layers are composited, so a swap recolors every layer at once. Index 0 of each list equals the master color.
+
+`CLASS_PALETTES` (A1-1) are partial palettes too, one per class (`warrior`, `mage`, `archer`, `rogue`), overriding only `a c d b k m` (accent, cloth, cloth shade, pants, boots, metal), never `o s h e w`. Resolution order for a hero bitmap is master, class, skin, hair, so skin and hair still recolor over a class. Class sprites are drawn with the same characters as the base hero; only the palette changes. Red stays on small parts (plume, trim, shield), never the whole body.
 
 ## 5. Authoring guide
 
@@ -86,13 +89,17 @@ Rows 1-9 are the head (hair `h`, skin `s`, one dot eye `e`), row 10 the scarf in
 
 ## 7. Validation rules
 
-A template is valid when every row length equals `w`, every frame has `h` rows, all characters exist in the palette (plus `.`), the anchor is inside the sprite, and the sprite uses at most 12 colors including the outline. Additionally for heroes: the required animation names and frame counts of section 3, equal frame counts across layers, and no forbidden animation names. For stages: only the stage's tile characters, one `idle` animation per template, and tile edge matching (section 5).
+A template is valid when every row length equals `w`, every frame has `h` rows, all characters exist in the palette (plus `.`), the anchor is inside the sprite, and the sprite uses at most 12 colors including the outline. Additionally for heroes: the eleven required animation names and frame counts of section 3 (26 per layer), equal frame counts across layers, and no forbidden animation names. For stages: only the stage's tile characters, one `idle` animation per template, and tile edge matching (section 5).
 
-## 8. A0 exports (what the engine imports)
+## 8. Exports (what the engine imports)
 
 | Export | File | Content |
 |---|---|---|
 | `MASTER_PALETTE`, `SKIN_TONES`, `HAIR_COLORS`, `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR`, `LIGHT_CHARS`, `PARTICLE_PALETTE`, `Palette` | `palettes.ts` | colors and character groups |
 | `SpriteTemplate`, `HeroLayerSet`, `CampfireSprites`, `StageSprites`, `BASE_HERO`, `CAMPFIRE`, `STAGE_SPRITES` | `spriteTemplates.ts` | types re-exported from `spriteTypes.ts`; data built in `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts` |
+
+| `CLASS_PALETTES` | `palettes.ts` (A1-1) | `Record<ClassPaletteId, Palette>`, partial palettes over `a c d b k m` |
+| `EFFECT_SPRITES`, `EffectSpriteId`, `ClassPaletteId` | `effectTemplates.ts`, types in `spriteTypes.ts`, re-exported from `spriteTemplates.ts` (A1-1) | six effect templates, ids `effects/<name>`, `idle` only, centre anchor |
+| `CLASS_LAYERS` | `classTemplates.ts` (planned, A1-2 and A1-3) | class id to `HeroLayerSet`, all eleven animations, equal frame counts |
 
 Stage props are keyed by their short name (`barrel`, `crate`, `bonePile`, `puddle`, `cobweb`, `chains`, `torch`, `doorFrame`), while template ids are `forgotten-cellar/<name>` so the sprite cache never collides across stages.

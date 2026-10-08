@@ -1,5 +1,5 @@
 // The default (classless) hero: layers body, head, gear (null), weapon. Batch A0.
-// Owned by the pixel-artist. Each of the 10 animations is described once as poses; the three layer
+// Owned by the pixel-artist. Each of the 11 animations is described once as poses; the three layer
 // templates are rendered from the same poses, so frame counts always match. The output is plain
 // palette-character rows (see docs/design/sprite-spec.md); outlines are added by Grid.outline.
 //
@@ -195,6 +195,70 @@ const POSES: Readonly<Record<string, readonly Pose[]>> = {
         g.rect(14, 14, 2, 2, 'k');
         g.line(16, 15, 22, 18, 'm');
         g.set(22, 18, 'w');
+        g.outline('o');
+      },
+    },
+  ],
+  // Generic signature pose (never played by the base hero; every class layer set has it):
+  // raise the weapon arm, thrust forward, recover.
+  ability: [
+    // raise: lean back, blade overhead
+    {
+      head: { x: 2, y: 2 },
+      torso: { x: 4, y: 10 },
+      legs: { rows: LEGS_STAND, x: 5, y: 15 },
+      arm: [
+        ...sleeve([
+          [9, 11],
+          [10, 11],
+          [11, 11],
+          [12, 10],
+          [12, 9],
+          [12, 8],
+          [12, 7],
+        ]),
+        ...hand(13, 6),
+      ],
+      weapon: (g) => swordUp(g, 14, 5, 5),
+    },
+    // thrust: lean in, blade straight out
+    {
+      head: { x: 4, y: 3 },
+      torso: { x: 6, y: 11 },
+      legs: { rows: LEGS_STRIDE, x: 3, y: 15 },
+      arm: [
+        ...sleeve([
+          [10, 12],
+          [11, 12],
+          [12, 12],
+          [13, 12],
+        ]),
+        ...hand(14, 12),
+      ],
+      weapon: (g) => {
+        g.rect(16, 11, 1, 4, 'k');
+        g.rect(17, 12, 5, 1, 'm');
+        g.set(22, 12, 'w');
+        g.outline('o');
+      },
+    },
+    // recover: blade angled forward and up
+    {
+      head: { x: 3, y: 3 },
+      torso: { x: 5, y: 11 },
+      legs: { rows: LEGS_STAND, x: 5, y: 15 },
+      arm: [
+        ...sleeve([
+          [9, 13],
+          [10, 13],
+          [11, 13],
+        ]),
+        ...hand(12, 13),
+      ],
+      weapon: (g) => {
+        g.rect(14, 12, 1, 4, 'k');
+        g.line(15, 13, 21, 10, 'm');
+        g.set(21, 10, 'w');
         g.outline('o');
       },
     },

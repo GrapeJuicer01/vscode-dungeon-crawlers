@@ -48,7 +48,7 @@ Columns 0-7 are the alcove (campfire at x 64), column 8 is the door frame (16x12
 
 ## 3. Palettes
 
-- One **master palette** (33 colors) in `src/game/sprites/palettes.ts`. Sprites reference palette characters, never hex.
+- One **master palette** (33 colors; cap 48, unchanged by A1-1) in `src/game/sprites/palettes.ts`. Sprites reference palette characters, never hex.
 - At most **12 colors per sprite**, outline included.
 - Standard hero characters (extend, never repurpose):
 
@@ -72,7 +72,7 @@ Columns 0-7 are the alcove (campfire at x 64), column 8 is the door frame (16x12
 | Light | `T` torch light, `F` campfire light |
 | Water particles | `q` light, `Q` mid (`8` is the dim end) |
 
-- 4 skin tones and 6 hair colors are **partial palette swaps**: a skin tone overrides only `s`; a hair color overrides only `h`. Index 0 of each equals the master color. Class accents will override `a`.
+- 4 skin tones and 6 hair colors are **partial palette swaps**: a skin tone overrides only `s`; a hair color overrides only `h`. Index 0 of each equals the master color. Class palettes are partial swaps over `a c d b k m` only (never `o s h e w`), applied after the master and before skin and hair (see the class table in section 6).
 - **Particle ramps** (bright to dim): ember `Y O R D`, spark `w Y O`, drip `q Q 8`, splash `w q Q`.
 - Each biome has an **8-color tile palette**. Enemies in a stage share 2-3 of those colors plus their own accent.
 - Colorblind-safe variant: never rely on red versus green alone; pair color with a shape cue.
@@ -86,7 +86,7 @@ Heroes are layered: **base body** (shared), **head/hair**, **gear**, **weapon** 
 | idle | 2 | gentle 1px bob |
 | walk | 4 | classic two-step bounce |
 | attack | 3 (A0 base hero; classes may use 3-4) | wind-up, strike, recover; the base hero swings a plain short sword with a crescent of air on the strike frame |
-| ability | 3 | cooldown-based signature move (arrives with H1, not in A0) |
+| ability | 3 | signature move, in the hero set since A1-1: raise the weapon arm, thrust forward, recover (timing 120/140/200 ms, release on frame 1). The base hero has the generic pose and never plays it; classes override it |
 | rest poses | 2 each | sit, eat, sleep (closed-eye line and a small "z"), polish weapon (the weapon layer is visible), read, warm hands |
 | victory | 2 | despawn pose before warp-out (sword raised, then a 1px hop) |
 
@@ -102,6 +102,34 @@ Heroes are invulnerable, so hits are theater, never damage.
 - Buff and status icons above heroes are small, decorative, and never read as a resource bar.
 
 ## 6. Hero classes
+
+Delivered so far (A1-1): the class palettes for Warrior, Mage, Archer, and Rogue, and the effects below. Class layers arrive with A1-2 (Warrior, Mage) and A1-3 (Archer, Rogue). Each layer set has all eleven animations (26 frames per layer).
+
+| Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
+|---|---|---|---|---|---|---|
+| Warrior | red `#d83a3a` | steel `#8d9ab4` | `#5c6886` | `#5a4a52` | `#5a3826` | `#d8e0ee` |
+| Mage | gold `#f4c430` | royal blue `#3f6fe0` | `#2a47a8` | `#35358a` | `#6a4020` | `#a9d6ff` |
+| Archer | brown `#a8703a` | leaf green `#3fa650` | `#276b35` | `#6b4a2a` | `#46301c` | `#c9d1c0` |
+| Rogue | purple `#a05ae6` | slate `#5f6e88` | `#3e4862` | `#2d3144` | `#392a3c` | `#c4cad8` |
+
+Rules: red is only the Warrior accent (plume, trim, shield) and the body cloth is steel, so a Warrior never reads as tinted by a hit. Pair color with shape (plume, hat, hood, mask).
+
+### Effects (A1-1)
+
+Master characters, `idle` only, centre anchor, calm things the hero does (never damage taken).
+
+| Effect | Size | Frames | Colors | Used by |
+|---|---|---|---|---|
+| `whirl` | 24x12 | 3 (expanding edge-on steel ring, dashed last frame) | `m w G` | Warrior ability |
+| `orbBolt` | 6x6 | 2 (pulse) | `d c w a` | Mage strike |
+| `arcaneBurst` | 24x24 | 3 (star, ring, fading ring) | `c d w a` | Mage ability |
+| `arrow` | 10x3 | 1 | `k m w` | Archer |
+| `dagger` | 7x5 | 2 (flat, tilted spin) | `o b m w` | Rogue ability |
+| `smokePuff` | 12x10 | 3 (grow, thin) | `G P b` | Rogue ability |
+
+The Rogue purple in `dagger` and `smokePuff` is the master indigo `b` and slate `G`/`P`, so these read slate and purple without a new master color.
+
+Planned class list:
 
 | Class | Palette | Silhouette cues | Signature prop |
 |---|---|---|---|

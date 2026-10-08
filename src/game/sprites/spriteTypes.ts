@@ -37,3 +37,12 @@ export interface StageSprites {
   props: Record<string, SpriteTemplate>;
   backdrop: SpriteTemplate;
 }
+
+/**
+ * Effect sprite ids (batch A1-1). Mirrors `EFFECT_IDS` in src/game/data/effects.ts (developer, H1);
+ * the sprite files cannot import data, so the list is repeated and the validator checks the keys.
+ */
+export type EffectSpriteId = 'whirl' | 'orbBolt' | 'arcaneBurst' | 'arrow' | 'dagger' | 'smokePuff';
+
+/** The classes delivered by H1; H2 and H3 widen this to 12. */
+export type ClassPaletteId = 'warrior' | 'mage' | 'archer' | 'rogue';

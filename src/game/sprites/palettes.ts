@@ -2,6 +2,8 @@
 // Owned by the pixel-artist. Sprites reference single characters; raw hex lives only in this file.
 // Rules and meanings: docs/design/art-style-guide.md section 3 and docs/design/sprite-spec.md.
 
+import type { ClassPaletteId } from './spriteTypes';
+
 /** One character -> '#rrggbb'. '.' is transparent and is never a key. */
 export type Palette = Record<string, string>;
 
@@ -106,4 +108,49 @@ export const PARTICLE_PALETTE: Readonly<
   spark: ['w', 'Y', 'O'],
   drip: ['q', 'Q', '8'],
   splash: ['w', 'q', 'Q'],
+};
+
+/**
+ * Class palettes (batch A1-1): partial palettes that recolor only `a c d b k m` (accent, cloth,
+ * cloth shade, pants, boots, metal). Never `o s h e w`. Applied after the master and before skin
+ * and hair. Red stays on small parts (Warrior plume, accents, shield), never the whole body.
+ * No new master characters were needed, so the master stays at 33 colors (cap 48).
+ */
+export const CLASS_PALETTES: Readonly<Record<ClassPaletteId, Palette>> = {
+  // red + steel: steel cloth, red accent (plume, trim, shield), dark brown leather
+  warrior: {
+    a: '#d83a3a',
+    c: '#8d9ab4',
+    d: '#5c6886',
+    b: '#5a4a52',
+    k: '#5a3826',
+    m: '#d8e0ee',
+  },
+  // blue + gold: royal blue robe, gold trim, indigo pants, pale blue orb metal
+  mage: {
+    a: '#f4c430',
+    c: '#3f6fe0',
+    d: '#2a47a8',
+    b: '#35358a',
+    k: '#6a4020',
+    m: '#a9d6ff',
+  },
+  // forest green + brown: leaf-green tunic, brown leather accent, dark wood
+  archer: {
+    a: '#a8703a',
+    c: '#3fa650',
+    d: '#276b35',
+    b: '#6b4a2a',
+    k: '#46301c',
+    m: '#c9d1c0',
+  },
+  // slate + purple: slate cloth, purple accent, near-black pants, cool steel
+  rogue: {
+    a: '#a05ae6',
+    c: '#5f6e88',
+    d: '#3e4862',
+    b: '#2d3144',
+    k: '#392a3c',
+    m: '#c4cad8',
+  },
 };

@@ -85,7 +85,7 @@ Heroes are layered: **base body** (shared), **head/hair**, **gear**, **weapon** 
 |---|---|---|
 | idle | 2 | gentle 1px bob |
 | walk | 4 | classic two-step bounce |
-| attack | 3 (A0 base hero; classes may use 3-4) | wind-up, strike, recover; the base hero swings a plain short sword with a crescent of air on the strike frame |
+| attack | 3 (base hero and every H1 class) | wind-up, strike, recover; the base hero swings a plain short sword with a crescent of air on the strike frame |
 | ability | 3 | signature move, in the hero set since A1-1: raise the weapon arm, thrust forward, recover (timing 120/140/200 ms, release on frame 1). The base hero has the generic pose and never plays it; classes override it |
 | rest poses | 2 each | sit, eat, sleep (closed-eye line and a small "z"), polish weapon (the weapon layer is visible), read, warm hands |
 | victory | 2 | despawn pose before warp-out (sword raised, then a 1px hop) |
@@ -103,7 +103,7 @@ Heroes are invulnerable, so hits are theater, never damage.
 
 ## 6. Hero classes
 
-Delivered so far (A1-1): the class palettes for Warrior, Mage, Archer, and Rogue, and the effects below. Class layers arrive with A1-2 (Warrior, Mage) and A1-3 (Archer, Rogue). Each layer set has all eleven animations (26 frames per layer).
+Delivered: all four H1 classes (A1-1 palettes and effects, A1-2 Warrior and Mage layers, A1-3 Archer and Rogue layers). Each layer set has all eleven animations (26 frames per layer, `attack` exactly 3). Body is shared; each class supplies `head`, `gear`, `weapon` (`classTemplates.ts`). The master palette stays at 33 colors (cap 48); classes use only `a c d b k m` overrides plus master characters, at most 11 colors per composited look (cap 12).
 
 | Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
 |---|---|---|---|---|---|---|
@@ -111,6 +111,15 @@ Delivered so far (A1-1): the class palettes for Warrior, Mage, Archer, and Rogue
 | Mage | gold `#f4c430` | royal blue `#3f6fe0` | `#2a47a8` | `#35358a` | `#6a4020` | `#a9d6ff` |
 | Archer | brown `#a8703a` | leaf green `#3fa650` | `#276b35` | `#6b4a2a` | `#46301c` | `#c9d1c0` |
 | Rogue | purple `#a05ae6` | slate `#5f6e88` | `#3e4862` | `#2d3144` | `#392a3c` | `#c4cad8` |
+
+Silhouette cues as delivered (each reads from the outline alone at 16x20):
+
+| Class | Head | Gear | Weapon | Cue |
+|---|---|---|---|---|
+| Warrior | steel helm with brow band, red plume rising and streaming back | broad pauldrons, round red-and-steel shield on the near arm | two-pixel sword; the strike frame adds a crescent, the `ability` thrust adds spin lines | wide shoulders, red plume |
+| Mage | tall bent pointed hat, gold band, wide brim (head 1 px lower) | flared robe, gold hem and belt | staff with a pale-blue orb in a gold cradle; the orb brightens with gold sparks on strike and ability | tallest silhouette, hat tip at the top edge |
+| Archer | green hood with a peak that bends back | quiver with white fletching behind the shoulder, chest strap | bow with a white string; the string pulls back and an arrow is nocked on the strike frame | hood point, quiver bulge |
+| Rogue | low rounded cowl, dark mask over the lower face, purple scarf tail (head 1 px lower and forward) | cape trailing back, purple belt | front dagger plus a short back dagger; the `ability` throw sends two blades forward and leaves the hands empty | low, forward-leaning, masked |
 
 Rules: red is only the Warrior accent (plume, trim, shield) and the body cloth is steel, so a Warrior never reads as tinted by a hit. Pair color with shape (plume, hat, hood, mask).
 

@@ -18,7 +18,7 @@ const ANCHOR = { x: 8, y: 19 } as const;
 
 // ---- Inner pieces (no outline; Grid.outline adds it) ----
 
-const HEAD = [
+export const HERO_HEAD = [
   '.hhhhhhhh.',
   'hhhhhhhhhh',
   'hhhhhsssss',
@@ -37,7 +37,7 @@ const LEGS_SIT = ['bbbbbbbbb', 'bbbbbbkkk'];
 
 // ---- Pose description ----
 
-interface Pose {
+export interface HeroPose {
   /** Inner top-left of the head. The eye sits at (x + 6, y + 3). */
   head: { x: number; y: number; closed?: boolean };
   /** Inner top-left of the torso. */
@@ -107,14 +107,15 @@ const heldSword =
   (g: Grid): void =>
     swordUp(g, 14, ty + 1, 7);
 
-const stand = (ty: number): Pick<Pose, 'head' | 'torso' | 'arm' | 'weapon'> => ({
+const stand = (ty: number): Pick<HeroPose, 'head' | 'torso' | 'arm' | 'weapon'> => ({
   head: { x: 3, y: ty - 8 },
   torso: { x: 5, y: ty },
   arm: holdArm(ty),
   weapon: heldSword(ty),
 });
 
-const POSES: Readonly<Record<string, readonly Pose[]>> = {
+/** The base poses, also the source of the hand and torso positions for the class layers. */
+export const HERO_POSES: Readonly<Record<string, readonly HeroPose[]>> = {
   idle: [
     { ...stand(10), legs: { rows: LEGS_STAND, x: 5, y: 15 } },
     { ...stand(11), legs: { rows: LEGS_STAND, x: 5, y: 15 } },
@@ -499,7 +500,7 @@ function polishSword(g: Grid, rx: number): void {
 
 // ---- Rendering of the three layers ----
 
-function renderBody(p: Pose): string[] {
+function renderBody(p: HeroPose): string[] {
   const g = new Grid(W, H);
   g.blit(p.legs.rows, p.legs.x, p.legs.y);
   g.blit(TORSO, p.torso.x, p.torso.y);
@@ -508,9 +509,9 @@ function renderBody(p: Pose): string[] {
   return g.rows();
 }
 
-function renderHead(p: Pose): string[] {
+function renderHead(p: HeroPose): string[] {
   const g = new Grid(W, H);
-  g.blit(HEAD, p.head.x, p.head.y);
+  g.blit(HERO_HEAD, p.head.x, p.head.y);
   g.outline('o');
   const ex = p.head.x + 6;
   const ey = p.head.y + 3;
@@ -524,15 +525,15 @@ function renderHead(p: Pose): string[] {
   return g.rows();
 }
 
-function renderWeapon(p: Pose): string[] {
+function renderWeapon(p: HeroPose): string[] {
   const g = new Grid(WEAPON_W, H);
   if (p.weapon) p.weapon(g);
   return g.rows();
 }
 
-function layer(id: string, w: number, render: (p: Pose) => string[]): SpriteTemplate {
+function layer(id: string, w: number, render: (p: HeroPose) => string[]): SpriteTemplate {
   const animations: Record<string, string[][]> = {};
-  for (const [name, poses] of Object.entries(POSES)) animations[name] = poses.map(render);
+  for (const [name, poses] of Object.entries(HERO_POSES)) animations[name] = poses.map(render);
   return { id, w, h: H, anchor: { x: ANCHOR.x, y: ANCHOR.y }, animations };
 }
 

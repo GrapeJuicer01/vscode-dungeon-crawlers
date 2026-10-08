@@ -508,3 +508,57 @@ Each has a default so work can proceed; changing one later is cheap except H4-2.
 - [Coding standards](../../engineering/coding-standards.md): `src/game/**` DOM-free rule and boundary row, game error-text rule, webview performance wording.
 - [Docs index](../../index.md), [glossary](../../glossary.md), [CLAUDE.md](../../../CLAUDE.md) directory map.
 - For the tester: [testing strategy](../../engineering/testing-strategy.md) sections 4.2, 6, 7.3, and 8 (the "frame-time counters" sentence is replaced by decision H4-6).
+
+## 13. As-built drift (checked against commits 081732d to b320b00)
+
+Purpose: where the code differs from sections 3 to 7. The code is correct unless a row says otherwise; [game engine](../game-engine.md) and [data model](../data-model.md) were updated to match. M3 has no equivalent section, so this one sets the pattern: one table per layer, then behaviors, then flags. Every row was verified in the source.
+
+### 13.1 New files
+
+| File | Role |
+|---|---|
+| `src/game/Ambience.ts` | stage ambient effects; `drip` picks a `DripPoint` with the seeded rng, accumulates `perSecond` as fractional debt, and emits a `drip` particle `DRIP_FALL_HEIGHT_PX` above the landing y with life `DRIP_FALL_MS` (derived from gravity). Corridor points are offset by the scroll and skipped when off screen. Called from `Game.step`. |
+| `src/game/entities/Prop.ts` | `Prop extends GuardedEntity`: a static solid floor prop that sorts with heroes (`sortY` is the foot y, `shadowWidth` 0). |
+| `src/game/sprites/artSet.ts` | developer glue that exports `SHIPPED_ART: ArtSet` from the artist's files. `main.ts` and the tests both use it; the artist's files are untouched. |
+
+### 13.2 Changed contracts
+
+| Plan (section) | As built |
+|---|---|
+| `ArtSet` (3.3) | adds `stageTileChars: Readonly<Record<string, string>>` (stage id to its tile characters); `validateArtSet` reads it for the "stage template uses only its characters" rule. |
+| `HeroLook.accent` (3.3) | a CSS `#rrggbb` string that overrides the palette character `a`, or `null` for the master colour. `lookFor(id)` always returns `accent: null`; H1 sets it. |
+| `StageDef` zone (data model 4) | `'alcove' \| 'door' \| 'corridor'`. The door zone is the one-tile column at x 128-143 and holds exactly one non-solid wall prop at `x 0` that is at most 16 px wide. `validateStages` demands exactly one door-zone prop. |
+| Solid props (3.4, data model 4) | solid only for alcove floor props. A solid anywhere else (including the corridor, which scrolls) is a validator error. |
+| Nav grid (3.2, game engine 12) | 40x4 cells of 8 px from y 128. Blocked cells come from alcove solids plus the campfire pit box (x 56, y 144, 16x8). Corridor props never block. |
+| Floor-prop rule (data model 4) | the foot y must lie in the floor band, `128 <= y < 160` (was the hero foot band 140-158). Hero feet still stay in 140-158 through the slot formulas; `FOOT_Y_MIN`/`FOOT_Y_MAX` remain in `layout.ts` as that documented band but are not used by the validator. |
+| `StageRuntime` (3.4) | gains `doorStrip` (16x180, drawn at x 128), `nearForeground` (144x20, the lip under alcove and door), `corridorForeground` (384x20), `solidProps: readonly Entity[]`, `dripPoints: readonly DripPoint[]`, `ambientChar: string`. `lights` is `readonly StageLight[]` (zone, `LightSource`, `flicker`), not `LightSource[]`. `livePropsBehind` holds only multi-frame props that are not solid alcove props. |
+| `PlacedProp` | gains `zone` and `frameMs` (torch `TORCH_FRAME_MS` 130, others `PROP_FRAME_MS` 500). |
+| Puddles | any prop with id `puddle` becomes a `DripPoint`, in any zone. |
+| `Entity` / `World` (3.4) | `Entity extends Guardable` and adds `x` (centre x, used for shadow and beam). `Guardable` has `faults`, `drawFaults`, `frozen`, `reported`. Entities extend the abstract `GuardedEntity` (also provides `clearFaults()`). `World.cache` is the `SpriteCache`, which exposes `baseHero`. `errorKey(error)` is exported. |
+| `Renderer` (3.4) | constructor `(bitmaps, art, onError = noop)`; new `advanceClock(dtMs)` that `Game.step` calls so props and torch flicker run on game time. |
+| `Roster` (3.4) | adds `countFighting()` (heroes in `advance` or `attack`; feeds `Engagement`), `countResting()` (heroes in `rest`; feeds the campfire), `clear()`, and the exported `lookFor(id)`. `apply` and `reconcile` take a `World` they do not use. |
+| `Hero` (3.4) | adds `x`, `y`, `faceRight`, `sortY`, `warpBeam` (0..1..0 over a warp phase; the renderer draws the beam from it), `exitClockMs`, `advanceExitClock(dtMs)` (the roster ticks it; the failsafe reads it), `look`, and a protected `heroLayers(world)` hook for class subclasses. |
+| `layout.ts` (3.1) | also holds `CAMPFIRE_X` 64, `CAMPFIRE_FOOT_Y` 152, `NAV_CELL_PX` 8, `NAV_COLS` 40, `NAV_ROWS` 4, `VISIBLE_SLOTS` 32, `Point`, and the slot functions `formationPosition`, `seatPosition`, `entrancePosition` (each writes into an `out` point; wrap offset 6 px per 32 slots). Entrance is x 136, y `146 + (slot % 3) * 4`. |
+| `tuning.ts` (data model 5) | adds `ENGINE_SEED` 0x50415845, `SKIN_TONE_COUNT` 4, `HAIR_COLOR_COUNT` 6, `PATH_RETRY_MS` 1000, `HERO_SHADOW_WIDTH_PX` 10, `FIRE_*` light and flicker values, `TORCH_FLICKER_MS` 140, `LIGHT_*` map and radius values, `LIGHT_BANDS` 4, `BACKDROP_*`, `DRIP_GRAVITY_PX_PER_S2` 360, `DRIP_FALL_HEIGHT_PX` 44, `WARP_SPARKS_PER_S` 40. `animations.ts` adds `PROP_FRAME_MS` and `loopFrameIndex`. |
+| `Particles` (3.2) | when a `drip` expires it spawns two `splash` particles (sideways velocity, 200-300 ms), using the pool's own rng; if the pool is full they are dropped silently. |
+| `rng.ts` | adds `hashCell(a, b, c, d)` for deterministic tile variants and torch flicker. |
+| Boot (3.5) | `Game` validates **stages only** (`validateStages`, which includes connectivity); a failure throws `RangeError('Stage data is invalid')` and the error list is not reported. Art validation (`validateArtSet`) is the tests' job, so a bad art set reaches users only if the tests were skipped. `main.ts` takes the boot clear colour from palette character `n` (fallback `#0a0810`), not a constant. `Lighting` is built on the first render, not at boot. |
+| `GameDeps.onError` | wrapped by `Game` into one sink that reports each distinct `scope:message` once per game (at most 64 distinct). Three dedup layers now exist: per entity, per game, and `main.ts` `reportError` per page load. |
+
+### 13.3 Behaviors confirmed or refined
+
+- **Draw faults are counted apart from update faults.** `update` faults freeze an entity after `FAULT_LIMIT` (3) consecutive faults; a frozen entity is still drawn. `draw` faults stop drawing it after 3 consecutive faults. Both counters reset on a clean call, and a host lifecycle event on a hero (`applyAgentState`) clears both. Replaces the single "frozen but still drawn" rule of test note 8.
+- `Game.frame` clamps the delta to 100 ms (non-positive and `NaN` count as 0), runs at most 5 fixed steps, and drops the remainder. `render` always runs, even after a step fault.
+- A snapshot that omits a live hero applies a synthetic `despawned` (same exit animation). A snapshot entry for an unknown `despawned` agent creates nothing. The queue holds 256 events; the 257th clears the queue and flags a resync from `agentSource()`; a later snapshot supersedes a pending resync.
+- An unreachable path leaves the hero in `standby` with a 1 s retry (`PATH_RETRY_MS`); it is never an error or a removal.
+- `sleep` is chosen only after 30 s of rest (`SLEEP_AFTER_REST_MS`); the first pose after arriving is `sit`, and a hero rebuilt from a snapshot starts on a hash-chosen non-sleep pose.
+- Torch flicker is a pure function of the render clock tick (`hashCell(lightIndex + 1, tick, 7, 7)`, 140 ms, plus or minus 4 px, which is half a radius step), not of the seeded rng. Campfire flicker still uses the seeded rng. Neither depends on the wall clock.
+- Draw order adds the door strip after the alcove strip and the near foreground (alcove and door) before the corridor foreground; live props are clipped to their zone; the corridor view is blitted as at most two region draws from one 384 px strip, so "blit twice" in task 10 is two regions of one strip. Shadows are 2 px bars at alpha 0.35 in the stage clear colour; warp beams are drawn right after the hero they belong to.
+
+### 13.4 Flags (nothing violates a Core invariant)
+
+1. **Campfire and solid props never leave quarantine.** `clearFaults()` is called only by `Hero.applyAgentState`. A campfire or `Prop` that faults three times stays frozen (campfire: no embers, no flicker) or hidden (draw faults) until the webview reloads. This is cosmetic and isolated, but it contradicts test note 8 ("a lifecycle event unfreezes") for non-heroes. Status: **accepted**. Documented in [game engine section 4](../game-engine.md#4-the-loop-and-crash-isolation) as by design (decorations have no lifecycle events); no code change.
+2. **Art is not validated at runtime.** Status: **resolved**. The shipped art is validated by `spriteValidator` through the `artSet` glue and covered by the art-validation test; a bad hero look would still only throw inside `Hero.draw` (guarded, reported once, hero hidden), never touching lifecycle.
+3. **Boot failure detail is dropped.** The `RangeError` for invalid stage data does not say which rule failed. Acceptable because tests run the same validator; revisit if stages become user-extensible.
+4. **Lighting failure shows up as a `render` error every frame.** `Lighting` is created inside `Renderer.render`, outside any per-entity guard, so a throw there aborts the whole render: the environment is drawn but heroes, foreground, and particles are not, on every frame. `Game.render` catches it, resets composite and alpha, and reports once; agents are unaffected (invariant 4 holds). Unlikely (pure pixel math); a cheap hardening is to build `Lighting` in the `Renderer` constructor so it fails at boot. Noted for the reviewer. Status: **resolved** by `Renderer.#guardedLightPass` (own guard, scope `render`, disabled after 3 faults), see [game engine section 4](../game-engine.md#4-the-loop-and-crash-isolation).
+5. **`FOOT_Y_MIN`/`FOOT_Y_MAX` are documentation-only constants.** Keep them or remove them in a later cleanup; the slot formulas are what keep heroes in 140-158.

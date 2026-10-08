@@ -3,7 +3,7 @@
 Purpose: the typed data tables of the game (stages now; classes, enemies, drops, achievements later), the art data the engine consumes, the startup validators, and the rules for persisted progress. Defines what is data versus code, who owns each table, and what is checked at startup.
 Related: [game engine](game-engine.md), [M4 plan](plans/m4-engine.md), [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [coding standards](../engineering/coding-standards.md#9-data-tables-and-configuration), [sprite spec](../design/sprite-spec.md), [art style guide](../design/art-style-guide.md), [roadmap](../engineering/roadmap.md), [glossary](../glossary.md).
 
-Status: M4 sections are the design for the engine milestone. Sections marked "planned" are constraints already decided, to be detailed in their own milestone plan.
+Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Sections marked "planned" are constraints already decided, to be detailed in their own milestone plan.
 
 ## 1. Principles
 
@@ -19,6 +19,7 @@ Status: M4 sections are the design for the engine milestone. Sections marked "pl
 | Master palette, skin and hair swaps, stage tile characters, particle ramps | `src/game/sprites/palettes.ts` | pixel-artist | A0 |
 | Sprite templates (hero layers, campfire, stage tiles, props, backdrop) | `src/game/sprites/spriteTemplates.ts` (more template files per batch) | pixel-artist | A0, H1-H3, E1-E5 |
 | Stages | `src/game/data/stages.ts` | developer | M4 (Stage 1), E1-E5 |
+| `ArtSet` glue (`SHIPPED_ART`) | `src/game/sprites/artSet.ts` | developer | M4 |
 | Animation timings | `src/game/data/animations.ts` | developer | M4 |
 | Engine tuning constants | `src/game/data/tuning.ts` | developer | M4 |
 | Classes, class map | `src/game/data/classes.ts`, `classMap.ts` | developer | H1-H3 |
@@ -68,6 +69,8 @@ export const CAMPFIRE: CampfireSprites;
 export const STAGE_SPRITES: Readonly<Record<string, StageSprites>>; // key = stage id
 ```
 
+The engine does not import these files directly. `src/game/sprites/artSet.ts` (developer-owned glue) gathers them into `SHIPPED_ART: ArtSet`, whose fields are `palette`, `skinTones`, `hairColors`, `baseHero`, `campfire`, `stageSprites`, `particlePalette`, `lightChars`, `stageAmbientChar`, `stageClearChar`, and `stageTileChars` (the last is `STAGE_TILE_CHARS`; the validator checks each stage's templates against it). `HeroLook` is `{ skin, hair, accent }`, where `accent` is a CSS `#rrggbb` overriding the `a` character or `null`. The `ArtSet` is validated by `validateArtSet` in tests, not at boot.
+
 Conventions the validator enforces: every non-hero sprite uses the animation name `idle` (one frame for a static tile or prop); hero layers use the hero animation names; `.` is transparent; a stage's templates use only the characters in `STAGE_TILE_CHARS[stageId]`; hero and campfire templates use at most 12 colors.
 
 ## 4. Stages (M4)
@@ -76,13 +79,14 @@ Conventions the validator enforces: every non-hero sprite uses the animation nam
 
 ```ts
 export interface LightDef { readonly radius: number; readonly intensity: number; readonly colorChar: string; readonly flicker: boolean; }
-export interface SolidDef { readonly w: number; readonly h: number; }          // foot footprint in px, blocks pathfinding
+export interface SolidDef { readonly w: number; readonly h: number; }          // foot footprint in px, blocks pathfinding; alcove floor props only
+export type StageZone = 'alcove' | 'door' | 'corridor';   // door = the 16 px column at x 128-143
 export interface PropPlacement {
   readonly prop: string;                         // key in StageSprites.props
-  readonly zone: 'alcove' | 'corridor';          // corridor positions repeat every 384 px
+  readonly zone: StageZone;                      // corridor positions repeat every 384 px
   readonly layer: 'wall' | 'floor';
   readonly x: number;                            // left edge in px within the zone
-  readonly y: number;                            // wall: top edge; floor: foot y
+  readonly y: number;                            // wall: top edge; floor: foot y in screen px
   readonly solid: SolidDef | null;
   readonly light: LightDef | null;
 }
@@ -96,16 +100,19 @@ export interface StageDef {
 }
 ```
 
-`validateStages(stages, sprites, palette)` returns a list of fixed-text errors (empty means valid):
+`validateStages(stages, art)` (in `Stage.ts`; takes the `ArtSet`) returns a list of fixed-text errors (empty means valid). `Game` runs it at construction and throws on any error; it is the only validator that runs at boot.
 
 | Check | Rule |
 |---|---|
 | ids and indexes | ids unique kebab-case; indexes 1..n contiguous and ascending |
 | art present | each stage has a `StageSprites` entry; every `prop` key exists; every tile list is non-empty |
-| placement bounds | alcove `x + w <= 128`; corridor `x + w <= 384`; floor-prop foot y inside the foot-y band; wall props inside y 0-127 |
-| lights | at most 8 per stage; `radius` 8-96; `intensity` 0-1; `colorChar` in the master palette |
-| solids | footprint inside the floor band; none overlaps a seat or formation slot cell |
-| connectivity | from the door, A* finds a path to every seat cell and formation slot cell (up to 32 each) on the built nav grid |
+| door | exactly one door-zone prop per stage; it must be a non-solid wall prop at `x 0`, at most 16 px wide |
+| placement bounds | alcove `x + w <= 128`; corridor `x + w <= 384`; `x >= 0`; floor-prop foot y inside the floor band (`128 <= y < 160`); wall props inside y 0-127 |
+| lights | at most 8 per stage; `radius` 8-96; `intensity` 0-1; `colorChar` is the torch or campfire light character |
+| solids | alcove floor props only (a solid corridor, door, or wall prop is an error); footprint inside the floor band and the alcove |
+| connectivity | the entrance cell is open; every seat and formation cell (32 each) is open (so none overlaps a solid or the campfire pit) and reachable by A* from the entrance on the built nav grid |
+
+The nav grid is built from alcove solids plus the campfire pit box (x 56, y 144, 16x8). A `puddle` prop in any zone becomes a drip point for the `drip` ambient effect.
 
 From E1, `enemies.ts` adds its own validator (50 unique ids, 5 per stage, one boss per stage, incremental mode per roadmap A3) and cross-checks that every enemy's stage exists in `STAGES`.
 
@@ -117,15 +124,17 @@ From E1, `enemies.ts` adds its own validator (50 unique ids, 5 per stage, one bo
 
 | Group | Constants (defaults) |
 |---|---|
-| Loop | `STEP_MS` 1000/60, `MAX_FRAME_MS` 100, `MAX_STEPS_PER_FRAME` 5, `EVENT_QUEUE_CAP` 256, `FAULT_LIMIT` 3, `EXIT_FAILSAFE_MS` 5000 |
-| Hero | `WALK_PX_PER_S` 40, `WARP_IN_MS` 600, `WARP_OUT_MS` 600, `VICTORY_MS` 1200, `REST_POSE_MIN_MS` 9000, `REST_POSE_MAX_MS` 16000, `SLEEP_AFTER_REST_MS` 30000, `VISIBLE_SLOTS` 32 |
+| Loop | `STEP_MS` 1000/60, `MAX_FRAME_MS` 100, `MAX_STEPS_PER_FRAME` 5, `EVENT_QUEUE_CAP` 256, `FAULT_LIMIT` 3, `EXIT_FAILSAFE_MS` 5000, `ENGINE_SEED` 0x50415845 |
+| Hero | `WALK_PX_PER_S` 40, `WARP_IN_MS` 600, `WARP_OUT_MS` 600, `VICTORY_MS` 1200, `REST_POSE_MIN_MS` 9000, `REST_POSE_MAX_MS` 16000, `SLEEP_AFTER_REST_MS` 30000, `SKIN_TONE_COUNT` 4, `HAIR_COLOR_COUNT` 6, `HERO_SHADOW_WIDTH_PX` 10, `PATH_RETRY_MS` 1000, `WARP_SPARKS_PER_S` 40 (`VISIBLE_SLOTS` 32 lives in `layout.ts`) |
 | Engagement | `ADVANCE_MS` 5000, `ENGAGE_MS` 2400, `SCROLL_PX_PER_S` 24, `SCROLL_EASE_MS` 300, `ATTACK_STAGGER_MAX_MS` 400 |
-| Campfire | `FLAME_LARGE_AT_RESTING` 3, ember rate 4/s plus 3/s per resting hero, light radius 40 plus 6 per resting hero (cap 72) |
-| Effects | `PARTICLE_CAPACITY` 384, `MAX_LIGHTS` 16, light map 80x45 |
+| Campfire | `FLAME_LARGE_AT_RESTING` 3, `EMBER_BASE_PER_S` 4 plus `EMBER_PER_RESTING_PER_S` 3 per resting hero, light radius `FIRE_LIGHT_BASE_PX` 40 plus `FIRE_LIGHT_PER_RESTING_PX` 6 per resting hero (cap `FIRE_LIGHT_MAX_PX` 72), `FIRE_LIGHT_INTENSITY` 0.9, `FIRE_FLICKER_MS` 120, `FIRE_SHADOW_WIDTH_PX` 30 |
+| Effects | `PARTICLE_CAPACITY` 384, `MAX_LIGHTS` 16, light map `LIGHT_MAP_WIDTH` 80 by `LIGHT_MAP_HEIGHT` 45 at `LIGHT_MAP_SCALE` 4, `LIGHT_RADIUS_STEP_PX` 8, `LIGHT_RADIUS_MAX_PX` 96, `LIGHT_BANDS` 4, `TORCH_FLICKER_MS` 140, `BACKDROP_PARALLAX` 0.25, `BACKDROP_WIDTH_PX` 128, `DRIP_GRAVITY_PX_PER_S2` 360, `DRIP_FALL_HEIGHT_PX` 44 |
+
+`animations.ts` also exports `FLAME_FRAME_MS` 110, `TORCH_FRAME_MS` 130, and `PROP_FRAME_MS` 500 (other looping props), plus the allocation-free `heroFrameIndex` and `loopFrameIndex`. Fixed room geometry (campfire position, nav cell size, slot formulas) lives in `layout.ts`, not in `tuning.ts`.
 
 ## 6. Hero identity data (M4)
 
-There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % 4`, `hairIndex = (hashId(id) >>> 8) % 6`, accent default. Class assignment (H1) adds `classes.ts` and `classMap.ts`; the class chosen for a session is sticky and held in the webview only (no persistence).
+There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % SKIN_TONE_COUNT`, `hairIndex = (hashId(id) >>> 8) % HAIR_COLOR_COUNT`, `accent: null` (implemented by the exported `lookFor(id)` in `Roster.ts`). Class assignment (H1) adds `classes.ts` and `classMap.ts`; the class chosen for a session is sticky and held in the webview only (no persistence).
 
 ## 7. Persisted progress (planned, E1)
 

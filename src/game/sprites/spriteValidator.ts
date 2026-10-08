@@ -485,7 +485,12 @@ export function validateArtSet(art: ArtSet): readonly string[] {
   });
   errors.push(...validateHeroLayers(art.baseHero, palette));
   for (const [id, layers] of Object.entries(art.classLayers)) {
-    errors.push(...validateClassLook(art, id, layers));
+    // Classes may share the base body template; report its faults once, not once per class.
+    for (const message of validateClassLook(art, id, layers)) {
+      if (!errors.includes(message)) {
+        errors.push(message);
+      }
+    }
   }
   for (const [id, cp] of Object.entries(art.classPalettes)) {
     if (art.classLayers[id] === undefined) {

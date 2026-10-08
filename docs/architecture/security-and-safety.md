@@ -1,7 +1,7 @@
 # Security and safety
 
 Purpose: the threat model for Pixel Agents and the controls that keep real agent sessions, transcripts, and the user's machine safe from the game, from a compromised webview, and from our own bugs. Each control names the invariant it serves and the test that enforces it.
-Related: [architecture overview](overview.md#6-security-boundary), [host-webview protocol](host-webview-protocol.md), [ADR 0007 allow-list protocol and pull handshake](adr/0007-allow-list-protocol-pull-handshake.md), [ADR 0001 bottom-panel webview](adr/0001-bottom-panel-webview.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0004 esbuild two bundles](adr/0004-esbuild-two-bundles.md), [coding standards](../engineering/coding-standards.md), [M2 plan](plans/m2-protocol.md), [M3 plan](plans/m3-monitor.md), [agent detection](agent-detection.md), [ADR 0005 transcript watching](adr/0005-transcript-watching.md), [CLAUDE.md](../../CLAUDE.md).
+Related: [architecture overview](overview.md#6-security-boundary), [host-webview protocol](host-webview-protocol.md), [ADR 0007 allow-list protocol and pull handshake](adr/0007-allow-list-protocol-pull-handshake.md), [ADR 0001 bottom-panel webview](adr/0001-bottom-panel-webview.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0004 esbuild two bundles](adr/0004-esbuild-two-bundles.md), [coding standards](../engineering/coding-standards.md), [M2 plan](plans/m2-protocol.md), [M3 plan](plans/m3-monitor.md), [M4 plan](plans/m4-engine.md), [game engine](game-engine.md), [ADR 0009 hero lifecycle isolation](adr/0009-hero-lifecycle-isolation.md), [agent detection](agent-detection.md), [ADR 0005 transcript watching](adr/0005-transcript-watching.md), [CLAUDE.md](../../CLAUDE.md).
 
 ## 1. What we protect
 
@@ -70,6 +70,8 @@ The webview runs our own bundle under a strict CSP, so it is not expected to be 
 | T12 | Game bug changes or hides a hero | hero state changes only through host `agentState`/`agentList`; webview has no message that reports game state; update loop in try/catch; rebuild from host list on reload | 1, 2, 4 | hero-invariant test, structural hero check | M4 |
 | T13 | Webview spams `ready` to load the host | each answer is bounded (one config, at most 64 agents) | 4 | bridge tests (bounded output) | M2 |
 | T14 | Persisted progress corrupts or grows unbounded | schema version, migrations, validation on load (E1) | 4 | persistence tests | E1 |
+| T20 | A faulty entity, bad art data, or an event flood in the engine takes down the scene, hides a hero, or stalls the panel | per-entity quarantine (frozen, never removed), try/catch per step and render, a frame callback that schedules the next frame first, a bounded event queue (256) that resyncs from the mirror, a bounded particle pool and light list, the `despawned` failsafe removal, the art validator run by tests, boot failure leaving the mirror working | 2, 4 | engine crash-isolation tests, hero-invariant test (faults, absurd deltas, queue overflow, pool exhaustion), art validator tests | M4 |
+| T21 | The engine reaches the host or an agent, or renders untrusted text as markup | `src/game/**` has no host channel, no `postMessage`, no `acquireVsCodeApi`, no DOM, timer, network, or storage access (lint and structural scan); `SceneFeed` and `GameHost` never call `HostChannel.send`; the engine draws no text in M4 (names and tool names are canvas text only, from M7); error messages in `src/game/**` are fixed strings | 3, 4, 7 | structural scan of `src/game/**` and the two webview files; `HostChannel` call-site test | M4 |
 | T15 | Untrusted workspace content executed | the extension never executes workspace content; `untrustedWorkspaces.supported: true` is therefore safe | 3 | review | M1 |
 
 ## 4. Data inventory (Core invariant 7)
@@ -97,7 +99,7 @@ The webview runs our own bundle under a strict CSP, so it is not expected to be 
 
 - The monitor (M3) catches errors in every timer callback, poll step, port event, and listener call; a per-file error affects only that file; a failure to construct the monitor in `activate` leaves the view working with an empty agent list.
 - Host handlers never throw across `onDidReceiveMessage`. The bridge's error logging and its `postMessage` rejection handler each wrap the logger call in their own try/catch, so even a throwing logger cannot escape as an exception or an unhandled rejection.
-- The webview catches errors in its message handler (M2) and its update loop (M4); errors are reported once per distinct message and never change hero state.
+- The webview catches errors in its message handler (M2) and its update loop (M4); errors are reported once per distinct message and never change hero state. The engine isolates faults per entity, per step, per render, and per frame callback, and cannot send anything to the host ([game engine section 4](game-engine.md#4-the-loop-and-crash-isolation), [ADR 0009](adr/0009-hero-lifecycle-isolation.md)).
 - The webview is never a source of truth: `retainContextWhenHidden: false`, no `getState`/`setState`, and every load rebuilds from the host snapshot.
 
 ## 7. Review checklist for changes near a boundary

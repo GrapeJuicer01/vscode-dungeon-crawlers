@@ -1,7 +1,7 @@
 # ADR 0003: Procedural, palette-indexed sprites and synthesized audio
 
 Purpose: records why all art is palette-indexed pixel maps in TypeScript and all sound is Web Audio synthesis, with no image or audio files in the repo or the package.
-Related: [architecture overview](../overview.md), [sprite spec](../../design/sprite-spec.md), [art style guide](../../design/art-style-guide.md), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [game engine](../game-engine.md) (planned).
+Related: [architecture overview](../overview.md), [sprite spec](../../design/sprite-spec.md), [art style guide](../../design/art-style-guide.md), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [game engine](../game-engine.md), [data model](../data-model.md).
 
 ## Status
 

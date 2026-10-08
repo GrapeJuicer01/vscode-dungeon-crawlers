@@ -1,7 +1,7 @@
 # CLAUDE.md: Pixel Agents
 
 Purpose: orientation for Claude Code and its subagents. Read this first. `SPEC.md` (if present) is the original brief and may be outdated: if it disagrees with `docs/`, the docs win. The core invariants below always win.
-Related: [team workflow](docs/engineering/team-workflow.md), [coding standards](docs/engineering/coding-standards.md), [testing strategy](docs/engineering/testing-strategy.md), [docs index](docs/index.md).
+Related: [team workflow](docs/engineering/team-workflow.md), [coding standards](docs/engineering/coding-standards.md), [testing strategy](docs/engineering/testing-strategy.md), [game engine](docs/architecture/game-engine.md), [docs index](docs/index.md).
 
 ## Project summary
 
@@ -47,15 +47,18 @@ src/monitor/adapters/       (M3) the only monitor files touching Node or vscode:
                             nodeRuntime (clock, timers, path), vscodeTerminals (terminal events, show() only)
 src/shared/                 (M2) both bundles, imports nothing outside src/shared/: protocol.ts (typed
                             host <-> webview messages, validators, creators), assertNever.ts
-src/webview/                index.html.ts (host-side HTML + CSP builder), main.ts (boot; message pump M2);
-                            hostChannel.ts, hostMessages.ts, hostState.ts (M2); ui.ts (M7), audio.ts (M8)
-src/game/                   (M4) engine: Game, Renderer, Camera, Lighting, Pathfinding, Collision, Particles; Combat (E1)
-src/game/entities/          (M4) Hero, Campfire; 12 classes (H1-H3), Summon (H2), Enemy, Boss (E1)
-src/game/data/              (M4) stages; classes, classMap (H1); enemies, drops (E1); achievements (M7)
-src/game/sprites/           (M4) palettes, spriteTemplates (art), spriteFactory (renderer)
+src/webview/                index.html.ts (host-side HTML + CSP builder), main.ts (boot; message pump M2; builds the
+                            engine M4); hostChannel.ts, hostMessages.ts, hostState.ts (M2); sceneFeed.ts, gameHost.ts
+                            (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); ui.ts (M7), audio.ts (M8)
+src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, layout, rng, Game, Roster, Engagement,
+                            Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Stage; Combat (E1)
+src/game/entities/          (M4) Entity (guard), Hero, Campfire; 12 classes (H1-H3), Summon (H2), Enemy, Boss (E1)
+src/game/data/              (M4) stages, animations, tuning; classes, classMap (H1); enemies, drops (E1); achievements (M7)
+src/game/sprites/           (M4) palettes, spriteTemplates (art, A0), spriteFactory, spriteValidator (developer)
 scripts/                    (H1) generate-doc-tables.ts
-test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test);
-                            support/ helpers and fakes (fakeVscode, fakeDom; monitor fakes from M3);
+test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); game/ engine suites
+                            incl. the hero-invariant test (M4);
+                            support/ helpers and fakes (fakeVscode, fakeDom; monitor fakes from M3; engine fakes M4);
                             fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3)
 test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
                             --disable-extensions); support/ in-host harness and providerSpy

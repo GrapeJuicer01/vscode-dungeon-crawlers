@@ -1,7 +1,7 @@
 # Glossary
 
 Purpose: one-line definitions of the terms used across the Pixel Agents docs, so every agent and contributor means the same thing by "hero", "host", "stage", or "gate". Owned by the architect; extended as milestones add terms.
-Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [agent detection](architecture/agent-detection.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
+Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [agent detection](architecture/agent-detection.md), [game engine](architecture/game-engine.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
 
 ## Agents and the game
 
@@ -84,6 +84,30 @@ Full contract in [agent detection](architecture/agent-detection.md); rationale i
 | port (monitor) | a narrow interface the monitor core depends on (`ReadOnlyFileSystem`, `PathOps`, `Clock`, `TimerPort`, `TerminalPort`, `MonitorLogger`), implemented by an adapter. |
 | adapter | a file under `src/monitor/adapters/`, the only monitor code allowed to import Node built-ins or `vscode`. |
 | `safeErrorCode` | the only way monitor code describes an error: `error.code` or `error.name`, never the message or stack. |
+
+## Engine (M4)
+
+Full design in [game engine](architecture/game-engine.md) and [data model](architecture/data-model.md); rationale in ADRs [0008](architecture/adr/0008-dom-free-engine-behind-ports.md), [0009](architecture/adr/0009-hero-lifecycle-isolation.md), [0010](architecture/adr/0010-split-room-stage-layout.md).
+
+| Term | Meaning |
+|---|---|
+| lifecycle | the one fact a hero stores about its agent: `spawned`, `working`, `idle`, or `despawned`. Changed only by `Hero.applyAgentState`, called only from `Roster`, fed by host events. |
+| phase | a hero's cosmetic animation state (`warpIn`, `standby`, `travel`, `advance`, `attack`, `rest`, `victory`, `warpOut`), derived from lifecycle and timers. Never feeds back into lifecycle. |
+| `Game` | the engine facade: event queue, fixed-step loop, render, `heroSnapshot`. DOM-free, has no host channel. |
+| `Roster` | the engine's hero map; applies host events and snapshots and decides when a hero is removed. |
+| `Surface`, `BitmapFactory` | the two ports through which the engine draws and creates bitmaps; implemented over canvas 2D in `src/webview/canvasSurface.ts`. |
+| `GameHost` | the webview-side loop driver: schedules frames, pauses when hidden, reports errors. |
+| `SceneFeed` | the webview `HostMessageTarget` that updates the `HostStateMirror` and queues the same events into the engine. |
+| fixed step | the engine updates in 1/60 s steps from an accumulator (at most 5 per frame); rendering is not interpolated. |
+| quarantine | what the engine does to an entity that throws three times in a row: freeze it (no update), keep it listed, report once. It is never removed for a fault. |
+| instant rebuild | creating heroes from a snapshot directly in their lifecycle's place, with no warp-in; used on reload. |
+| alcove, corridor | the two halves of a stage's room: the static campfire room (x 0-127) and the scrolling dungeon corridor (x 144-319), split by a door column ([ADR 0010](architecture/adr/0010-split-room-stage-layout.md)). |
+| formation slot, seat | a hero's stable position index in the corridor (while working) and around the campfire (while idle). |
+| engagement | the party rhythm that decides when the corridor scrolls (advance) and when working heroes attack (engage); timed in M4, enemy-driven from E1. |
+| strip | a pre-rendered offscreen bitmap of a stage's static wall and floor (alcove 128x180, corridor segment 384x180). |
+| light map | the 80x45 offscreen buffer that holds ambient plus light sources and is multiplied onto the environment. |
+| `ArtSet` | the bundle of palettes, templates, and sprite data the engine is constructed with. |
+| A0 | the first art batch: master palette, base hero, campfire, Stage 1 environment. |
 
 ## Process
 

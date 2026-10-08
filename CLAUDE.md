@@ -51,14 +51,17 @@ src/webview/                index.html.ts (host-side HTML + CSP builder), main.t
                             engine M4); hostChannel.ts, hostMessages.ts, hostState.ts (M2); sceneFeed.ts, gameHost.ts
                             (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); ui.ts (M7), audio.ts (M8)
 src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, layout, rng, Game, Roster, Engagement,
-                            Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Ambience, Stage; Combat (E1)
-src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; 12 classes (H1-H3), Summon (H2), Enemy, Boss (E1)
-src/game/data/              (M4) stages, animations, tuning; classes, classMap (H1); enemies, drops (E1); achievements (M7)
+                            Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Ambience, Stage; Effects (H1, cosmetic
+                            effect pool); Combat (E1)
+src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero + createHero (H1, data-driven: the
+                            12 classes are rows, subclass files only where code is needed), Summon (H2), Enemy, Boss (E1)
+src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1); enemies,
+                            drops (E1); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,
                             campfireTemplates, stage1Templates; engine (developer): spriteFactory,
                             spriteValidator, artSet (SHIPPED_ART glue)
-scripts/                    (H1) generate-doc-tables.ts
+scripts/                    (H1) generate-doc-tables.ts + docs-tables.mjs (esbuild runner behind `npm run docs:tables`)
 test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); game/ engine suites
                             incl. the hero-invariant test (M4);
                             support/ helpers and fakes (fakeVscode, fakeDom; monitor fakes from M3; engine fakes M4);

@@ -92,7 +92,7 @@ Full design in [game engine](architecture/game-engine.md) and [data model](archi
 | Term | Meaning |
 |---|---|
 | lifecycle | the one fact a hero stores about its agent: `spawned`, `working`, `idle`, or `despawned`. Changed only by `Hero.applyAgentState`, called only from `Roster`, fed by host events. |
-| phase | a hero's cosmetic animation state (`warpIn`, `standby`, `travel`, `advance`, `attack`, `rest`, `victory`, `warpOut`), derived from lifecycle and timers. Never feeds back into lifecycle. |
+| phase | a hero's cosmetic animation state (`warpIn`, `standby`, `travel`, `advance`, `attack`, `ability` (H1), `rest`, `victory`, `warpOut`), derived from lifecycle and timers. Never feeds back into lifecycle. |
 | `Game` | the engine facade: event queue, fixed-step loop, render, `heroSnapshot`. DOM-free, has no host channel. |
 | `Roster` | the engine's hero map; applies host events and snapshots and decides when a hero is removed. |
 | `Surface`, `BitmapFactory` | the two ports through which the engine draws and creates bitmaps; implemented over canvas 2D in `src/webview/canvasSurface.ts`. |
@@ -108,6 +108,11 @@ Full design in [game engine](architecture/game-engine.md) and [data model](archi
 | light map | the 80x45 offscreen buffer that holds ambient plus light sources and is multiplied onto the environment. |
 | `ArtSet` | the bundle of palettes, templates, and sprite data the engine is constructed with. |
 | A0 | the first art batch: master palette, base hero, campfire, Stage 1 environment. |
+| class (H1) | a cosmetic hero identity (Warrior, Mage, Archer, Rogue; 12 by H3): a palette, silhouette, weapon, and effect shots. It has no health, mana, or power; it is chosen by `classFor(id)` and never changes for a session id. See the [H1 plan](architecture/plans/h1-classes.md). |
+| `classFor` | the pure function in `classMap.ts` that hashes a session id (upper 16 bits of `hashId`) over the delivered classes; no state, no storage, no tool names. |
+| ability (H1) | a class hero's 3-frame signature animation, played from the `attack` phase when a hidden seeded timer fires. Cosmetic: it spawns effects and changes nothing about the hero or the host. |
+| effect, `EffectPool` (H1) | a small pooled sprite (arrow, orb, burst, whirl, dagger, smoke) spawned by a class hook and drawn after the entities; it has no collision and no target until E1. |
+| delivered classes | the classes present in `classes.ts` so far; `classFor` hashes over this set. |
 
 ## Process
 

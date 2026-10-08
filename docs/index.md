@@ -30,6 +30,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [m2-protocol](architecture/plans/m2-protocol.md) | M2 Protocol (refreshed against M1 as built; includes integration test notes) |
 | [m3-monitor](architecture/plans/m3-monitor.md) | M3 Monitor (checked against M2 as built; includes decisions for the human) |
 | [m4-engine](architecture/plans/m4-engine.md) | M4 Engine (checked against M3 as built; includes the exact A0 art list and decisions for the human) |
+| [h1-classes](architecture/plans/h1-classes.md) | H1 Warrior, Mage, Archer, Rogue (checked against M4 as built; class assignment from the session id, ability phase, effect pool, `docs:tables`, exact art list, decisions H1-1 to H1-10) |
 
 ### ADRs
 

@@ -1,7 +1,7 @@
 # Data model
 
 Purpose: the typed data tables of the game (stages now; classes, enemies, drops, achievements later), the art data the engine consumes, the startup validators, and the rules for persisted progress. Defines what is data versus code, who owns each table, and what is checked at startup.
-Related: [game engine](game-engine.md), [M4 plan](plans/m4-engine.md), [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [coding standards](../engineering/coding-standards.md#9-data-tables-and-configuration), [sprite spec](../design/sprite-spec.md), [art style guide](../design/art-style-guide.md), [roadmap](../engineering/roadmap.md), [glossary](../glossary.md).
+Related: [game engine](game-engine.md), [M4 plan](plans/m4-engine.md), [H1 plan](plans/h1-classes.md), [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [coding standards](../engineering/coding-standards.md#9-data-tables-and-configuration), [sprite spec](../design/sprite-spec.md), [art style guide](../design/art-style-guide.md), [roadmap](../engineering/roadmap.md), [glossary](../glossary.md).
 
 Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Sections marked "planned" are constraints already decided, to be detailed in their own milestone plan.
 
@@ -22,7 +22,8 @@ Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M
 | `ArtSet` glue (`SHIPPED_ART`) | `src/game/sprites/artSet.ts` | developer | M4 |
 | Animation timings | `src/game/data/animations.ts` | developer | M4 |
 | Engine tuning constants | `src/game/data/tuning.ts` | developer | M4 |
-| Classes, class map | `src/game/data/classes.ts`, `classMap.ts` | developer | H1-H3 |
+| Classes, class map, effect ids | `src/game/data/classes.ts`, `classMap.ts`, `effects.ts` | developer | H1-H3 |
+| Class palettes, class layers, effect sprites | `palettes.ts` (`CLASS_PALETTES`), `classTemplates.ts` (`CLASS_LAYERS`), `effectTemplates.ts` (`EFFECT_SPRITES`) | pixel-artist | H1 (A1-1 to A1-3), H2, H3 |
 | Enemies, drops | `src/game/data/enemies.ts`, `drops.ts` | developer | E1-E5 |
 | Achievements | `src/game/data/achievements.ts` | developer | M7 |
 
@@ -70,6 +71,8 @@ export const STAGE_SPRITES: Readonly<Record<string, StageSprites>>; // key = sta
 ```
 
 The engine does not import these files directly. `src/game/sprites/artSet.ts` (developer-owned glue) gathers them into `SHIPPED_ART: ArtSet`, whose fields are `palette`, `skinTones`, `hairColors`, `baseHero`, `campfire`, `stageSprites`, `particlePalette`, `lightChars`, `stageAmbientChar`, `stageClearChar`, and `stageTileChars` (the last is `STAGE_TILE_CHARS`; the validator checks each stage's templates against it). `HeroLook` is `{ skin, hair, accent }`, where `accent` is a CSS `#rrggbb` overriding the `a` character or `null`. The `ArtSet` is validated by `validateArtSet` in tests, not at boot.
+
+H1 adds (planned, [H1 plan section 3.5](plans/h1-classes.md#35-sprites-and-art-set)): `CLASS_PALETTES` in `palettes.ts`; `CLASS_LAYERS` (class id to `HeroLayerSet`) and `EFFECT_SPRITES` (effect id to `SpriteTemplate`, animation `idle`, center anchor) in the template files; `ArtSet` gains `classLayers`, `classPalettes`, and `effects`; `HeroLook` gains `classId`; the base hero gains a 3-frame `ability` and `ability` joins the required hero animations (eleven, 26 frames per layer). Palette order for a hero bitmap is master, class, skin, hair, accent.
 
 Conventions the validator enforces: every non-hero sprite uses the animation name `idle` (one frame for a static tile or prop); hero layers use the hero animation names; `.` is transparent; a stage's templates use only the characters in `STAGE_TILE_CHARS[stageId]`; hero and campfire templates use at most 12 colors.
 
@@ -128,13 +131,25 @@ From E1, `enemies.ts` adds its own validator (50 unique ids, 5 per stage, one bo
 | Hero | `WALK_PX_PER_S` 40, `WARP_IN_MS` 600, `WARP_OUT_MS` 600, `VICTORY_MS` 1200, `REST_POSE_MIN_MS` 9000, `REST_POSE_MAX_MS` 16000, `SLEEP_AFTER_REST_MS` 30000, `SKIN_TONE_COUNT` 4, `HAIR_COLOR_COUNT` 6, `HERO_SHADOW_WIDTH_PX` 10, `PATH_RETRY_MS` 1000, `WARP_SPARKS_PER_S` 40 (`VISIBLE_SLOTS` 32 lives in `layout.ts`) |
 | Engagement | `ADVANCE_MS` 5000, `ENGAGE_MS` 2400, `SCROLL_PX_PER_S` 24, `SCROLL_EASE_MS` 300, `ATTACK_STAGGER_MAX_MS` 400 |
 | Campfire | `FLAME_LARGE_AT_RESTING` 3, `EMBER_BASE_PER_S` 4 plus `EMBER_PER_RESTING_PER_S` 3 per resting hero, light radius `FIRE_LIGHT_BASE_PX` 40 plus `FIRE_LIGHT_PER_RESTING_PX` 6 per resting hero (cap `FIRE_LIGHT_MAX_PX` 72), `FIRE_LIGHT_INTENSITY` 0.9, `FIRE_FLICKER_MS` 120, `FIRE_SHADOW_WIDTH_PX` 30 |
+| Classes (H1, planned) | `EFFECT_CAPACITY` 24, `ABILITY_INTERVAL_MIN_MS` 4000, `ABILITY_INTERVAL_MAX_MS` 8000, `ATTACK_STRIKE_FRAME` 1, `ABILITY_RELEASE_FRAME` 1, `EFFECT_FRAME_MS` 90, `EFFECT_CULL_MARGIN_PX` 32, `HERO_FRAME_MS.ability` 120/140/200 |
 | Effects | `PARTICLE_CAPACITY` 384, `MAX_LIGHTS` 16, light map `LIGHT_MAP_WIDTH` 80 by `LIGHT_MAP_HEIGHT` 45 at `LIGHT_MAP_SCALE` 4, `LIGHT_RADIUS_STEP_PX` 8, `LIGHT_RADIUS_MAX_PX` 96, `LIGHT_BANDS` 4, `TORCH_FLICKER_MS` 140, `BACKDROP_PARALLAX` 0.25, `BACKDROP_WIDTH_PX` 128, `DRIP_GRAVITY_PX_PER_S2` 360, `DRIP_FALL_HEIGHT_PX` 44 |
 
 `animations.ts` also exports `FLAME_FRAME_MS` 110, `TORCH_FRAME_MS` 130, and `PROP_FRAME_MS` 500 (other looping props), plus the allocation-free `heroFrameIndex` and `loopFrameIndex`. Fixed room geometry (campfire position, nav cell size, slot formulas) lives in `layout.ts`, not in `tuning.ts`.
 
-## 6. Hero identity data (M4)
+## 6. Hero identity and classes (M4, H1)
 
-There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % SKIN_TONE_COUNT`, `hairIndex = (hashId(id) >>> 8) % HAIR_COLOR_COUNT`, `accent: null` (implemented by the exported `lookFor(id)` in `Roster.ts`). Class assignment (H1) adds `classes.ts` and `classMap.ts`; the class chosen for a session is sticky and held in the webview only (no persistence).
+There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % SKIN_TONE_COUNT`, `hairIndex = (hashId(id) >>> 8) % HAIR_COLOR_COUNT`, `accent: null` (implemented by the exported `lookFor(id)` in `Roster.ts`).
+
+**Classes (planned in the [H1 plan](plans/h1-classes.md), not yet built).** `classes.ts` holds `CLASSES: readonly ClassDef[]`, one compact row per class: `id`, `name`, `role`, `colors`, `silhouette` (the last two are documentation text for the generated table), `strike` (a list of cosmetic `EffectShot`), and `ability` (id, name, effect shots). A row has no health, mana, power, or cooldown field and none may be added without a Core invariant review; the structural test pins the key set. `effects.ts` lists the `EffectId` union. `classMap.ts` exports `DELIVERED_CLASSES` and the pure `classFor(id)`: `DELIVERED_CLASSES[(hashId(id) >>> 16) % length]`. The class is therefore sticky by construction, stable across webview reloads, held nowhere, and never persisted (persisting it would store session ids, Core invariant 7). H1 delivers four classes; H2 and H3 extend `CLASS_IDS` to 12, and the validator then requires exactly 12 unique ids with complete template sets.
+
+| Check (`validateClasses`, `validateClassArt`; tests only) | Rule |
+|---|---|
+| ids | unique, equal to `CLASS_IDS`; names equal the art style guide |
+| shots | effect ids exist in `EFFECT_IDS` and in `ArtSet.effects`; lifetimes 100-1500 ms; at most 4 shots per list |
+| art | every class has layers (eleven animations, 26 frames per layer, equal counts) and a partial palette overriding only `a c d b k m` |
+| composited look | at most 12 colors per class look under every skin and hair swap |
+
+`npm run docs:tables` regenerates the class table in `docs/design/classes.md` from `classes.ts` between generated-region markers; it never reads art.
 
 ## 7. Persisted progress (planned, E1)
 

@@ -79,6 +79,8 @@ function drawClipped(
   surface.drawBitmapRegion(frame, left - dx, 0, right - left, set.h, left, dy, right - left, set.h);
 }
 
+const LIGHT_FAULT_LIMIT = 3;
+
 export class Renderer {
   readonly #bitmaps: BitmapFactory;
   readonly #art: ArtSet;
@@ -91,6 +93,8 @@ export class Renderer {
   #ctx: MutableDrawContext | null = null;
   #current: Entity | null = null;
   #clockMs = 0;
+  #lightFaults = 0;
+  #lightFaultReported = false;
   readonly #drawCurrent = (): void => {
     if (this.#current !== null && this.#ctx !== null) {
       this.#current.draw(this.#ctx);
@@ -130,7 +134,7 @@ export class Renderer {
     blitCorridor(surface, stage.corridorStrip, corridorOffset, 0, INTERNAL_HEIGHT, 0);
     this.#drawLiveProps(surface, stage, corridorOffset);
 
-    this.#lightPass(surface, world, corridorOffset);
+    this.#guardedLightPass(surface, world, corridorOffset);
 
     this.#sortEntities(world, heroes);
     this.#drawShadows(surface, stage.clearColor);
@@ -240,6 +244,25 @@ export class Renderer {
       this.#lightings.set(stage.def.id, lighting);
     }
     return lighting;
+  }
+
+  /** Lighting is built outside the entity guard, so it gets its own: report once, disable after a few faults. */
+  #guardedLightPass(surface: Surface, world: World, corridorOffset: number): void {
+    if (this.#lightFaults >= LIGHT_FAULT_LIMIT) {
+      return;
+    }
+    try {
+      this.#lightPass(surface, world, corridorOffset);
+    } catch (error) {
+      this.#lightFaults++;
+      if (!this.#lightFaultReported) {
+        this.#lightFaultReported = true;
+        this.#onError(error, 'render');
+      }
+      // A fault mid-compose may leave the multiply state set; entities must draw normally.
+      surface.setComposite('source-over');
+      surface.setAlpha(1);
+    }
   }
 
   #lightPass(surface: Surface, world: World, corridorOffset: number): void {

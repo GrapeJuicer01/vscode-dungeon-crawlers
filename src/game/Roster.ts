@@ -46,11 +46,8 @@ export class Roster {
       case 'spawned':
         if (existing === undefined) {
           this.#create(agent, false);
-        } else if (existing.exiting) {
-          this.#remove(existing);
-          this.#create(agent, false);
         } else {
-          existing.applyAgentState(agent);
+          this.#updateOrReplace(existing, agent, false);
         }
         return;
       case 'working':
@@ -59,7 +56,7 @@ export class Roster {
           // A missed `spawned` is tolerated, as in the mirror: no warp-in.
           this.#create(agent, true);
         } else {
-          existing.applyAgentState(agent);
+          this.#updateOrReplace(existing, agent, true);
         }
         return;
       case 'despawned':
@@ -81,11 +78,10 @@ export class Roster {
         if (agent.state !== 'despawned') {
           this.#create(agent, true);
         }
-      } else if (existing.exiting && agent.state !== 'despawned') {
-        this.#remove(existing);
-        this.#create(agent, true);
-      } else {
+      } else if (agent.state === 'despawned') {
         existing.applyAgentState(agent);
+      } else {
+        this.#updateOrReplace(existing, agent, true);
       }
     }
     for (const hero of this.#list) {
@@ -156,6 +152,20 @@ export class Roster {
     this.#byId.clear();
     this.#list.length = 0;
     this.#slots.length = 0;
+  }
+
+  /**
+   * A live (non-despawned) event for a known hero. An exiting hero is replaced by a fresh one,
+   * since its lifecycle cannot leave despawned; otherwise it would stay in victory/warpOut and
+   * never be removed. Driven only by the host event; Hero.applyAgentState stays the lifecycle writer.
+   */
+  #updateOrReplace(existing: Hero, agent: AgentInfo, instant: boolean): void {
+    if (existing.exiting) {
+      this.#remove(existing);
+      this.#create(agent, instant);
+    } else {
+      existing.applyAgentState(agent);
+    }
   }
 
   #create(agent: AgentInfo, instant: boolean): void {

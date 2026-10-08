@@ -15,7 +15,12 @@ import type { HeroLook } from './sprites/spriteFactory';
 /** The look is a pure function of the id: stable across reloads. */
 export function lookFor(id: string): HeroLook {
   const h = hashId(id);
-  return { skin: h % SKIN_TONE_COUNT, hair: (h >>> 8) % HAIR_COLOR_COUNT, accent: null };
+  return {
+    skin: h % SKIN_TONE_COUNT,
+    hair: (h >>> 8) % HAIR_COLOR_COUNT,
+    accent: null,
+    classId: null,
+  };
 }
 
 export class Roster {
@@ -130,7 +135,7 @@ export class Roster {
   countFighting(): number {
     let n = 0;
     for (const hero of this.#list) {
-      if (hero.phase === 'advance' || hero.phase === 'attack') {
+      if (hero.phase === 'advance' || hero.phase === 'attack' || hero.phase === 'ability') {
         n++;
       }
     }

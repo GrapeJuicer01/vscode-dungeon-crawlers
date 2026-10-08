@@ -5,9 +5,11 @@
 // reach lifecycle. Drawing uses only bitmap draws; no number or bar is ever drawn on a hero.
 import { assertNever } from '../../shared/assertNever';
 import type { AgentInfo, AgentState } from '../../shared/protocol';
-import { heroFrameIndex } from '../data/animations';
+import { ABILITY_TOTAL_MS, HERO_FRAME_MS, heroFrameIndex } from '../data/animations';
 import {
+  ABILITY_RELEASE_FRAME,
   ATTACK_STAGGER_MAX_MS,
+  ATTACK_STRIKE_FRAME,
   HERO_SHADOW_WIDTH_PX,
   PATH_RETRY_MS,
   REST_POSE_MAX_MS,
@@ -29,7 +31,15 @@ import { GuardedEntity } from './Entity';
 import type { DrawContext, World } from './Entity';
 
 export type HeroPhase =
-  'warpIn' | 'standby' | 'travel' | 'advance' | 'attack' | 'rest' | 'victory' | 'warpOut';
+  | 'warpIn'
+  | 'standby'
+  | 'travel'
+  | 'advance'
+  | 'attack'
+  | 'ability'
+  | 'rest'
+  | 'victory'
+  | 'warpOut';
 
 export interface HeroInit {
   readonly info: AgentInfo;
@@ -45,6 +55,8 @@ const REST_POSES = ['sit', 'eat', 'polish', 'read', 'warmHands', 'sleep'] as con
 const SLEEP_POSE = 'sleep';
 const PATH_CAPACITY = 160;
 const MAX_MOVES_PER_UPDATE = 8;
+const ATTACK_FRAME_COUNT = HERO_FRAME_MS['attack']?.length ?? 3;
+const ABILITY_FRAME_COUNT = HERO_FRAME_MS['ability']?.length ?? 3;
 
 export class Hero extends GuardedEntity {
   readonly id: string;
@@ -77,6 +89,8 @@ export class Hero extends GuardedEntity {
 
   readonly #stagger: number;
   #engageMs = 0;
+  #attackFrame = -1;
+  #abilityReleased = false;
   #sparkDebt = 0;
 
   constructor(init: HeroInit) {
@@ -146,6 +160,11 @@ export class Hero extends GuardedEntity {
     return this.#y;
   }
 
+  /** The cosmetic class, or null for the base hero. Set once from the id; never changes. */
+  get classId(): string | null {
+    return this.look.classId;
+  }
+
   get faceRight(): boolean {
     return this.#faceRight;
   }
@@ -197,6 +216,25 @@ export class Hero extends GuardedEntity {
     return world.cache.baseHero;
   }
 
+  /**
+   * Cosmetic hooks (H1). They receive only the World, which has no roster, so a hook has no path
+   * to applyAgentState. The base hero does nothing and never casts.
+   */
+  /** Fires once each time the attack animation enters ATTACK_STRIKE_FRAME. */
+  protected onAttackStrike(_world: World): void {
+    // Base hero: nothing to play.
+  }
+
+  /** Asked each update while the phase is `attack` and the party is engaged. */
+  protected shouldCastAbility(_dtMs: number, _world: World): boolean {
+    return false;
+  }
+
+  /** Fires once per ability on animation frame ABILITY_RELEASE_FRAME. */
+  protected onAbilityRelease(_world: World): void {
+    // Base hero: nothing to play.
+  }
+
   update(dtMs: number, world: World): void {
     this.#phaseMs += dtMs;
     this.#animMs += dtMs;
@@ -217,6 +255,7 @@ export class Hero extends GuardedEntity {
       case 'travel':
       case 'advance':
       case 'attack':
+      case 'ability':
       case 'rest':
         break;
       default:
@@ -242,6 +281,7 @@ export class Hero extends GuardedEntity {
         return;
       case 'advance':
       case 'attack':
+      case 'ability':
         this.#updateFighting(dtMs, world);
         return;
       case 'rest':
@@ -306,6 +346,8 @@ export class Hero extends GuardedEntity {
         return 'walk';
       case 'attack':
         return 'attack';
+      case 'ability':
+        return 'ability';
       case 'rest':
         return this.#restPose;
       case 'victory':
@@ -317,6 +359,11 @@ export class Hero extends GuardedEntity {
   }
 
   #enter(phase: HeroPhase): void {
+    if (phase === 'attack') {
+      this.#attackFrame = -1;
+    } else if (phase === 'ability') {
+      this.#abilityReleased = false;
+    }
     this.#phase = phase;
     this.#phaseMs = 0;
     this.#animMs = 0;
@@ -471,16 +518,50 @@ export class Hero extends GuardedEntity {
       this.#startTravel(world);
       return;
     }
+    if (this.#phase === 'ability') {
+      this.#updateAbility(world);
+      return;
+    }
     if (world.engagement.isEngaged) {
       this.#engageMs += dtMs;
       if (this.#phase === 'advance' && this.#engageMs >= this.#stagger) {
         this.#enter('attack');
+      } else if (this.#phase === 'attack') {
+        this.#updateAttack(dtMs, world);
       }
     } else {
       this.#engageMs = 0;
       if (this.#phase === 'attack') {
         this.#enter('advance');
       }
+    }
+  }
+
+  /** Strike detection (once per attack cycle) and the ability trigger. */
+  #updateAttack(dtMs: number, world: World): void {
+    const frame = heroFrameIndex('attack', this.#animMs, ATTACK_FRAME_COUNT);
+    if (frame !== this.#attackFrame) {
+      this.#attackFrame = frame;
+      if (frame === ATTACK_STRIKE_FRAME) {
+        this.onAttackStrike(world);
+      }
+    }
+    if (this.shouldCastAbility(dtMs, world)) {
+      this.#enter('ability');
+    }
+  }
+
+  /** Plays the 3-frame ability in place, releases its effects once, then resumes fighting. */
+  #updateAbility(world: World): void {
+    if (
+      !this.#abilityReleased &&
+      heroFrameIndex('ability', this.#animMs, ABILITY_FRAME_COUNT) >= ABILITY_RELEASE_FRAME
+    ) {
+      this.#abilityReleased = true;
+      this.onAbilityRelease(world);
+    }
+    if (this.#phaseMs >= ABILITY_TOTAL_MS) {
+      this.#enter(world.engagement.isEngaged ? 'attack' : 'advance');
     }
   }
 

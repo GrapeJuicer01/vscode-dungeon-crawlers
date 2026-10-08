@@ -15,6 +15,8 @@ export interface HeroLook {
   readonly skin: number;
   readonly hair: number;
   readonly accent: string | null;
+  /** The class whose partial palette recolours the hero, or null for the base look (H1). */
+  readonly classId: string | null;
 }
 
 export interface FrameSet {
@@ -41,6 +43,12 @@ export interface ArtSet {
   readonly stageClearChar: Readonly<Record<string, string>>;
   /** Stage id -> the (at most 8) characters its templates may use. */
   readonly stageTileChars: Readonly<Record<string, string>>;
+  /** Class id -> layers. A missing entry falls back to the base hero look (H1). */
+  readonly classLayers: Readonly<Record<string, HeroLayerSet>>;
+  /** Class id -> partial palette over `a c d b k m`, applied before skin and hair (H1). */
+  readonly classPalettes: Readonly<Record<string, Palette>>;
+  /** Effect id -> template (animation `idle`, centre anchor) (H1). */
+  readonly effects: Readonly<Record<string, SpriteTemplate>>;
 }
 
 /** Extents in pixels left of, right of, above, and below the anchor. */
@@ -200,9 +208,21 @@ export class SpriteCache {
     return this.#art.baseHero;
   }
 
+  /** The layers of a class, or null when the art set has none (the caller falls back to base). */
+  classLayers(id: string): HeroLayerSet | null {
+    return this.#art.classLayers[id] ?? null;
+  }
+
+  /** The frames of a cosmetic effect, or null when the art set lacks it (the draw is skipped). */
+  effect(id: string): FrameSet | null {
+    const template = this.#art.effects[id];
+    return template === undefined ? null : this.sheet(template);
+  }
+
   /** Built lazily per look and layer set, then cached. */
   hero(look: HeroLook, layers: HeroLayerSet): HeroSprites {
     const key = [
+      look.classId ?? '-',
       look.skin,
       look.hair,
       look.accent ?? '-',
@@ -217,6 +237,7 @@ export class SpriteCache {
     }
     const palette: Palette = {
       ...this.#art.palette,
+      ...(look.classId === null ? {} : (this.#art.classPalettes[look.classId] ?? {})),
       ...(this.#art.skinTones[look.skin] ?? {}),
       ...(this.#art.hairColors[look.hair] ?? {}),
     };

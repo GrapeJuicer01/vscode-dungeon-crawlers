@@ -12,6 +12,7 @@ export const REQUIRED_HERO_ANIMATIONS: Readonly<Record<string, number>> = {
   idle: 2,
   walk: 4,
   attack: 3,
+  ability: 3,
   sit: 2,
   eat: 2,
   sleep: 2,
@@ -24,6 +25,10 @@ export const REQUIRED_HERO_ANIMATIONS: Readonly<Record<string, number>> = {
 /** Hero animations must never imply damage or defeat (Core invariant 1 at the asset level). */
 const FORBIDDEN_HERO_ANIMATION = /hurt|downed|death|dead|die|dying/i;
 const HERO_CHARS = 'oshecdbkmwa';
+/** The only master characters a class palette may recolour (never o s h e w). */
+const CLASS_PALETTE_CHARS = 'acdbkm';
+const MAX_EFFECT_COLORS = 8;
+const MAX_EFFECT_SIZE = 32;
 const MAX_HERO_COLORS = 12;
 const MAX_STAGE_COLORS = 8;
 const TILE_SIZE = 16;
@@ -201,6 +206,136 @@ export function validateHeroLayers(layers: HeroLayerSet, palette: Palette): read
   return errors;
 }
 
+/** Distinct colors of the composited look under a full palette; swaps replace, never add. */
+function compositeColorCount(layers: HeroLayerSet, palette: Palette): number {
+  const colors = new Set<string>();
+  for (const name of heroFrameNames(layers)) {
+    const count = layers.body.animations[name]?.length ?? 0;
+    for (let i = 0; i < count; i++) {
+      for (const row of heroFrameRows(layers, name, i)) {
+        for (const ch of row) {
+          const hex = ch === '.' ? undefined : palette[ch];
+          if (hex !== undefined) {
+            colors.add(hex.toLowerCase());
+          }
+        }
+      }
+    }
+  }
+  return colors.size;
+}
+
+function validateClassPalette(id: string, cp: Palette, master: Palette): string[] {
+  const errors: string[] = [];
+  for (const [key, value] of Object.entries(cp)) {
+    if (master[key] === undefined || !CLASS_PALETTE_CHARS.includes(key) || key.length !== 1) {
+      errors.push(
+        `${id}: class palette may override only ${CLASS_PALETTE_CHARS.split('').join(' ')}`,
+      );
+      break;
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+      errors.push(`${id}: class palette value is not #rrggbb`);
+      break;
+    }
+  }
+  return errors;
+}
+
+/** One class: its layers, palette, and the composited look under every skin and hair swap. */
+function validateClassLook(art: ArtSet, id: string, layers: HeroLayerSet): string[] {
+  const errors = [...validateHeroLayers(layers, art.palette)];
+  const cp = art.classPalettes[id];
+  if (cp === undefined) {
+    return errors;
+  }
+  errors.push(...validateClassPalette(id, cp, art.palette));
+  if (errors.length > 0) {
+    return errors;
+  }
+  for (const skin of art.skinTones) {
+    for (const hair of art.hairColors) {
+      const full: Palette = { ...art.palette, ...cp, ...skin, ...hair };
+      const n = compositeColorCount(layers, full);
+      if (n > MAX_HERO_COLORS) {
+        errors.push(`${id}: composited look uses ${n} colors, limit ${MAX_HERO_COLORS}`);
+        return errors;
+      }
+    }
+  }
+  return errors;
+}
+
+function validateEffectTemplate(key: string, t: SpriteTemplate, palette: Palette): string[] {
+  const errors = [...validateTemplate(t, palette, null, MAX_EFFECT_COLORS)];
+  if (Object.keys(t.animations).join() !== 'idle') {
+    errors.push(`${t.id}: effect templates use only the idle animation`);
+  }
+  if (t.w > MAX_EFFECT_SIZE || t.h > MAX_EFFECT_SIZE) {
+    errors.push(`${t.id}: effect is larger than ${MAX_EFFECT_SIZE}x${MAX_EFFECT_SIZE}`);
+  }
+  if (t.id !== `effects/${key}`) {
+    errors.push(`${t.id}: effect id does not match its key ${key}`);
+  }
+  return errors;
+}
+
+/**
+ * The cross-check between the code tables and the art: every class id has layers and a palette,
+ * every effect id has a template, the layer ids belong to the class, and nothing is extra.
+ */
+export function validateClassArt(
+  art: ArtSet,
+  classIds: readonly string[],
+  effectIds: readonly string[],
+): readonly string[] {
+  const errors: string[] = [];
+  for (const id of classIds) {
+    const layers = art.classLayers[id];
+    if (layers === undefined) {
+      errors.push(`${id}: no class layers`);
+    } else {
+      const slots: [string, SpriteTemplate | null][] = [
+        ['head', layers.head],
+        ['gear', layers.gear],
+        ['weapon', layers.weapon],
+      ];
+      for (const [slot, t] of slots) {
+        if (t !== null && t.id !== `${id}/${slot}`) {
+          errors.push(`${t.id}: ${slot} layer id must be ${id}/${slot}`);
+        }
+      }
+      if (layers.body.id !== art.baseHero.body.id && layers.body.id !== `${id}/body`) {
+        errors.push(`${layers.body.id}: body layer id must be ${id}/body or the base body`);
+      }
+    }
+    if (art.classPalettes[id] === undefined) {
+      errors.push(`${id}: no class palette`);
+    }
+  }
+  for (const id of Object.keys(art.classLayers)) {
+    if (!classIds.includes(id)) {
+      errors.push(`${id}: class layers for an unknown class`);
+    }
+  }
+  for (const id of Object.keys(art.classPalettes)) {
+    if (!classIds.includes(id)) {
+      errors.push(`${id}: class palette for an unknown class`);
+    }
+  }
+  for (const id of effectIds) {
+    if (art.effects[id] === undefined) {
+      errors.push(`${id}: no effect template`);
+    }
+  }
+  for (const key of Object.keys(art.effects)) {
+    if (!effectIds.includes(key)) {
+      errors.push(`${key}: effect template for an unknown effect`);
+    }
+  }
+  return errors;
+}
+
 function luminance(hex: string): number {
   const [r, g, b] = hexToRgb(hex).map((v) => {
     const s = v / 255;
@@ -349,6 +484,17 @@ export function validateArtSet(art: ArtSet): readonly string[] {
     }
   });
   errors.push(...validateHeroLayers(art.baseHero, palette));
+  for (const [id, layers] of Object.entries(art.classLayers)) {
+    errors.push(...validateClassLook(art, id, layers));
+  }
+  for (const [id, cp] of Object.entries(art.classPalettes)) {
+    if (art.classLayers[id] === undefined) {
+      errors.push(...validateClassPalette(id, cp, palette));
+    }
+  }
+  for (const [key, t] of Object.entries(art.effects)) {
+    errors.push(...validateEffectTemplate(key, t, palette));
+  }
   for (const t of [art.campfire.logs, art.campfire.flameSmall, art.campfire.flameLarge]) {
     errors.push(...validateTemplate(t, palette, null, MAX_HERO_COLORS));
     if (Object.keys(t.animations).join() !== 'idle') {

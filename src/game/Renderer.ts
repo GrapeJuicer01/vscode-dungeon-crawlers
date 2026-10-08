@@ -4,7 +4,12 @@
 // entity sort buffer and draw context are reused, and per-entity guards share one closure.
 import type { Camera } from './Camera';
 import { loopFrameIndex } from './data/animations';
-import { BACKDROP_PARALLAX, BACKDROP_WIDTH_PX, TORCH_FLICKER_MS } from './data/tuning';
+import {
+  BACKDROP_PARALLAX,
+  BACKDROP_WIDTH_PX,
+  EFFECT_FAULT_LIMIT,
+  TORCH_FLICKER_MS,
+} from './data/tuning';
 import { Hero } from './entities/Hero';
 import { guarded } from './entities/Entity';
 import type { Entity, World } from './entities/Entity';
@@ -95,6 +100,8 @@ export class Renderer {
   #clockMs = 0;
   #lightFaults = 0;
   #lightFaultReported = false;
+  #effectFaults = 0;
+  #effectFaultReported = false;
   readonly #drawCurrent = (): void => {
     if (this.#current !== null && this.#ctx !== null) {
       this.#current.draw(this.#ctx);
@@ -153,6 +160,8 @@ export class Renderer {
       }
     }
     this.#current = null;
+
+    this.#guardedEffectPass(surface, world);
 
     const fgH = INTERNAL_HEIGHT - FOREGROUND_Y;
     surface.drawBitmap(stage.nearForeground, 0, FOREGROUND_Y, false);
@@ -260,6 +269,24 @@ export class Renderer {
         this.#onError(error, 'render');
       }
       // A fault mid-compose may leave the multiply state set; entities must draw normally.
+      surface.setComposite('source-over');
+      surface.setAlpha(1);
+    }
+  }
+
+  /** Effects draw after the entities, unlit, before the foreground; own guard, disabled after a few faults. */
+  #guardedEffectPass(surface: Surface, world: World): void {
+    if (this.#effectFaults >= EFFECT_FAULT_LIMIT) {
+      return;
+    }
+    try {
+      world.effects.draw(surface, world.cache);
+    } catch (error) {
+      this.#effectFaults++;
+      if (!this.#effectFaultReported) {
+        this.#effectFaultReported = true;
+        this.#onError(error, 'render');
+      }
       surface.setComposite('source-over');
       surface.setAlpha(1);
     }

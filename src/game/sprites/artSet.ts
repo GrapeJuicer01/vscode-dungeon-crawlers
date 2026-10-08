@@ -2,6 +2,7 @@
 // the art files stay untouched, and tests validate this exact object with spriteValidator.
 import type { ArtSet } from './spriteFactory';
 import {
+  CLASS_PALETTES,
   HAIR_COLORS,
   LIGHT_CHARS,
   MASTER_PALETTE,
@@ -11,7 +12,7 @@ import {
   STAGE_CLEAR_CHAR,
   STAGE_TILE_CHARS,
 } from './palettes';
-import { BASE_HERO, CAMPFIRE, STAGE_SPRITES } from './spriteTemplates';
+import { BASE_HERO, CAMPFIRE, EFFECT_SPRITES, STAGE_SPRITES } from './spriteTemplates';
 
 export const SHIPPED_ART: ArtSet = {
   palette: MASTER_PALETTE,
@@ -25,4 +26,9 @@ export const SHIPPED_ART: ArtSet = {
   stageAmbientChar: STAGE_AMBIENT_CHAR,
   stageClearChar: STAGE_CLEAR_CHAR,
   stageTileChars: STAGE_TILE_CHARS,
+  // Class layers arrive with the pixel-artist's classTemplates.ts (A1-2, A1-3). Until then every
+  // class falls back to the base look (the engine tolerates a missing entry).
+  classLayers: {},
+  classPalettes: CLASS_PALETTES,
+  effects: EFFECT_SPRITES,
 };

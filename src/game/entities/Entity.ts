@@ -1,6 +1,7 @@
 // The entity contract, the world an entity sees, and the per-entity crash guard
 // (docs/architecture/game-engine.md section 4, ADR 0009).
 import type { Camera } from '../Camera';
+import type { EffectPool } from '../Effects';
 import type { Engagement } from '../Engagement';
 import type { ErrorSink, Surface } from '../ports';
 import type { Particles } from '../Particles';
@@ -14,6 +15,7 @@ export interface World {
   readonly stage: StageRuntime;
   readonly campfire: Campfire;
   readonly particles: Particles;
+  readonly effects: EffectPool;
   readonly engagement: Engagement;
   readonly rng: Rng;
   readonly cache: SpriteCache;

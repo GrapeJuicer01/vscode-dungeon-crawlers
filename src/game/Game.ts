@@ -4,16 +4,18 @@
 // try/catch, so an engine bug can never affect agents (Core invariant 4).
 import type { AgentInfo, AgentState } from '../shared/protocol';
 import { Ambience } from './Ambience';
+import { EffectPool } from './Effects';
 import { Camera } from './Camera';
 import { Campfire } from './entities/Campfire';
 import { errorKey, guarded } from './entities/Entity';
 import type { World } from './entities/Entity';
-import { Hero } from './entities/Hero';
+import { createHero } from './entities/ClassHero';
 import type { HeroFactory } from './entities/Hero';
 import { TimedEngagement } from './Engagement';
 import type { StageDef } from './data/stages';
 import {
   EVENT_QUEUE_CAP,
+  EFFECT_CAPACITY,
   MAX_FRAME_MS,
   MAX_STEPS_PER_FRAME,
   PARTICLE_CAPACITY,
@@ -41,7 +43,7 @@ export interface GameDeps {
   readonly seed: number;
   /** The mirror's agents(), used only to resync after an event-queue overflow. */
   readonly agentSource: () => readonly AgentInfo[];
-  /** Default creates Hero; tests and H1-H3 inject. */
+  /** Default is createHero (class heroes, H1); tests inject their own. */
   readonly heroFactory?: HeroFactory;
 }
 
@@ -49,6 +51,8 @@ export interface HeroSnapshot {
   readonly id: string;
   readonly lifecycle: AgentState;
   readonly exiting: boolean;
+  /** The cosmetic class; never changes for an id (H1). */
+  readonly classId: string | null;
 }
 
 /** Distinct (scope, message) pairs reported per game; a bound so a bug cannot grow the set. */
@@ -107,11 +111,12 @@ export class Game implements AgentEventSink {
       stage: buildStage(def, deps.art, cache, deps.bitmaps),
       campfire,
       particles: new Particles(PARTICLE_CAPACITY, rng),
+      effects: new EffectPool(EFFECT_CAPACITY),
       engagement: new TimedEngagement(),
       rng,
       cache,
     };
-    this.#roster = new Roster(deps.heroFactory ?? ((init) => new Hero(init)), this.#sink);
+    this.#roster = new Roster(deps.heroFactory ?? createHero, this.#sink);
     this.#renderer = new Renderer(deps.bitmaps, deps.art, this.#sink);
     this.#updateCampfire = (): void => {
       this.#world.campfire.update(this.#dtHolder.ms, this.#world);
@@ -186,6 +191,7 @@ export class Game implements AgentEventSink {
       guarded(world.campfire, 'update', this.#updateCampfire, this.#sink);
       this.#ambience.update(STEP_MS, world, this.#camera);
       world.particles.update(STEP_MS);
+      this.#updateEffects(world);
       this.#renderer.advanceClock(STEP_MS);
     } catch (error: unknown) {
       this.#sink(error, 'step');
@@ -212,9 +218,12 @@ export class Game implements AgentEventSink {
 
   /** Read-only observation of every hero, for tests and dev tooling. */
   heroSnapshot(): readonly HeroSnapshot[] {
-    return this.#roster
-      .heroes()
-      .map((hero) => ({ id: hero.id, lifecycle: hero.lifecycle, exiting: hero.exiting }));
+    return this.#roster.heroes().map((hero) => ({
+      id: hero.id,
+      lifecycle: hero.lifecycle,
+      exiting: hero.exiting,
+      classId: hero.classId,
+    }));
   }
 
   /** Clears the queue and pools; later calls are no-ops. */
@@ -224,6 +233,17 @@ export class Game implements AgentEventSink {
     this.#pendingSnapshot = null;
     this.#resync = false;
     this.#world.particles.clear();
+    this.#world.effects.clear();
+  }
+
+  /** Effects get their own guard: a fault here must not stop heroes, the campfire, or the loop. */
+  #updateEffects(world: World): void {
+    try {
+      world.effects.update(STEP_MS, world.particles);
+    } catch (error: unknown) {
+      this.#sink(error, 'update');
+      world.effects.clear();
+    }
   }
 
   #clearQueue(): void {

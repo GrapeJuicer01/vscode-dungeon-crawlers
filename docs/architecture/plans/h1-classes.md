@@ -23,7 +23,7 @@ Layers touched: data tables (classes, classMap, effects, tuning, animations), ga
 - `World` is `{ stage, campfire, particles, engagement, rng, cache }`; `Renderer.render(surface, world, heroes, camera)` draws entities after the light pass, then foreground, then particles. `Particles` draws 1 px rectangles only, so a projectile sprite needs its own pool.
 - `HeroSnapshot` is `{ id, lifecycle, exiting }`. `lookFor(id)` lives in `Roster.ts`.
 - No `scripts/` directory, no `docs:tables` script, no CI stale-docs step, and no `docs/design/classes.md` exist yet.
-- `testing-strategy.md` section 4.2 describes class mapping as "each tool and activity maps to the class in `classMap.ts`". Decision H1-1 changes that to id-based; the tester updates the row if the human accepts the default.
+- `testing-strategy.md` section 4.2 describes class mapping as "each tool and activity maps to the class in `classMap.ts`". Decision H1-1 (accepted 2026-10-09) changes that to id-based; the tester updates the row.
 
 ## 2. Invariant check
 
@@ -71,7 +71,7 @@ export interface ClassDef {
 }
 export const CLASSES: readonly ClassDef[];                 // as const satisfies readonly ClassDef[]
 export function classDef(id: ClassId): ClassDef;           // throws RangeError('Unknown class') only on a programming error
-export function validateClasses(defs: readonly ClassDef[], art: ArtSet): readonly string[];   // tests only, not run at boot
+export function validateClasses(defs: readonly ClassDef[]): readonly string[];   // tests only, not run at boot; takes the table only, the art cross-check is validateClassArt (3.5)
 
 // data/classMap.ts
 export const DELIVERED_CLASSES: readonly ClassId[];        // H1: all four, in CLASS_IDS order
@@ -225,7 +225,7 @@ Do the tasks in order; each is independently verifiable. No new packages. Work o
 9. **`docs:tables`.** `scripts/generate-doc-tables.ts` imports `data/classes.ts` and `data/classMap.ts` (pure data, no art) and rewrites the region between `<!-- BEGIN GENERATED: classes -->` and `<!-- END GENERATED: classes -->` in `docs/design/classes.md` with a compact table (class, role, colors, silhouette, strike, ability) and the delivered count; a `--check` argument prints nothing and exits 1 if the file would change. Runner: a small `scripts/docs-tables.mjs` that bundles the script with the esbuild API (already a devDependency) into `out/scripts/` and runs it, the same pattern as `test/run.mjs`; no `--experimental-strip-types`, no new package. `package.json`: `"docs:tables": "node scripts/docs-tables.mjs"`. Output uses the compact `|---|` delimiter row so `markdownlint-cli2` stays clean (MD060 is off) and Prettier ignores Markdown. Check: running it twice leaves no diff; changing a class name in `classes.ts` changes the table; `--check` fails until the script is re-run.
 10. **CI.** In `.github/workflows/ci.yml` add, after Test, a step "Check generated docs" running `npm run docs:tables` then `git diff --exit-code -- docs`. Check: the workflow YAML parses and the step order keeps `npm ci` first.
 11. **Docs.** Create `docs/design/classes.md` (purpose line, links, the generated region, a short prose section per class: what it looks like and which cosmetic effect it plays, and a paragraph stating there is no health or damage) and `docs/design/game-design.md` (short: heroes follow agents, classes are cosmetic, how class is assigned, what the effects are). Update the art-style guide link status only if the artist has not (artist-owned).
-12. **Local checks.** F5 with `--disable-extensions`, `pixelAgents.simulator: on`, `simulatorAgentCount` 8: record 60 s in DevTools Performance at the reference panel size (decision H4-3); confirm 60 fps, a mix of classes, abilities firing during engage, effects never overlapping a bar or label (there are none), classes unchanged after hiding and re-showing the tab and after "Developer: Reload Webviews". Temporarily make `ClassHero.onAttackStrike` throw (do not commit) and confirm one console error line, the hero stays drawn and keeps its lifecycle, other heroes keep fighting.
+12. **Local checks (human-owned, open; see section 13.3).** F5 with `--disable-extensions`, `pixelAgents.simulator: on`, `simulatorAgentCount` 8: record 60 s in DevTools Performance at the reference panel size (decision H4-3); confirm 60 fps, a mix of classes, abilities firing during engage, effects never overlapping a bar or label (there are none), classes unchanged after hiding and re-showing the tab and after "Developer: Reload Webviews". Temporarily make `ClassHero.onAttackStrike` throw (do not commit) and confirm one console error line, the hero stays drawn and keeps its lifecycle, other heroes keep fighting.
 13. **`CHANGELOG.md` and `README.md`.** Added: "Four hero classes (Warrior, Mage, Archer, Rogue) with their own look, attack, and signature effect; cosmetic only; class is derived from the session id; `npm run docs:tables`." README: one sentence under what the panel shows.
 14. **Existing tests that pin M4-only behavior** (change by design, the tester does it, listed so the developer does not chase them): the hero-animation-count assertions (ten to eleven required animations), the draw-call ceiling (120 to 144 bitmap draws, note 7), the `Phase` exhaustiveness checks, `HeroSnapshot` equality helpers (new field), `engineStructure.test.ts` file lists (new files), and `testing-strategy.md` section 4.2 "Class mapping".
 15. **Docs drift.** Flag in the handoff anything in [game engine](../game-engine.md), [data model](../data-model.md), or this plan that the code changed.
@@ -253,7 +253,7 @@ Unit suites use the M4 fakes plus a test `ArtSet` extended with two tiny class l
 5. **ClassHero effects.** Shots spawn at the right positions (floored hero position plus offsets), with the right velocities, flipped when facing left; mage and archer spawn one strike shot per cycle; warrior and rogue spawn none; an ability spawns exactly its shots once; the first ability is not before `ABILITY_INTERVAL_MIN_MS` of attack time; intervals stay within 4 to 8 s; the schedule is deterministic for a fixed seed; the timer does not advance while resting or advancing.
 6. **Effect pool.** Capacity honored (`spawn` false when full, no throw); expired slots reused; deterministic; `update` ends projectiles with spark particles into the particle pool (dropped silently when full); culling beyond the margin; `draw` uses `drawBitmap` only (a recording surface sees no `fillRect` from the pool); frame choice follows `EFFECT_FRAME_MS`; missing effect art is skipped without throwing; `clear` empties it.
 7. **Renderer.** Effects draw after the last entity and before the first foreground draw; composite is `source-over` and alpha 1 after every frame; a throwing effect draw is isolated (foreground and particles still draw; reported once; disabled after three faults); draw-call budget with 8 heroes of mixed classes and 24 live effects: at most 144 bitmap draws and 450 fills (the M4 ceiling of 120 rises by the 24-effect cap, [game engine section 15](../game-engine.md#15-performance-budget)).
-8. **Crash isolation.** A `ClassHero` subclass injected through `heroFactory` whose `onAttackStrike`, `shouldCastAbility`, or `onAbilityRelease` throws: `frame` never throws, the next frame renders, three consecutive faults freeze that hero (still listed and drawn), a lifecycle event unfreezes it, the lifecycle is unchanged throughout. A throwing `EffectPool.update` or `draw` leaves heroes, the loop, and the lifecycle untouched.
+8. **Crash isolation.** A `ClassHero` subclass injected through `heroFactory` whose `onAttackStrike`, `shouldCastAbility`, or `onAbilityRelease` throws: `frame` never throws, the next frame renders, only a throwing `shouldCastAbility` (it runs on every attack-phase update) reaches `FAULT_LIMIT` (3 consecutive faults) and freezes the hero (still listed and drawn); a lifecycle event unfreezes it. `onAttackStrike` and `onAbilityRelease` fire once per cycle, so a clean update between two throws resets the count and the hero keeps fighting, which is still safe. The lifecycle is unchanged throughout. A throwing `EffectPool.update` or `draw` leaves heroes, the loop, and the lifecycle untouched.
 9. **Hero-invariant test** (extend [testing strategy section 5](../../engineering/testing-strategy.md#5-hero-invariant-test-from-m4)). New stimuli, each for 10 simulated minutes with 1, 8, 32, and 64 heroes covering all four classes in `spawned`, `working`, and `idle`: continuous attack and ability casting; effect-pool exhaustion; a missing class art entry (fallback look); throwing hooks; throwing effect update and draw. After each: `heroSnapshot()` (now including `classId`) equals the pre-stimulus snapshot and nothing was sent. Then each of the four events behaves as in M4 for class heroes, including events applied during `ability`.
 10. **Structural** (extend `engineStructure.test.ts`). In `src/game/entities/**`, `Roster.ts`, `Effects.ts`, `data/classes.ts`, `data/classMap.ts`, `data/effects.ts`: no word-boundary match for `hp`, `health`, `mana`, `dead`, `downed`, `retreat`, `damage`, `gauge` (comments stripped); `ClassHero.ts` and `Effects.ts` call no `fillRect` or `strokeRect`; `ClassHero.ts` does not import `Roster`; `applyAgentState(` is still defined only in `Hero.ts` and called only in `Roster.ts`; `lifecycle` assigned only in `Hero.ts`; `classFor` reads no argument other than the id and imports nothing but `hashId` and the class list; no hook returns or accepts an `AgentInfo`; every `switch` over `.phase` includes `ability` and ends in `assertNever`.
 11. **Generated docs** (`docsTables.test.ts`, gate G2). `docs/design/classes.md` contains the begin and end markers once each; the region equals what the generator produces now (call the generator's exported pure `renderClassTable(CLASSES)`); the generator's `--check` mode: a crafted change to a class name makes the check fail; the generator performs no network or non-docs write (writes only `docs/design/classes.md`); the script imports no vscode, DOM, or art files.
@@ -281,7 +281,7 @@ Not automated: rendered pixels, silhouettes (manual), real-canvas compositing, a
 ## 9. Risks, assumptions, defaults
 
 - **Performance (60 fps, 8+ heroes now, 30+ enemies later).** New per-frame cost: at most 24 effect `drawBitmap` calls and an `EffectPool.update` over 24 slots, and hero bitmap sets that are now cached per (class, skin, hair) look. Sets are built lazily on first draw, so 8 heroes build at most 8 sets; each is 26 frames per look (the M4 base hero was 24 with ten animations of 2 to 4 frames); keep each build under a few ms. Mitigations: pooled effects, cached bitmaps, no allocation per frame, a hard cap of 24 live effects. Ranged heroes strike about 6 times per 2.4 s engage; at 500 ms life the live count stays near 12 for 8 heroes.
-- **Class reshuffle on later batches.** Because the class is `hash % delivered-count`, adding classes in H2 and H3 changes the class of a given id after the extension updates (which restarts the webview anyway). Within one running extension the class never changes. Accepted; the alternative of fixing the class by full 12-class table order would show a missing-art hero until all batches land.
+- **Class reshuffle on later batches.** Because the class is `hash % delivered-count`, adding classes in H2 and H3 changes the class of a given id after the extension updates (which restarts the webview anyway). Within one running extension the class never changes. Accepted by the human on 2026-10-09 with the plan sign-off (H1-1); the alternative of fixing the class by full 12-class table order would show a missing-art hero until all batches land.
 - **Reload stability.** Pure function of id, so a webview reload (every tab hide/show with `retainContextWhenHidden: false`) rebuilds the same classes. This is the main reason tool names are not used (H1-1).
 - **Photosensitivity.** Effects are at most 24x24 px, three frames, no full-screen flash, no strobing (frame time 90 ms, interval between abilities at least 4 s per hero). Reduce-motion and effect-density options arrive in M7 through `EffectPool` spawn gating.
 - **Art/engine contract drift.** The validator is the single source of truth. The artist runs it (or the tester's suite does) before the developer lands task 5. A change to animation counts goes through the sprite spec.
@@ -343,6 +343,8 @@ Shadows, warp beams, the end-of-flight sparks, and everything in the M4 list. Th
 
 Each has a default so work can proceed. H1-1 is the one that changes wording in the roadmap and testing strategy.
 
+**Sign-off (2026-10-09).** The human approved this plan ("proceed with the M5 plan"), which accepts the defaults below. That includes H1-1 (class is a pure hash of the agent id; tool names are not used) and the consequence recorded in section 9: when delivered classes grow in H2 and H3, `hash % n` changes and each hero's class is reshuffled once, an accepted one-time change.
+
 | # | Question | Default chosen | Alternative |
 |---|---|---|---|
 | H1-1 | How is a hero's class chosen? | `classFor(id)`: a pure hash of the session id over the delivered classes. Tool names are not used. Stable across reloads and replaced heroes, needs no storage. Roadmap and testing-strategy wording about "tools map to classes" is replaced by "id maps to class" | Map the tool on the creating event (`Edit` to Warrior, `Read` to Mage, ...) with the id hash as fallback: `toolName` is `null` on a normal `spawned`, so most heroes would still use the hash, and a webview reload would re-create working heroes with their *current* tool, changing class on every tab re-show. Persisting the class per session id would fix that but stores session ids (invariant 7), so it is not offered |
@@ -359,10 +361,43 @@ Each has a default so work can proceed. H1-1 is the one that changes wording in 
 ## 12. Architect doc pass (applied before development)
 
 - New: this plan.
-- [Roadmap](../../engineering/roadmap.md): H1 plan link, scope, files, and art lines; "tools" wording replaced by the id-hash default pending H1-1.
+- [Roadmap](../../engineering/roadmap.md): H1 plan link, scope, files, and art lines; "tools" wording replaced by the id-hash default (H1-1, accepted 2026-10-09).
 - [Game engine](../game-engine.md): components (Effects, ClassHero), the `ability` phase and diagram, identity and class paragraph, render step 6b, seams, performance ceiling.
 - [Data model](../data-model.md): classes, class map, effects ownership and section 6, art contract additions, tuning constants.
 - [Glossary](../../glossary.md): class, ability, effect, `classFor`, delivered classes.
 - [Docs index](../../index.md) and [CLAUDE.md](../../../CLAUDE.md) directory map (`Effects.ts`, `ClassHero.ts`, `classes.ts`, `classMap.ts`, `effects.ts`, `scripts/`).
 - No new ADR: class-from-id and a cosmetic effect pool are cheap to reverse and covered by [ADR 0002](../adr/0002-no-hero-health.md) and [ADR 0009](../adr/0009-hero-lifecycle-isolation.md). If the human picks the tool-based alternative of H1-1, add an ADR then.
 - For the tester: [testing strategy](../../engineering/testing-strategy.md) sections 4.2 (Class mapping row), 5, and 7.3; plus the changes listed in task 14.
+
+## 13. As-built drift (checked against HEAD ec76b05 on `feat/h1-classes`)
+
+Purpose: where the code differs from sections 3 to 10. The code is correct unless a row says otherwise; [game engine](../game-engine.md) and [data model](../data-model.md) were updated to match. Every row was verified in the source. Pattern as in [M4 plan section 13](m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00).
+
+### 13.1 Changed contracts
+
+| Plan (section) | As built |
+|---|---|
+| `validateClasses(defs, art)` (3.1) | `validateClasses(defs: readonly ClassDef[])` in `data/classes.ts`; it takes no art parameter (the table module stays art-free). The art cross-check is `validateClassArt(art, classIds, effectIds)` in `sprites/spriteValidator.ts`, as in 3.5. |
+| Fault guard (task 7) | `EFFECT_FAULT_LIMIT` = 3 lives in `data/tuning.ts`; the renderer's effects pass counts faults against it and stops drawing effects after the third. |
+| `createHero` location (3.4) | `src/game/entities/ClassHero.ts` exports `createHero(init)`. `Game` only imports it, as the default `heroFactory` (`deps.heroFactory ?? createHero`). |
+| Effect playback (3.2) | Moving effects (nonzero velocity) loop at `EFFECT_FRAME_MS` 90 ms per frame; static effects play once at 90 ms per frame and hold their last frame until they expire. |
+| Fallback look (2, 3.5) | A class with no entry in `ArtSet.classLayers` draws the base hero layers, still recoloured by that class's palette when `ArtSet.classPalettes` has one (the cache applies the class palette whenever `look.classId` is set). |
+| `validateArtSet` (3.5) | Classes may share the base `body` template, so a fault in it would repeat once per class look; `validateArtSet` de-duplicates identical messages and reports the shared hero/body fault once. |
+| `Game` and `World` (task 3) | `World.effects: EffectPool` exists. `Game` builds the pool (capacity `EFFECT_CAPACITY`) and updates it in `#updateEffects`, its own try/catch with scope `'update'`; on a fault it clears the pool. `dispose` clears it too. |
+| Effect colours (3.5, 10.1) | Effect sheets are built from the master palette. The class palette is not applied to effects; an effect that needs a class colour uses master characters. |
+| Effect id type (3.1) | `EffectSpriteId` is a local string union in `sprites/spriteTypes.ts` (`whirl`, `orbBolt`, `arcaneBurst`, `arrow`, `dagger`, `smokePuff`) so art files do not import `data/`. `EFFECT_SPRITES` is keyed by it. Keying by `EffectId` from `data/effects.ts` is deferred until the unions can share one source. |
+| Art-only exports (10) | `HERO_POSES`, `HERO_HEAD`, and `HeroPose` are exported from `heroTemplates.ts` so `classTemplates.ts` can derive class layers from the same poses. They are for artist-owned files only; the engine must not import them. |
+| Simulator ids (task 2) | `sim-0-0` to `sim-7-0` map to rogue, warrior, warrior, mage, rogue, mage, archer, mage: all four classes occur in 8 simulated heroes. |
+| Generated table (task 9) | The first line of the region reads `Delivered classes: N of 12.` The 12 is `PLANNED_CLASS_COUNT`, hardcoded in `scripts/generate-doc-tables.ts`; N is `DELIVERED_CLASSES.length`. |
+
+### 13.2 New files and tooling
+
+| File | Role |
+|---|---|
+| `scripts/docs-tables.mjs` | the `npm run docs:tables` runner: bundles `generate-doc-tables.ts` with the esbuild API into `out/scripts/generate-doc-tables.cjs` and calls its `main`. Accepts `--check`. |
+| `scripts/generate-doc-tables.ts` | pure generator (`renderClassTable`, `applyClassTable`, `main`); imports only `data/classes.ts` and `data/classMap.ts`. |
+| `src/game/sprites/classTemplates.ts`, `effectTemplates.ts` | artist-owned class layers (`CLASS_LAYERS`) and effect sprites (`EFFECT_SPRITES`). |
+
+### 13.3 Open item
+
+Task 12 (the manual F5 benchmark and the forced-throw check) is human-owned and still open. It cannot be run by an agent: it needs a 60 s DevTools Performance recording at the reference panel size with 8 simulated heroes, a hide/show and "Developer: Reload Webviews" class-stability check, and a temporary (uncommitted) throw in `ClassHero.onAttackStrike` that must show one console error line while the scene keeps running. The roadmap tick for H1 should note this as outstanding until the human records the result.

@@ -288,6 +288,69 @@ export default defineConfig(
       ],
     },
   },
+  // Engine (M4, ADR 0008): DOM-free and clock-free. Repeats the block above and adds the webview
+  // imports plus the browser globals and nondeterministic calls the engine must not use; the DOM,
+  // time, and randomness arrive through ports, frame deltas, and a seeded generator.
+  {
+    files: ['src/game/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [VSCODE_PATH, ...NODE_BUILTIN_PATHS],
+          patterns: [
+            NODE_SCHEME_PATTERN,
+            {
+              group: [
+                '**/monitor',
+                '**/monitor/**',
+                '**/extension',
+                '**/index.html',
+                '**/host',
+                '**/host/**',
+                '**/webview',
+                '**/webview/**',
+              ],
+              message:
+                'src/game/ imports only src/shared/ and itself (ADR 0008); the DOM arrives through ports.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'document',
+          'window',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'setTimeout',
+          'setInterval',
+          'fetch',
+          'localStorage',
+          'performance',
+          'acquireVsCodeApi',
+        ].map((name) => ({
+          name,
+          message:
+            'src/game/ is DOM-free and clock-free (ADR 0008): use a port or the frame delta.',
+        })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Use the seeded generator from rng.ts (ADR 0008).',
+        },
+        {
+          object: 'Date',
+          property: 'now',
+          message: 'Time arrives as a frame delta (ADR 0008).',
+        },
+      ],
+    },
+  },
   // src/webview/index.html.ts: host-side pure string builder that imports nothing at all.
   {
     files: ['src/webview/index.html.ts'],

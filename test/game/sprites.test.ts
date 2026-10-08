@@ -19,7 +19,7 @@ import { FakeBitmaps } from '../support/engineFakes';
 import type { FakeBitmap } from '../support/engineFakes';
 
 const PALETTE = { a: '#ff0000', b: '#00ff80', c: '#102030' };
-const LOOK: HeroLook = { skin: 0, hair: 0, accent: null };
+const LOOK: HeroLook = { skin: 0, hair: 0, accent: null, classId: null };
 
 void describe('rasterizeFrame', () => {
   void it('writes exact RGBA for a 3x3 frame; "." is transparent', () => {
@@ -162,7 +162,7 @@ void describe('SpriteCache', () => {
 
   void it('skin and hair swaps change only their own characters', () => {
     const { cache } = make();
-    const base = cache.hero({ skin: 0, hair: 0, accent: null }, BASE_HERO);
+    const base = cache.hero({ skin: 0, hair: 0, accent: null, classId: null }, BASE_HERO);
     const frame = (set: typeof base, name: string): FakeBitmap =>
       set[name]?.frames[0] as FakeBitmap;
     const rows = heroFrameRows(BASE_HERO, 'idle', 0);
@@ -177,17 +177,19 @@ void describe('SpriteCache', () => {
       }
       return changed;
     };
-    const skin = cache.hero({ skin: 2, hair: 0, accent: null }, BASE_HERO);
+    const skin = cache.hero({ skin: 2, hair: 0, accent: null, classId: null }, BASE_HERO);
     assert.deepEqual([...diff(frame(base, 'idle'), frame(skin, 'idle'))], ['s']);
-    const hair = cache.hero({ skin: 0, hair: 3, accent: null }, BASE_HERO);
+    const hair = cache.hero({ skin: 0, hair: 3, accent: null, classId: null }, BASE_HERO);
     assert.deepEqual([...diff(frame(base, 'idle'), frame(hair, 'idle'))], ['h']);
-    const accent = cache.hero({ skin: 0, hair: 0, accent: '#123456' }, BASE_HERO);
+    const accent = cache.hero({ skin: 0, hair: 0, accent: '#123456', classId: null }, BASE_HERO);
     assert.deepEqual([...diff(frame(base, 'idle'), frame(accent, 'idle'))], ['a']);
   });
 
   void it('an unknown skin or hair index falls back to the master colours instead of throwing', () => {
     const { cache } = make();
-    assert.doesNotThrow(() => cache.hero({ skin: 99, hair: 99, accent: null }, BASE_HERO));
+    assert.doesNotThrow(() =>
+      cache.hero({ skin: 99, hair: 99, accent: null, classId: null }, BASE_HERO),
+    );
   });
 
   void it('sheet caches by template id and uses the idle frames', () => {

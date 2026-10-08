@@ -14,6 +14,7 @@ import {
   VICTORY_MS,
   WARP_OUT_MS,
 } from '../../src/game/data/tuning';
+import { classFor } from '../../src/game/data/classMap';
 import { Game } from '../../src/game/Game';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
 import { FakeBitmaps, RecordingSurface } from '../support/engineFakes';
@@ -221,7 +222,12 @@ void describe('non-lifecycle stimuli never change a hero or remove one', () => {
         feed(rig, { ...a, state: 'spawned' });
       }
       const before = JSON.stringify(
-        list(n).map((a) => ({ id: a.id, lifecycle: 'spawned', exiting: false })),
+        list(n).map((a) => ({
+          id: a.id,
+          lifecycle: 'spawned',
+          exiting: false,
+          classId: classFor(a.id),
+        })),
       );
       run(rig, 800);
       steps(rig, TEN_MINUTES);
@@ -378,7 +384,9 @@ void describe('host events change hero state exactly as specified', () => {
     feed(rig, agent('x', 'despawned'));
     feed(rig, agent('y', 'working'));
     rig.game.step();
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'y', lifecycle: 'working', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'y', lifecycle: 'working', exiting: false, classId: null },
+    ]);
     assert.notEqual(log.byId('y').phase, 'warpIn');
   });
 
@@ -390,7 +398,9 @@ void describe('host events change hero state exactly as specified', () => {
     run(rig, 200);
     feed(rig, agent('a', 'spawned', null, 3));
     rig.game.step();
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'spawned', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'spawned', exiting: false, classId: classFor('a') },
+    ]);
   });
 
   void it('the queue limit is 256 and a hero list survives 300 queued events', () => {

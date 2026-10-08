@@ -18,6 +18,7 @@ import type {
   Surface,
 } from '../../src/game/ports';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
+import type { ArtSet } from '../../src/game/sprites/spriteFactory';
 import type { AgentInfo, AgentState } from '../../src/shared/protocol';
 
 export interface DrawCall {
@@ -228,6 +229,8 @@ export interface GameRigOptions {
   readonly seed?: number;
   readonly onError?: GameDeps['onError'];
   readonly record?: boolean;
+  /** Defaults to SHIPPED_ART; class suites pass a variant (for example without class layers). */
+  readonly art?: ArtSet;
 }
 
 /** A Game over SHIPPED_ART and Stage 1 on fake bitmaps and a recording surface. */
@@ -239,7 +242,7 @@ export function gameRig(options: GameRigOptions = {}): GameRig {
   const errors: GameRig['errors'] = [];
   const rig: GameRig = { game: undefined as unknown as Game, surface, bitmaps, errors, mirror: [] };
   const deps: GameDeps = {
-    art: SHIPPED_ART,
+    art: options.art ?? SHIPPED_ART,
     stages: STAGES,
     bitmaps,
     onError:

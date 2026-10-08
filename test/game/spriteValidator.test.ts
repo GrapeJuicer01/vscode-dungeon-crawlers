@@ -41,11 +41,12 @@ void describe('validateArtSet on the shipped art', () => {
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
   });
 
-  void it('the required hero animations are the ten documented ones with documented counts', () => {
+  void it('the required hero animations are the eleven documented ones with documented counts', () => {
     assert.deepEqual(REQUIRED_HERO_ANIMATIONS, {
       idle: 2,
       walk: 4,
       attack: 3,
+      ability: 3,
       sit: 2,
       eat: 2,
       sleep: 2,

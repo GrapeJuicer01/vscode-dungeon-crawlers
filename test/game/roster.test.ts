@@ -33,7 +33,9 @@ void describe('Roster: events in, heroes out', () => {
     const hero = log.byId('a');
     assert.equal(hero.lifecycle, 'spawned');
     assert.equal(hero.phase, 'warpIn');
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'spawned', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'spawned', exiting: false, classId: null },
+    ]);
     run(rig, WARP_IN_MS + 100);
     assert.equal(hero.phase, 'standby', 'waits at the door while spawned');
     assert.equal(hero.lifecycle, 'spawned');
@@ -142,7 +144,9 @@ void describe('Roster: events in, heroes out', () => {
     run(rig, 1000);
     feed(rig, agent('a', 'despawned'));
     rig.game.step();
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'despawned', exiting: true }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'despawned', exiting: true, classId: null },
+    ]);
     run(rig, 100);
     assert.equal(log.byId('a').phase, 'victory');
     run(rig, VICTORY_MS - 100 + 60);
@@ -182,7 +186,9 @@ void describe('Roster: events in, heroes out', () => {
     assert.notEqual(fresh, old);
     assert.equal(fresh.lifecycle, 'spawned');
     assert.equal(fresh.phase, 'warpIn');
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'spawned', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'spawned', exiting: false, classId: null },
+    ]);
   });
 
   void it('spawned for a live id just applies the state (no duplicate hero)', () => {
@@ -296,7 +302,9 @@ void describe('Roster: snapshots (reconcile)', () => {
     rig.game.enqueueSnapshot([agent('x', 'idle')]);
     rig.game.enqueueAgent(agent('x', 'working'));
     rig.game.step();
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'x', lifecycle: 'working', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'x', lifecycle: 'working', exiting: false, classId: null },
+    ]);
   });
 });
 
@@ -380,7 +388,7 @@ void describe('Hero lifecycle can only be written by applyAgentState', () => {
       info: agent('a', 'working'),
       slot: 0,
       instant: true,
-      look: { skin: 0, hair: 0, accent: null },
+      look: { skin: 0, hair: 0, accent: null, classId: null },
     };
     const hero = new Hero(init);
     hero.applyAgentState(agent('other', 'despawned'));
@@ -398,7 +406,7 @@ void describe('Hero lifecycle can only be written by applyAgentState', () => {
       info: agent('a', 'working'),
       slot: 0,
       instant: true,
-      look: { skin: 0, hair: 0, accent: null },
+      look: { skin: 0, hair: 0, accent: null, classId: null },
     });
     hero.applyAgentState(agent('a', 'despawned'));
     hero.advanceExitClock(1000);

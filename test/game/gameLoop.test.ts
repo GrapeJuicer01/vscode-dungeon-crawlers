@@ -2,6 +2,7 @@
 // validation (M4 plan test notes 7, 11; game-engine sections 4 and 5).
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { classFor } from '../../src/game/data/classMap';
 import { Game } from '../../src/game/Game';
 import { STAGES } from '../../src/game/data/stages';
 import {
@@ -222,7 +223,12 @@ void describe('event queue overflow (cap 256)', () => {
     feed(rig, agent('victim', 'despawned', null, 5)); // the 257th event: overflow, dropped
     rig.game.step();
     const victim = rig.game.heroSnapshot().find((h) => h.id === 'victim');
-    assert.deepEqual(victim, { id: 'victim', lifecycle: 'despawned', exiting: true });
+    assert.deepEqual(victim, {
+      id: 'victim',
+      lifecycle: 'despawned',
+      exiting: true,
+      classId: classFor('victim'),
+    });
     run(rig, 2500);
     assert.equal(
       rig.game.heroSnapshot().some((h) => h.id === 'victim'),

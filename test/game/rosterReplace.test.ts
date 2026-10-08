@@ -50,7 +50,7 @@ for (const exit of EXITS) {
         assert.equal(fresh.lifecycle, state);
         assert.deepEqual(
           rig.game.heroSnapshot().filter((h) => h.id === 'a'),
-          [{ id: 'a', lifecycle: state, exiting: false }],
+          [{ id: 'a', lifecycle: state, exiting: false, classId: null }],
           'one entry, not exiting',
         );
         assert.equal(liveFor(rig, 'a').length, 1);
@@ -195,8 +195,12 @@ void describe('Roster.reconcile with exiting heroes', () => {
     assert.equal(log.byId('a'), second, 'now alive, so updated in place');
     assert.equal(second.lifecycle, 'idle');
     assert.equal(log.made.length, 2);
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'idle', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'idle', exiting: false, classId: null },
+    ]);
     run(rig, 5000);
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'idle', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'idle', exiting: false, classId: null },
+    ]);
   });
 });

@@ -110,12 +110,19 @@ void describe('lifecycle has one writer (invariant 2)', () => {
     assert.doesNotMatch(src, /\bset\s+lifecycle\b/);
   });
 
-  void it('Roster is constructed and used only by Game.ts; Hero is built only by Game and Roster glue', () => {
+  void it('Roster is constructed and used only by Game.ts; heroes are built only by createHero in ClassHero.ts, which Game imports', () => {
     assert.deepEqual(filesMatching(gameFiles, /\bnew\s+Roster\s*\(/), ['src/game/Game.ts']);
     assert.deepEqual(filesMatching(gameFiles, /\bimport\b[^;]*\bRoster\b/).sort(), [
       'src/game/Game.ts',
     ]);
-    assert.deepEqual(filesMatching(gameFiles, /\bnew\s+Hero\s*\(/), ['src/game/Game.ts']);
+    // H1: the base Hero is never constructed by the engine; the default factory is createHero.
+    assert.deepEqual(filesMatching(gameFiles, /\bnew\s+Hero\s*\(/), []);
+    assert.deepEqual(filesMatching(gameFiles, /\bnew\s+ClassHero\s*\(/), [
+      'src/game/entities/ClassHero.ts',
+    ]);
+    assert.deepEqual(filesMatching(gameFiles, /\bimport\b[^;]*\bcreateHero\b/), [
+      'src/game/Game.ts',
+    ]);
   });
 
   void it('engagement, camera, lighting, particles, pathfinding, and the renderer cannot reach Roster or Hero state', () => {

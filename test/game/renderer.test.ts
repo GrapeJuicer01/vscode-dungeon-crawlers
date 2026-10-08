@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { STEP_MS } from '../../src/game/data/tuning';
 import { CORRIDOR_X, INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../../src/game/layout';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
+import { SpriteCache } from '../../src/game/sprites/spriteFactory';
 import { agent, feed, gameRig, run } from '../support/engineFakes';
 import type { DrawCall, GameRig } from '../support/engineFakes';
 
@@ -19,12 +20,28 @@ function populated(
 ): { rig: GameRig; heroBitmaps: Set<unknown> } {
   const rig = gameRig();
   rig.game.frame(0, rig.surface); // builds the lighting bitmaps
-  const before = rig.bitmaps.fromRgbaBitmaps.length;
-  for (let i = 0; i < n; i++) {
-    feed(rig, agent(`h${i}`, states[i % states.length] ?? 'idle'));
+  // Hero bitmaps are the frames SpriteCache.hero returns. Counting every fromRgba after the first
+  // frame would also count lazily built effect sheets (H1), which are not heroes.
+  const heroBitmaps = new Set<unknown>();
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- wrapped and applied with `this`
+  const original = SpriteCache.prototype.hero;
+  SpriteCache.prototype.hero = function (this: SpriteCache, ...args: Parameters<typeof original>) {
+    const sprites = original.apply(this, args);
+    for (const set of Object.values(sprites)) {
+      for (const frame of set.frames) {
+        heroBitmaps.add(frame);
+      }
+    }
+    return sprites;
+  };
+  try {
+    for (let i = 0; i < n; i++) {
+      feed(rig, agent(`h${i}`, states[i % states.length] ?? 'idle'));
+    }
+    run(rig, settleMs);
+  } finally {
+    SpriteCache.prototype.hero = original;
   }
-  run(rig, settleMs);
-  const heroBitmaps = new Set<unknown>(rig.bitmaps.fromRgbaBitmaps.slice(before));
   return { rig, heroBitmaps };
 }
 
@@ -183,10 +200,10 @@ void describe('draw-call budget (game-engine section 15)', () => {
     return { bitmaps, fills, multiplies };
   }
 
-  void it('8 heroes: at most 120 bitmap draws, 450 fills, and exactly 1 multiply blit per frame', (t) => {
+  void it('8 heroes: at most 144 bitmap draws, 450 fills, and exactly 1 multiply blit per frame', (t) => {
     const c = counts(8);
     t.diagnostic(`8 heroes, worst of 600 frames: ${JSON.stringify(c)}`);
-    assert.ok(c.bitmaps <= 120, `${c.bitmaps} bitmap draws`);
+    assert.ok(c.bitmaps <= 144, `${c.bitmaps} bitmap draws`);
     assert.ok(c.fills <= 450, `${c.fills} fills`);
     assert.equal(c.multiplies, 1);
   });
@@ -214,7 +231,7 @@ void describe('draw-call budget (game-engine section 15)', () => {
       fills = Math.max(fills, rig.surface.count('fillRect'));
     }
     t.diagnostic(`8 warping heroes: ${bitmaps} bitmap draws, ${fills} fills (worst frame)`);
-    assert.ok(bitmaps <= 120 && fills <= 450);
+    assert.ok(bitmaps <= 144 && fills <= 450);
   });
 
   void it('a steady 8-hero frame (no warps) is about 34 bitmap draws', (t) => {

@@ -91,7 +91,9 @@ void describe('entity update faults', () => {
       'update stops being attempted once frozen',
     );
     assert.equal(hero.frozen, true);
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'working', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'working', exiting: false, classId: null },
+    ]);
     assert.equal(hero.drawCalls - draws, 20, 'a frozen hero is still drawn every frame');
   });
 
@@ -397,7 +399,9 @@ void describe('surface and reporter faults', () => {
     rig.game.step();
     feed(rig, agent('a', 'despawned', null, 2));
     assert.doesNotThrow(() => run(rig, 500));
-    assert.deepEqual(rig.game.heroSnapshot(), [{ id: 'a', lifecycle: 'idle', exiting: false }]);
+    assert.deepEqual(rig.game.heroSnapshot(), [
+      { id: 'a', lifecycle: 'idle', exiting: false, classId: null },
+    ]);
     assert.equal(rig.errors.length, 1);
   });
 

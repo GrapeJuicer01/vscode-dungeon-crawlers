@@ -6,6 +6,7 @@ export const HERO_FRAME_MS: Readonly<Record<string, readonly number[]>> = {
   idle: [500],
   walk: [130],
   attack: [140, 90, 160],
+  ability: [120, 140, 200],
   sit: [600],
   eat: [600],
   sleep: [600],
@@ -14,6 +15,9 @@ export const HERO_FRAME_MS: Readonly<Record<string, readonly number[]>> = {
   warmHands: [600],
   victory: [300],
 };
+
+/** Length of one `ability` animation, in ms. */
+export const ABILITY_TOTAL_MS: number = (HERO_FRAME_MS['ability'] ?? []).reduce((a, b) => a + b, 0);
 
 export const FLAME_FRAME_MS = 110;
 export const TORCH_FRAME_MS = 130;

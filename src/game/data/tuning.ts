@@ -69,3 +69,20 @@ export const BACKDROP_WIDTH_PX = 128;
 export const DRIP_GRAVITY_PX_PER_S2 = 360;
 export const DRIP_FALL_HEIGHT_PX = 44;
 export const WARP_SPARKS_PER_S = 40;
+
+// ---- Classes and cosmetic effects (H1) ----
+/** Live cosmetic effects (projectiles, bursts). Assumption: 24 covers 8 heroes with headroom. */
+export const EFFECT_CAPACITY = 24;
+/** Hidden ability interval, in ms of attack time. Assumption: 4 to 8 s feels alive, never busy. */
+export const ABILITY_INTERVAL_MIN_MS = 4000;
+export const ABILITY_INTERVAL_MAX_MS = 8000;
+/** Attack frame index on which a strike effect is released (frame 1 is the strike pose). */
+export const ATTACK_STRIKE_FRAME = 1;
+/** Ability frame index on which the ability effects are released. */
+export const ABILITY_RELEASE_FRAME = 1;
+/** Duration of one effect animation frame, in ms. Assumption: 90 ms reads as a quick pulse. */
+export const EFFECT_FRAME_MS = 90;
+/** An effect farther than this many px outside the 0..320 view is expired early. */
+export const EFFECT_CULL_MARGIN_PX = 32;
+/** Consecutive draw faults before the renderer disables the effect pass. */
+export const EFFECT_FAULT_LIMIT = 3;

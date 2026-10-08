@@ -9,12 +9,23 @@
 //    workspace, so only the development build of Pixel Agents loads.
 //    Our extension's log level is trace, and the in-host suite gets the temp user-data-dir in
 //    PIXEL_AGENTS_IT_USER_DATA_DIR so it can read the "Pixel Agents" log channel's file.
+//    M3: the monitor reads transcripts, so the run never touches the real ~/.claude. A temp
+//    <temp>/claude/projects is the transcript root (pixelAgents.transcriptPath in the temp
+//    user-data-dir's settings.json), the simulator is off, and polling and the debounce are
+//    short. The root is also passed to the in-host suite in PIXEL_AGENTS_IT_TRANSCRIPT_ROOT
+//    (test-side only; the extension reads no environment variable). HOME is deliberately NOT
+//    overridden: on macOS an empty HOME stops the real webview from ever sending `ready`
+//    (observed with VS Code 1.141), which fails the M1 and M2 suites. USERPROFILE (the Windows
+//    home) is pointed at an empty <temp>/home, but that is effective on Windows only: on
+//    macOS and Linux os.homedir() reads HOME, so the override does nothing there. The real guard
+//    is the temp pixelAgents.transcriptPath in the temp settings.json, which monitor.itest.ts
+//    asserts took effect.
 // 4. Exits 1 if the build is stale, the suite fails to compile, or any test fails.
 //
 // PIXEL_AGENTS_VSCODE_VERSION selects the VS Code build (default `stable`; for example `1.90.0`
 // tests the engines.vscode minimum). Electron needs a display: on headless Linux use xvfb-run -a.
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
@@ -70,7 +81,26 @@ async function main() {
   const userDataDir = path.join(temp, 'user-data');
   const extensionsDir = path.join(temp, 'extensions');
   const workspace = path.join(temp, 'workspace');
-  await Promise.all([userDataDir, extensionsDir, workspace].map((dir) => mkdir(dir)));
+  const fakeHome = path.join(temp, 'home');
+  const transcriptRoot = path.join(temp, 'claude', 'projects');
+  await Promise.all([userDataDir, extensionsDir, workspace, fakeHome].map((dir) => mkdir(dir)));
+  await mkdir(transcriptRoot, { recursive: true });
+  // User settings written before VS Code starts; machine-scoped settings are read from here.
+  await mkdir(path.join(userDataDir, 'User'), { recursive: true });
+  await writeFile(
+    path.join(userDataDir, 'User', 'settings.json'),
+    JSON.stringify(
+      {
+        'pixelAgents.transcriptPath': transcriptRoot,
+        'pixelAgents.simulator': 'off',
+        'pixelAgents.pollIntervalMs': 250,
+        'pixelAgents.debounceMs': 100,
+        'pixelAgents.idleTimeoutSeconds': 5,
+      },
+      null,
+      2,
+    ),
+  );
 
   try {
     await runTests({
@@ -90,7 +120,11 @@ async function main() {
       ],
       // Test-side only: tells the in-host suite where this run's logs are. Production code
       // reads no environment variable (security-and-safety.md section 5).
-      extensionTestsEnv: { PIXEL_AGENTS_IT_USER_DATA_DIR: userDataDir },
+      extensionTestsEnv: {
+        PIXEL_AGENTS_IT_USER_DATA_DIR: userDataDir,
+        PIXEL_AGENTS_IT_TRANSCRIPT_ROOT: transcriptRoot,
+        USERPROFILE: fakeHome,
+      },
     });
   } finally {
     await rm(temp, { recursive: true, force: true });

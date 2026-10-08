@@ -37,6 +37,95 @@
           "name": "Pixel Agents"
         }
       ]
+    },
+    "configuration": {
+      "title": "Pixel Agents",
+      "properties": {
+        "pixelAgents.simulator": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Show simulated agents only while no real Claude Code session is detected.",
+            "Always show simulated agents, beside real sessions.",
+            "Never show simulated agents."
+          ],
+          "default": "auto",
+          "scope": "window",
+          "markdownDescription": "Simulated agents for a zero-configuration demo. Simulated agents are named `Sim ...` (ids start with `sim-`) and are **not** real sessions. `auto` shows them only while no real Claude Code session is detected."
+        },
+        "pixelAgents.simulatorAgentCount": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 16,
+          "scope": "window",
+          "markdownDescription": "Number of simulated agents (`Sim ...`) when the simulator runs."
+        },
+        "pixelAgents.projectScope": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "all"
+          ],
+          "enumDescriptions": [
+            "Read only the transcripts of the folders open in this window.",
+            "Read the transcripts of every project on this machine."
+          ],
+          "default": "workspace",
+          "scope": "machine",
+          "markdownDescription": "Which Claude Code project transcripts are read. `workspace` (default) reads only the sessions of the folders open in this window. `all` reads the transcripts of **every project on this machine**, in every window. Either way only session id, name, state, tool name, and timestamp are extracted, nothing is stored, and nothing leaves the machine. User or remote settings only."
+        },
+        "pixelAgents.transcriptPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Root directory of Claude Code transcripts. Empty means `~/.claude/projects`. Must be an absolute path or start with `~/`. Read-only: nothing under it is ever written, and symbolic links below it are never followed. Set this if you relocated Claude Code's configuration directory. User or remote settings only."
+        },
+        "pixelAgents.idleTimeoutSeconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 3600,
+          "scope": "window",
+          "markdownDescription": "Seconds of transcript silence before a working agent with no pending tool is shown as idle."
+        },
+        "pixelAgents.toolTimeoutSeconds": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 30,
+          "maximum": 86400,
+          "scope": "window",
+          "markdownDescription": "Seconds of transcript silence before a working agent with a pending tool (for example a long build) is shown as idle. Never less than `#pixelAgents.idleTimeoutSeconds#`."
+        },
+        "pixelAgents.sessionEndTimeoutMinutes": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 1440,
+          "scope": "window",
+          "markdownDescription": "Minutes of transcript silence before a session counts as ended and its hero leaves. Never less than `#pixelAgents.toolTimeoutSeconds#`."
+        },
+        "pixelAgents.debounceMs": {
+          "type": "integer",
+          "default": 750,
+          "minimum": 0,
+          "maximum": 10000,
+          "scope": "window",
+          "markdownDescription": "Milliseconds used to smooth state changes: the delay from spawn to the first state, the quiet time after a turn ends, and the per-agent update coalescing window."
+        },
+        "pixelAgents.pollIntervalMs": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 250,
+          "maximum": 10000,
+          "scope": "window",
+          "markdownDescription": "Milliseconds between transcript polls."
+        }
+      }
     }
   },
   "scripts": {

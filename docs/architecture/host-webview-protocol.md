@@ -1,7 +1,7 @@
 # Host-webview protocol
 
 Purpose: the contract between the extension host and the webview: every message type, field rules, validation, the `ready` handshake, bridge states, ordering guarantees, and how to add a message safely. `src/shared/protocol.ts` implements this document; if they disagree, fix one of them in the same change.
-Related: [architecture overview](overview.md), [security and safety](security-and-safety.md), [ADR 0007 allow-list protocol and pull handshake](adr/0007-allow-list-protocol-pull-handshake.md), [ADR 0001 bottom-panel webview](adr/0001-bottom-panel-webview.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0004 esbuild two bundles](adr/0004-esbuild-two-bundles.md), [M2 plan](plans/m2-protocol.md), [agent detection](agent-detection.md) (planned, M3), [CLAUDE.md](../../CLAUDE.md).
+Related: [architecture overview](overview.md), [security and safety](security-and-safety.md), [ADR 0007 allow-list protocol and pull handshake](adr/0007-allow-list-protocol-pull-handshake.md), [ADR 0001 bottom-panel webview](adr/0001-bottom-panel-webview.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0004 esbuild two bundles](adr/0004-esbuild-two-bundles.md), [M2 plan](plans/m2-protocol.md), [M3 plan](plans/m3-monitor.md), [agent detection](agent-detection.md), [CLAUDE.md](../../CLAUDE.md).
 
 ## 1. Principles
 
@@ -24,6 +24,8 @@ Defined in `src/shared/protocol.ts`, imported by both bundles ([ADR 0004](adr/00
 
 No message or type has an optional property. "Absent" is `null`.
 
+**Id convention (M3, not a shape rule).** Real agent ids are Claude Code session UUIDs (lower case). Ids starting with `sim-` are simulated agents from the monitor's simulator, whose names start with `Sim` and a space ([agent detection section 3.3](agent-detection.md#33-simulator-source)); UI may label them, and `focusAgent` for them reveals nothing.
+
 ## 3. Message catalog
 
 ### Host to webview (`HostToWebviewMessage`)
@@ -31,7 +33,7 @@ No message or type has an optional property. "Absent" is `null`.
 | `type` | Fields | When | Since |
 |---|---|---|---|
 | `config` | `config: ConfigSnapshot` | answer to every `ready` (first); from M7 also on a relevant setting change | M2 |
-| `agentList` | `agents: readonly AgentInfo[]` (at most 64, unique ids) | answer to every `ready` (second). Replaces the webview's whole agent set. Empty until M3. | M2 |
+| `agentList` | `agents: readonly AgentInfo[]` (at most 64, unique ids) | answer to every `ready` (second). Replaces the webview's whole agent set. Empty in M2; from M3 the monitor's live agents (`AgentMonitor.getAgents()`, never `despawned` ones). | M2 |
 | `agentState` | `agent: AgentInfo` | one agent changed state (`spawned`, `working`, `idle`, `despawned`), only while the bridge is `ready` | M2 (type), M3 (sent) |
 
 ### Webview to host (`WebviewToHostMessage`)
@@ -158,9 +160,11 @@ The bridge may still be `ready` from the old document; pushes in that window can
 ```mermaid
 sequenceDiagram
   participant M as AgentMonitor (M3)
+  participant E as extension.ts
   participant B as WebviewBridge
   participant W as webview
-  M->>B: postAgentState(agentInfo)
+  M->>E: onDidChangeAgent(agentInfo), coalesced per agent
+  E->>B: postAgentState(agentInfo)
   alt bridge ready
     B->>B: createAgentStateMessage (copy 5 allow-listed keys)
     B->>W: { type: 'agentState', agent }
@@ -176,17 +180,21 @@ sequenceDiagram
 sequenceDiagram
   participant W as webview (M7 roster click)
   participant B as WebviewBridge
-  participant R as revealAgentTerminal (M3, extension.ts)
+  participant R as AgentMonitor.revealAgentTerminal (M3)
   participant T as terminal
   W->>B: { type: 'focusAgent', agentId }
   B->>B: parseWebviewMessage
-  alt reveal capability null (M2)
+  alt reveal capability null (M2, or monitor failed to start)
     B->>B: drop, trace "reveal unavailable"
   else agentId not a live agent in host list
     B->>B: drop, trace "unknown agent"
   else live agent
     B->>R: revealAgentTerminal(agentId)
-    R->>T: terminal.show() only
+    alt agent linked to an open terminal
+      R->>T: terminal.show() only
+    else simulated, startup, or closed terminal
+      R->>R: trace "reveal skipped (no terminal)"
+    end
   end
   Note over B,T: nothing is posted back; no input, signal, or dispose
 ```

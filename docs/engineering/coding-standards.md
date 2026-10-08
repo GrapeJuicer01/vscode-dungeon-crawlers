@@ -1,7 +1,7 @@
 # Coding standards
 
 Purpose: the rules every line of Pixel Agents code follows: TypeScript settings, bundle boundaries, error handling, logging, performance, data tables, config, formatting, and commits. The linters enforce what they can; the reviewer checks the rest.
-Related: [CLAUDE.md](../../CLAUDE.md), [team workflow](team-workflow.md), [roadmap](roadmap.md), [testing strategy](testing-strategy.md), [architecture overview](../architecture/overview.md), [host-webview protocol](../architecture/host-webview-protocol.md), [security and safety](../architecture/security-and-safety.md), [ADR 0004 esbuild two bundles](../architecture/adr/0004-esbuild-two-bundles.md), [ADR 0006 test runner](../architecture/adr/0006-node-test-runner.md), [ADR 0007 allow-list protocol](../architecture/adr/0007-allow-list-protocol-pull-handshake.md), [M1 plan](../architecture/plans/m1-scaffold.md), [M2 plan](../architecture/plans/m2-protocol.md), [sprite spec](../design/sprite-spec.md).
+Related: [CLAUDE.md](../../CLAUDE.md), [team workflow](team-workflow.md), [roadmap](roadmap.md), [testing strategy](testing-strategy.md), [architecture overview](../architecture/overview.md), [host-webview protocol](../architecture/host-webview-protocol.md), [security and safety](../architecture/security-and-safety.md), [ADR 0004 esbuild two bundles](../architecture/adr/0004-esbuild-two-bundles.md), [ADR 0006 test runner](../architecture/adr/0006-node-test-runner.md), [ADR 0007 allow-list protocol](../architecture/adr/0007-allow-list-protocol-pull-handshake.md), [ADR 0005 transcript watching](../architecture/adr/0005-transcript-watching.md), [agent detection](../architecture/agent-detection.md), [M1 plan](../architecture/plans/m1-scaffold.md), [M2 plan](../architecture/plans/m2-protocol.md), [M3 plan](../architecture/plans/m3-monitor.md), [sprite spec](../design/sprite-spec.md).
 
 ## 1. Precedence
 
@@ -33,12 +33,15 @@ Two bundles, three typecheck projects ([ADR 0004](../architecture/adr/0004-esbui
 | Area | Bundle | May import | Must not import |
 |---|---|---|---|
 | `src/shared/**` | both | nothing outside `src/shared/` | `vscode`, Node built-ins, any other `src/` folder (including `src/host/**`) |
-| `src/extension.ts`, `src/monitor/**` | host | `vscode`, `node:*`, `src/shared/**`, `src/host/**`, `src/webview/index.html.ts` | `src/game/**`, webview runtime files |
+| `src/extension.ts` | host | `vscode`, `node:*`, `src/shared/**`, `src/host/**`, `src/monitor/**`, `src/webview/index.html.ts` | `src/game/**`, webview runtime files |
+| `src/monitor/*.ts` (core, from M3) | host | `src/shared/**` and sibling core files only; Node and `vscode` capabilities arrive as ports (`ReadOnlyFileSystem`, `PathOps`, `Clock`, `TimerPort`, `TerminalPort`, `MonitorLogger`) built by `extension.ts` | `vscode`, Node built-ins, `src/monitor/adapters/**`, `src/host/**`, `src/game/**`, `src/webview/**`, `src/extension.ts` |
+| `src/monitor/adapters/nodeFileSystem.ts`, `nodeRuntime.ts` (from M3) | host | `node:fs/promises` read functions (`open`, `lstat`, `readdir`, `realpath`), `node:fs` `constants`, `node:os` `homedir`, `node:path`; `src/monitor/ports.ts` types | `vscode`, every other Node built-in, any write or watch API |
+| `src/monitor/adapters/vscodeTerminals.ts` (from M3) | host | `vscode` (type-only; `vscode.window` is passed in), `src/monitor/ports.ts` types | Node built-ins; any terminal member other than the events, `terminals`, `activeTerminal`, `exitStatus`, and `show()` |
 | `src/host/**` (from M2) | host | `src/shared/**` only; `vscode` objects arrive as narrow interfaces (for example `WebviewPort`, `BridgeLogger`) passed in by `extension.ts` | `vscode`, Node built-ins, `src/monitor/**`, `src/game/**`, `src/webview/**`, `src/extension.ts` |
 | `src/webview/index.html.ts` | host | nothing (pure string builder) | `vscode`, `node:*`, DOM APIs |
 | `src/webview/**` (other files), `src/game/**` | webview | `src/shared/**`, each other | `vscode`, `node:*`, `src/monitor/**`, `src/host/**`, `src/extension.ts` |
 
-`src/host/` exists so host logic can be unit tested under `node:test` without a `vscode` stub ([ADR 0007](../architecture/adr/0007-allow-list-protocol-pull-handshake.md) consequences). `extension.ts` stays thin glue: it adapts `vscode` objects to the `src/host/` interfaces and wires events; decisions live in `src/host/`. Inside the webview bundle, modules that tests import (for example `hostChannel.ts`, `hostMessages.ts`, `hostState.ts`) stay DOM-free; only `main.ts` touches `window`, `document`, and `acquireVsCodeApi`.
+The monitor core follows the same pattern as `src/host/` (from M3): logic in vscode- and Node-free files, capabilities through narrow ports, adapters as the only files that touch `node:fs` or `vscode` ([agent detection section 2](../architecture/agent-detection.md#2-components)). `src/host/` exists so host logic can be unit tested under `node:test` without a `vscode` stub ([ADR 0007](../architecture/adr/0007-allow-list-protocol-pull-handshake.md) consequences). `extension.ts` stays thin glue: it adapts `vscode` objects to the `src/host/` interfaces and wires events; decisions live in `src/host/`. Inside the webview bundle, modules that tests import (for example `hostChannel.ts`, `hostMessages.ts`, `hostState.ts`) stay DOM-free; only `main.ts` touches `window`, `document`, and `acquireVsCodeApi`.
 
 ESLint `no-restricted-imports` encodes this table. Typed linting lists `tsconfig.json`, `tsconfig.webview.json`, and `tsconfig.tools.json` explicitly in `parserOptions.project` (not `projectService`, which would map every file to the host project). The tsconfig `lib` and `types` settings back it up: the webview project has no Node or `vscode` types; the host project has no DOM.
 
@@ -65,13 +68,16 @@ ESLint `no-restricted-imports` encodes this table. Typed linting lists `tsconfig
 
 - Host logs go to one `LogOutputChannel` named "Pixel Agents", created once in `activate` with `vscode.window.createOutputChannel('Pixel Agents', { log: true })` (from M2) and pushed to `context.subscriptions`. Modules in `src/host/` and `src/monitor/` receive it as a narrow logger interface (for example `BridgeLogger` with `trace` and `error`), never the `vscode` object. Levels: `trace` for expected drops (invalid message, unknown agent, view gone), `error` for caught exceptions from our own code; no `info` noise on the normal path. Log messages are fixed reason strings plus, for errors, `error.name: error.message`; never a message payload. No `console.log` in host code. In the webview, `console.error` is allowed only in the crash handler.
 - Never log, store, or post transcript content. Allowed in logs: session id, name, state, tool name, timestamp, file counts, error class and message from our own code (Core invariant 7).
-- Never log absolute user paths beyond the configured transcript directory name.
+- **Monitor errors (from M3).** Code under `src/monitor/**` describes an error only with `safeErrorCode(error)` (`error.code` such as `EACCES`, else `error.name` such as `SyntaxError`), never `error.message` or `error.stack`, never `String(error)`, `JSON.stringify`, or template interpolation of a caught value: V8 `JSON.parse` messages quote transcript text and Node fs messages embed paths. Transcript records are read with bracket access (`record['message']`), so a grep for `.message` in `src/monitor/**` stays empty. `extension.ts` uses `safeErrorCode` for monitor failures too. Repeated reason lines go through the rate-limited logger.
+- Never log absolute user paths, including the transcript root (log `default` or `custom` instead).
 
 ## 7. Lifecycle and disposal
 
 - Everything with a `dispose()` (watchers, listeners, timers wrapped as disposables, the view provider registration) is pushed to `context.subscriptions` or to a parent's disposable list.
 - Only disposables the extension itself created are ever disposed (listeners, registrations, the output channel, watchers, timers; for example the provider's per-view listener list). Never dispose, close, or hide a terminal or anything owned by an agent session (Core invariant 3, [security and safety section 5](../architecture/security-and-safety.md#5-read-only-and-reveal-only-guarantees)).
 - `deactivate()` leaves no timer, watcher, or listener running.
+- Host timers go through `TimerPort`; the Node implementation `unref()`s them so a missed dispose in a test cannot keep a process alive. Async monitor work checks a disposed flag after every `await` and emits nothing after `dispose()`.
+- **Grep-trap names.** The read-only structural tests match the words `unlink` and `terminal*.dispose(` anywhere in `src/`. Do not name a method `unlink` (the monitor uses `dropLink`) and never call `dispose()` on an identifier starting with `terminal`; the terminal adapter keeps its own event subscriptions in an array named `subscriptions`, and the terminal port is disposed only through `context.subscriptions`.
 - The webview cancels its animation frame and listeners on `pagehide`.
 
 ## 8. Performance (webview)
@@ -86,6 +92,9 @@ ESLint `no-restricted-imports` encodes this table. Typed linting lists `tsconfig
 - Game content lives in typed tables under `src/game/data/`. Enemies come from a compact row table plus per-stage scaling formulas, validated at startup.
 - Persisted progress carries `schemaVersion` and a migration for every prior version.
 - Every tunable threshold is a `pixelAgents.*` setting with a default, a description, and min/max where numeric.
+- Setting keys carry their unit when numeric (`idleTimeoutSeconds`, `sessionEndTimeoutMinutes`, `debounceMs`); code converts to milliseconds once, in the config reader. Each setting has a row in a typed settings table in code (`MONITOR_SETTINGS` from M3) that a test compares with `contributes.configuration`. The config reader is total: wrong types and out-of-range values fall back or clamp, never throw.
+- Settings that widen what the extension reads (`pixelAgents.projectScope`, `pixelAgents.transcriptPath`) are `machine`-scoped, so a workspace's `.vscode/settings.json` cannot change them.
+- Safety bounds (protocol limits, monitor read and line limits, agent caps) are constants, not settings.
 - Ambiguity: choose a sensible default and record it in a code comment starting `Assumption:` or in the relevant doc.
 
 ## 10. Formatting and linting

@@ -1,7 +1,7 @@
 # Glossary
 
 Purpose: one-line definitions of the terms used across the Pixel Agents docs, so every agent and contributor means the same thing by "hero", "host", "stage", or "gate". Owned by the architect; extended as milestones add terms.
-Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
+Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [agent detection](architecture/agent-detection.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
 
 ## Agents and the game
 
@@ -31,8 +31,8 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | protocol | the typed, validated messages between host and webview in `src/shared/protocol.ts` ([host-webview protocol](architecture/host-webview-protocol.md)). |
 | handshake | the webview sends `ready`; the host answers with `config` then `agentList` snapshots, and only then pushes `agentState` events ([ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md)). |
 | `focusAgent` | the only webview action that reaches the host: reveal (show) an agent's terminal. It never writes to or controls the terminal. |
-| monitor | the read-only host code in `src/monitor/` that detects agent sessions and emits agent-state events (M3). |
-| source | one input to the monitor: transcript watching, terminal observation, or the simulator (fake agents for demo and tests). |
+| monitor | the read-only host code in `src/monitor/` that detects agent sessions and emits agent-state events (M3, [agent detection](architecture/agent-detection.md)). |
+| source | one input to the monitor: transcript polling, terminal observation (reveal links only), or the simulator (fake agents for demo and tests). |
 | allow-list | the only agent fields that may be read, stored, logged, or sent: session id, name, state, tool name, timestamp (Core invariant 7). |
 | CSP, nonce | the webview's Content-Security-Policy and the per-load random value that authorizes our single script and style block ([overview](architecture/overview.md#6-security-boundary)). |
 | data table | a typed, `readonly` table of game content under `src/game/data/` (enemies, stages, classes, drops, achievements). |
@@ -57,11 +57,33 @@ Full contract in [host-webview protocol](architecture/host-webview-protocol.md);
 | `WebviewBridge` | the vscode-free host object in `src/host/webviewBridge.ts` that receives webview messages, answers `ready`, posts pushes, and handles `focusAgent`. |
 | bridge state | `detached` (no view), `loading` (view attached or hidden, waiting for `ready`; pushes dropped), `ready` (pushes posted). |
 | port | `WebviewPort`, the one-method interface (`postMessage`) through which the bridge posts; `extension.ts` adapts the real `vscode.Webview` to it. |
-| reveal capability | `revealAgentTerminal`, the bridge's only outward action: show a live agent's terminal. `null` in M2; wired to `Terminal.show()` in M3. |
+| reveal capability | `revealAgentTerminal`, the bridge's only outward action: show a live agent's terminal. `null` in M2; from M3 `AgentMonitor.revealAgentTerminal`, which ends in `Terminal.show()` for a linked agent. |
 | `HostStateMirror` | the webview's in-memory copy of host state (config and agents), rebuilt from scratch on every load. The M4 `Game` reads it; the webview never writes state back. |
 | `assertNever` | the shared exhaustiveness guard in `src/shared/assertNever.ts` that ends every `switch` over a union; its error never includes the value. |
 | `src/host/` | host-bundle folder for vscode-free, unit-testable host logic; imports only `src/shared/` ([coding standards section 3](engineering/coding-standards.md#3-bundle-boundaries)). |
 | log channel | the single "Pixel Agents" `LogOutputChannel`; fixed reason strings at trace level for drops, `error.name: message` at error level; never payloads. |
+
+## Monitor (M3)
+
+Full contract in [agent detection](architecture/agent-detection.md); rationale in [ADR 0005](architecture/adr/0005-transcript-watching.md).
+
+| Term | Meaning |
+|---|---|
+| transcript | the JSONL file Claude Code appends to for one session, `<root>/<project dir>/<session uuid>.jsonl`. Read-only input; only five fields are derived from it. |
+| transcript root | the directory the monitor reads: `pixelAgents.transcriptPath`, or `~/.claude/projects` by default. Resolved with `realpath`; nothing below it is followed through a symbolic link. |
+| project directory | a directory under the root named by encoding a working directory (every character outside `[A-Za-z0-9]` becomes `-`). |
+| project scope | which project directories are read: `workspace` (this window's folders, default) or `all` (every project on the machine). |
+| poll | one pass of the transcript source: `lstat` tracked files, read appended bytes (bounded), classify complete lines, evaluate silence thresholds. Polls never overlap. |
+| signal | the fixed result of classifying one transcript line: `prompt`, `assistant`, `toolUse` (with a tool name), `toolResult`, `turnEnd`, `ignored`, or `unparseable`. Carries no transcript text. |
+| session state machine | the pure reducer that turns signals and silence into `spawned`, `working`, `idle`, `despawned` for one transcript session. |
+| silence | time since a session's last activity signal; compared with the idle, tool, and session-end timeouts. |
+| coalescing | the registry rule that emits at most one agent-state event per agent per `debounceMs`, always the latest; `spawned` and `despawned` go out immediately. |
+| registry | `AgentRegistry`: the monitor's live agent records, the `AgentInfo` snapshot behind `getAgents()`, and the per-origin agent caps. |
+| terminal link | the monitor's association of a session with the terminal that was active when the session appeared; used only to reveal. |
+| simulated agent | a fake agent from `SimulatorSource`: id `sim-<slot>-<generation>`, name `Sim <Name>`. In `auto` mode only while no real session exists. |
+| port (monitor) | a narrow interface the monitor core depends on (`ReadOnlyFileSystem`, `PathOps`, `Clock`, `TimerPort`, `TerminalPort`, `MonitorLogger`), implemented by an adapter. |
+| adapter | a file under `src/monitor/adapters/`, the only monitor code allowed to import Node built-ins or `vscode`. |
+| `safeErrorCode` | the only way monitor code describes an error: `error.code` or `error.name`, never the message or stack. |
 
 ## Process
 

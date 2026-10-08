@@ -1,7 +1,7 @@
 # Architecture overview
 
 Purpose: the big picture of Pixel Agents: what it talks to, what runs where, how data flows, and which boundaries keep agents safe from the game. Start here before reading any other architecture doc.
-Related: [CLAUDE.md](../../CLAUDE.md), [docs index](../index.md), [glossary](../glossary.md), [roadmap](../engineering/roadmap.md), [coding standards](../engineering/coding-standards.md), ADRs [0001](adr/0001-bottom-panel-webview.md), [0002](adr/0002-no-hero-health.md), [0003](adr/0003-procedural-sprites.md), [0004](adr/0004-esbuild-two-bundles.md), [0006](adr/0006-node-test-runner.md), [0007](adr/0007-allow-list-protocol-pull-handshake.md); plans: [M1 scaffold](plans/m1-scaffold.md), [M2 protocol](plans/m2-protocol.md); [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md); planned: [agent detection](agent-detection.md) (M3), [game engine](game-engine.md) (M4), [data model](data-model.md) (M4).
+Related: [CLAUDE.md](../../CLAUDE.md), [docs index](../index.md), [glossary](../glossary.md), [roadmap](../engineering/roadmap.md), [coding standards](../engineering/coding-standards.md), ADRs [0001](adr/0001-bottom-panel-webview.md), [0002](adr/0002-no-hero-health.md), [0003](adr/0003-procedural-sprites.md), [0004](adr/0004-esbuild-two-bundles.md), [0005](adr/0005-transcript-watching.md), [0006](adr/0006-node-test-runner.md), [0007](adr/0007-allow-list-protocol-pull-handshake.md); plans: [M1 scaffold](plans/m1-scaffold.md), [M2 protocol](plans/m2-protocol.md), [M3 monitor](plans/m3-monitor.md), [M4 engine](plans/m4-engine.md); ADRs [0008](adr/0008-dom-free-engine-behind-ports.md), [0009](adr/0009-hero-lifecycle-isolation.md), [0010](adr/0010-split-room-stage-layout.md); [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md), [agent detection](agent-detection.md), [game engine](game-engine.md) (M4 design), [data model](data-model.md) (M4 design).
 
 ## 1. What it is
 
@@ -23,8 +23,8 @@ flowchart LR
   user -- watches panel, clicks hero --> ext
   cc -- run in --> term
   cc -- append to --> tx
-  ext -. reads allow-listed fields only .-> tx
-  ext -. observes presence, reveals on click .-> term
+  ext -. polls read-only, extracts allow-listed fields only .-> tx
+  ext -. observes open and close, reveals on click .-> term
   ext -- saves game progress --> state
 ```
 
@@ -37,7 +37,8 @@ flowchart TB
   subgraph host[Extension host bundle: dist/extension.js, Node CJS]
     ext[extension.ts<br/>activation, view provider, log channel,<br/>commands, status bar]
     bridge[host/webviewBridge.ts<br/>vscode-free routing, handshake,<br/>reveal-only focusAgent]
-    mon[monitor/<br/>AgentMonitor + Transcript, Terminal,<br/>Simulator sources]
+    mon[monitor/ core<br/>AgentMonitor, registry, state machine,<br/>Transcript, Terminal, Simulator sources]
+    adp[monitor/adapters/<br/>read-only fs, clock and timers,<br/>vscode terminals: show only]
     html[webview/index.html.ts<br/>HTML + CSP builder]
     store[host/ progress store<br/>globalState, schema + migrations]
   end
@@ -45,15 +46,19 @@ flowchart TB
   subgraph web[Webview bundle: dist/webview.js, browser IIFE]
     main[webview/main.ts<br/>boot, message listener, ready]
     hostmods[webview/hostChannel, hostMessages,<br/>hostState: send, parse + dispatch,<br/>HostStateMirror]
+    feed[webview/sceneFeed, gameHost,<br/>canvasSurface: events to engine,<br/>frame loop, canvas ports]
     ui[webview/ui.ts<br/>overlay UI]
     audio[webview/audio.ts<br/>Web Audio synth]
-    game[game/<br/>Game, Renderer, Camera, Lighting,<br/>Pathfinding, Collision, Particles, Combat]
+    game[game/ - DOM-free<br/>Game, Roster, Renderer, Camera, Lighting,<br/>Pathfinding, Collision, Particles, Combat]
     ent[game/entities/<br/>Hero + classes, Enemy, Boss,<br/>Campfire, Summon]
     data[game/data/<br/>typed tables]
     spr[game/sprites/<br/>palettes, templates, factory]
   end
 
   mon -- agent-state events --> ext
+  ext -- builds and injects --> adp
+  adp -- ports --> mon
+  mon -. imports .-> shared
   ext -- builds HTML via --> html
   ext -- adapts webview, wires events --> bridge
   bridge <-- postMessage --> main
@@ -62,7 +67,8 @@ flowchart TB
   bridge -. imports .-> shared
   hostmods -. imports .-> shared
   main --> hostmods
-  main --> game
+  main --> feed
+  feed --> game
   main --> ui
   main --> audio
   game --> ent
@@ -72,29 +78,31 @@ flowchart TB
 
 | Container | Runs in | Responsibility | Arrives in |
 |---|---|---|---|
-| `src/extension.ts` | host | activate, register the view provider, own disposables; create the "Pixel Agents" log channel, adapt the webview to the bridge and register view listeners (M2); wire the monitor and reveal (M3), status bar, commands (M7) | M1, grows in M2, M3, M7 |
+| `src/extension.ts` | host | activate, register the view provider, own disposables; create the "Pixel Agents" log channel, adapt the webview to the bridge and register view listeners (M2); build the monitor adapters, read settings, wire the monitor into the bridge and reveal, forward configuration and workspace-folder changes (M3); status bar, commands (M7) | M1, grows in M2, M3, M7 |
 | `src/host/` | host | vscode-free host logic: `WebviewBridge` (bridge states, `ready` handshake, validated dispatch, reveal-only `focusAgent`); progress store (E1). Imports only `src/shared/` | M2, E1 |
 | `src/webview/index.html.ts` | host | pure function: build the webview HTML and CSP from a nonce and the script URI | M1 |
 | `src/shared/protocol.ts`, `assertNever.ts` | both | message unions, `AgentState`, `AgentInfo`, limits, exact-key validators, allow-list creators, exhaustiveness guard; no imports from outside `src/shared/` | M2 |
-| `src/monitor/` | host | read-only agent detection; emits `spawned`, `working`, `idle`, `despawned` | M3 |
-| `src/webview/main.ts` | webview | boot the canvas; register the `message` listener, then send `ready`; hand host messages to the mirror (M2) and the game (M4) | M1 (blank canvas), M2, M4 |
-| `src/webview/hostChannel.ts`, `hostMessages.ts`, `hostState.ts` | webview | DOM-free: typed `send` over `acquireVsCodeApi`, parse and dispatch host messages, `HostStateMirror` (the agent list the M4 `Game` reads) | M2 |
-| `src/game/**` | webview | the dungeon simulation and renderer | M4 onward |
+| `src/monitor/` (core) | host | read-only agent detection ([agent detection](agent-detection.md)): transcript polling, session state machine, terminal links, simulator, registry with coalescing; emits `spawned`, `working`, `idle`, `despawned`. Imports only `src/shared/`; no `vscode`, no Node built-ins | M3 |
+| `src/monitor/adapters/` | host | the only monitor files that touch Node (`nodeFileSystem.ts` read-only fs, `nodeRuntime.ts` clock, timers, path) or `vscode` (`vscodeTerminals.ts`, `show()` only); built by `extension.ts` and injected as ports | M3 |
+| `src/webview/main.ts` | webview | boot the canvas; register the `message` listener, then send `ready`; build the engine and hand host messages to the mirror (M2) and the engine through `SceneFeed` (M4) | M1 (blank canvas), M2, M4 |
+| `src/webview/hostChannel.ts`, `hostMessages.ts`, `hostState.ts` | webview | DOM-free: typed `send` over `acquireVsCodeApi`, parse and dispatch host messages, `HostStateMirror` (the authoritative agent list; the engine resyncs from it on queue overflow) | M2 |
+| `src/webview/sceneFeed.ts`, `gameHost.ts`, `canvasSurface.ts` | webview | `SceneFeed` forwards host messages to the mirror and the engine; `GameHost` drives the frame loop (pause when hidden, error reporting); `canvasSurface.ts` is the only canvas adapter | M4 |
+| `src/game/**` | webview | the dungeon simulation and renderer, DOM-free and clock-free behind `Surface` and `BitmapFactory` ports ([game engine](game-engine.md), [ADR 0008](adr/0008-dom-free-engine-behind-ports.md)) | M4 onward |
 | `src/webview/ui.ts`, `audio.ts` | webview | overlay UI; synthesized sound | M7, M8 |
 
 ## 4. Data flow
 
-1. A source in the monitor observes a session change (transcript append, terminal open or close, or a simulator tick).
-2. `AgentMonitor` debounces and normalizes it into an agent-state event holding only id, name, state, tool name, and timestamp (Core invariant 7).
+1. A source in the monitor observes a session change: a transcript append or silence threshold (on each poll), a transcript file removed or out of scope, or a simulator step. Terminal open and close only maintain reveal links; they never change state.
+2. `AgentMonitor` runs the session state machine, normalizes the result, and coalesces it per agent into an agent-state event holding only id, name, state, tool name, and timestamp (Core invariant 7).
 3. `extension.ts` hands the event to `WebviewBridge.postAgentState`, which posts it (rebuilt by the allow-list creator) only if the bridge is `ready`. If the view is hidden or still loading, nothing is sent; the snapshot on the next `ready` covers it ([host-webview protocol](host-webview-protocol.md#5-bridge-states-host)).
-4. `main.ts` passes the message to `handleHostMessage`, which validates it and updates `HostStateMirror`; from M4 `Game` updates the matching hero from the mirror. Only these events change hero state (Core invariant 2, [ADR 0002](adr/0002-no-hero-health.md)).
+4. `main.ts` passes the message to `handleHostMessage`, which validates it and updates `HostStateMirror`; from M4 `SceneFeed` also queues the same event into `Game`, which applies it to the matching hero at the start of the next fixed step. Only these events change hero state (Core invariant 2, [ADR 0002](adr/0002-no-hero-health.md), [ADR 0009](adr/0009-hero-lifecycle-isolation.md)).
 5. The webview may send `ready` (on every document load, requesting a snapshot) and `focusAgent` (reveal a terminal). The bridge validates both and drops anything else ([ADR 0007](adr/0007-allow-list-protocol-pull-handshake.md)).
 
 ## 5. Boundaries that protect agents
 
 - **Read-only monitor.** No code path writes to, signals, kills, or sends input to a process or terminal. Enforced by review and grep tests: over `src/host/**` and `extension.ts` from M2, extended to `src/monitor/**` in M3.
 - **One-way state.** Hero state flows host to webview only. Nothing the game does can reach the monitor or a session; the webview can send only `ready` and `focusAgent`, and the bridge's only outward capability is a reveal callback.
-- **Crash isolation.** The host bridge never throws across `onDidReceiveMessage`, and the webview `message` listener is wrapped in try/catch (M2); the webview update loop is wrapped in try/catch (from M4). A webview crash or reload cannot affect the host; on reload the scene is rebuilt from the host's agent list (Core invariant 4).
+- **Crash isolation.** The host bridge never throws across `onDidReceiveMessage`, and the webview `message` listener is wrapped in try/catch (M2); the webview update loop is wrapped in try/catch (from M4): per entity with quarantine, per step and render, and in a frame callback that schedules the next frame first ([game engine section 4](game-engine.md#4-the-loop-and-crash-isolation)). The engine has no host channel, so a game fault cannot reach the host or an agent. A webview crash or reload cannot affect the host; on reload the scene is rebuilt from the host's agent list (Core invariant 4).
 - **Bundle boundary.** Host and webview never import each other's runtime code; they share only `src/shared/` ([ADR 0004](adr/0004-esbuild-two-bundles.md)). `src/host/` is host-only and vscode-free ([coding standards section 3](../engineering/coding-standards.md#3-bundle-boundaries)).
 
 ## 6. Security boundary
@@ -112,8 +120,16 @@ flowchart TB
 
 After M1 the host bundle registers the view and serves the HTML; the webview bundle draws a blank, integer-scaled canvas. There is no protocol, monitor, or game yet, and no message channel in either direction: the webview does not call `acquireVsCodeApi` and the host registers no message handler. Tests run on Node's built-in `node:test` ([ADR 0006](adr/0006-node-test-runner.md)); integration tests run the extension in a downloaded VS Code via the dev-only `@vscode/test-electron` launcher with `--disable-extensions` ([ADR 0006 amendment](adr/0006-node-test-runner.md#amendment-m1-review-extension-host-integration-tests)). In development builds the webview bundle carries an inline sourcemap so DevTools never fetches a `.map` under the CSP ([ADR 0004 implementation notes](adr/0004-esbuild-two-bundles.md#implementation-notes-m1)). The task-level plan is [M1 scaffold](plans/m1-scaffold.md).
 
-### 7.2 M2 (in progress)
+### 7.2 M2 (committed)
 
 M2 opens the message channel; nothing new is drawn. The host gains the "Pixel Agents" log channel and `src/host/webviewBridge.ts`, which `extension.ts` attaches to each resolved view before setting `html`. On every document load (first open, every re-show, every webview reload) `main.ts` registers its `message` listener and sends `ready`; the bridge answers with `config` (`protocolVersion: 1`) and an empty `agentList`, which the webview stores in `HostStateMirror`. `focusAgent` is accepted by the protocol but dropped by the bridge, because no reveal capability exists until M3. Because `ready` is a protocol message on the public `onDidReceiveMessage` event, the integration suite can confirm that the webview script really ran after each show without any production test hook. CSP, bundles, and sourcemaps are unchanged. The task-level plan is [M2 protocol](plans/m2-protocol.md); the contract is [host-webview protocol](host-webview-protocol.md).
+
+### 7.3 M3 (committed)
+
+M3 adds the read-only monitor; still nothing is drawn. `activate` builds an `AgentMonitor` from injected adapters (read-only file system, clock and timers, terminal events) and wires it into the M2 bridge: `getAgents` returns the monitor's live agents, each monitor change goes to `postAgentState`, and `revealAgentTerminal` reaches `Terminal.show()` for a linked agent. Transcripts are polled, never watched or written ([ADR 0005](adr/0005-transcript-watching.md)); by default only this window's workspace folders are read. With no real sessions, labelled `Sim ...` agents run. Nine `pixelAgents.*` settings control scope, path, thresholds, and the simulator. The protocol is unchanged. The task-level plan is [M3 monitor](plans/m3-monitor.md); the behaviour contract is [agent detection](agent-detection.md).
+
+### 7.4 M4 (planned, not yet built)
+
+M4 draws the dungeon. The webview builds a DOM-free `Game` (behind `Surface` and `BitmapFactory` ports implemented over canvas 2D) and a `SceneFeed` that forwards each validated host message to both the `HostStateMirror` and the engine. A `GameHost` runs the frame loop and pauses it when the panel is hidden. Stage 1 is a fixed 320x180 split room: a static campfire alcove and a scrolling corridor ([ADR 0010](adr/0010-split-room-stage-layout.md)). Each agent is a hero whose lifecycle changes only through queued host events ([ADR 0009](adr/0009-hero-lifecycle-isolation.md)); working heroes advance and swing at nothing, idle heroes rest at the campfire, despawned heroes do a victory pose and warp out. There are no enemies, classes, text, or sound yet, and the host, the protocol, the CSP, and the settings are unchanged. The task-level plan is [M4 engine](plans/m4-engine.md); the design is [game engine](game-engine.md) and [data model](data-model.md).
 
 Rows in the container table above show when each container arrives.

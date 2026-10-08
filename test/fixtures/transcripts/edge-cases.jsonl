@@ -1,0 +1,6 @@
+{"type":"user","message":"synthetic truncated
+{"type":"mystery","note":"synthetic unknown type"}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Not A Valid Name","input":{}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__files__read","input":{}}]}}
+[{"type":"assistant"}]
+{"type":"user","message":{"role":"user","content":"synthetic prompt two"}}

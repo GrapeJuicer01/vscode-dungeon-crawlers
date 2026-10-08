@@ -4,7 +4,7 @@
 // subscriptions, and the view wired to the WebviewBridge (listener before html, ready answered
 // with config then agentList, hide and dispose handled, old view listeners dropped on re-resolve).
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type * as vscode from 'vscode';
 import * as extension from '../../src/extension';
 import { activate, deactivate, PixelAgentsViewProvider, VIEW_TYPE } from '../../src/extension';
@@ -42,9 +42,28 @@ interface FakeContext {
   subscriptions: { dispose(): void }[];
 }
 
+/** Every context handed out, so afterEach can dispose what activate registered (stops monitor timers). */
+const contexts: FakeContext[] = [];
+
 function fakeContext(): FakeContext {
-  return { extensionUri: EXTENSION_URI, subscriptions: [] };
+  const context: FakeContext = { extensionUri: EXTENSION_URI, subscriptions: [] };
+  contexts.push(context);
+  return context;
 }
+
+/** M3: activate also builds the monitor; the simulator is off so these tests see no agents. */
+function resetWithQuietMonitor(): void {
+  resetFakeVscode();
+  recorded.config.simulator = 'off';
+}
+
+afterEach(() => {
+  for (const context of contexts.splice(0)) {
+    for (const disposable of [...context.subscriptions].reverse()) {
+      disposable.dispose();
+    }
+  }
+});
 
 function resolve(provider: PixelAgentsViewProvider, view: FakeWebviewView): void {
   provider.resolveWebviewView(
@@ -102,7 +121,7 @@ function nonceOf(doc: string): string {
 }
 
 void describe('activate', () => {
-  beforeEach(resetFakeVscode);
+  beforeEach(resetWithQuietMonitor);
 
   void it('registers exactly one provider for the contributed view id', () => {
     activated();
@@ -131,21 +150,34 @@ void describe('activate', () => {
     assert.deepEqual(recorded.outputChannels[0]?.options, { log: true });
   });
 
-  void it('hands exactly three disposables to context.subscriptions: channel, provider, registration', () => {
+  void it('hands exactly eight disposables to context.subscriptions: channel, terminal port, monitor, three monitor listeners, provider, registration (M3)', () => {
     const { context, provider, log } = activated();
-    assert.equal(context.subscriptions.length, 3);
+    assert.equal(context.subscriptions.length, 8);
     const expected = [log, provider, recorded.registrations[0]?.disposable];
     for (const disposable of expected) {
       assert.ok(context.subscriptions.includes(disposable as { dispose(): void }));
     }
   });
 
-  void it('touches no window API other than createOutputChannel and registerWebviewViewProvider (no status bar, terminals)', () => {
+  void it('touches only the read-only window API it needs (no status bar, no createTerminal, no commands)', () => {
     activated();
+    const allowed = new Set([
+      'createOutputChannel',
+      'registerWebviewViewProvider',
+      // M3 TerminalPort adapter: read terminals and subscribe to open and close.
+      'terminals',
+      'onDidOpenTerminal',
+      'onDidCloseTerminal',
+      'activeTerminal',
+    ]);
+    const used = [...new Set(recorded.windowAccesses)];
     assert.deepEqual(
-      [...new Set(recorded.windowAccesses)].sort(),
-      ['createOutputChannel', 'registerWebviewViewProvider'].sort(),
+      used.filter((member) => !allowed.has(member)),
+      [],
     );
+    for (const required of ['createOutputChannel', 'registerWebviewViewProvider']) {
+      assert.ok(used.includes(required), `${required} expected`);
+    }
   });
 
   void it('logs nothing on activation', () => {
@@ -168,7 +200,7 @@ void describe('activate', () => {
 });
 
 void describe('PixelAgentsViewProvider.resolveWebviewView: options and HTML (M1)', () => {
-  beforeEach(resetFakeVscode);
+  beforeEach(resetWithQuietMonitor);
 
   void it('locks webview options to scripts only, rooted at dist/', () => {
     const webview = new FakeWebview();
@@ -212,7 +244,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: options and HTML (M1)
 });
 
 void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)', () => {
-  beforeEach(resetFakeVscode);
+  beforeEach(resetWithQuietMonitor);
 
   void it('registers exactly one message listener, before html is assigned (the first ready cannot be missed)', () => {
     const webview = new FakeWebview();
@@ -234,7 +266,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
     assert.deepEqual(view.webview.postedMessages, []);
   });
 
-  void it('answers ready with exactly config then an empty agentList (M2 deps from activate)', () => {
+  void it('answers ready with exactly config then an empty agentList (no sessions, simulator off)', () => {
     const view = new FakeWebviewView();
     const { provider, log } = activated();
     resolve(provider, view);
@@ -277,7 +309,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
     assert.ok(log.calls.every((call) => !call.message.includes('SECRET-PAYLOAD')));
   });
 
-  void it('drops focusAgent in M2 (no reveal capability): nothing posted, nothing thrown', () => {
+  void it('drops focusAgent for an agent the monitor does not list: nothing posted, nothing thrown', () => {
     const view = new FakeWebviewView();
     const { provider, log } = activated();
     resolve(provider, view);
@@ -285,7 +317,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
     const before = view.webview.postedMessages.length;
     assert.doesNotThrow(() => view.webview.deliver({ type: 'focusAgent', agentId: 'sim-1' }));
     assert.equal(view.webview.postedMessages.length, before);
-    assert.deepEqual(log.messages('trace'), ['dropped focusAgent: reveal unavailable']);
+    assert.deepEqual(log.messages('trace'), ['dropped focusAgent: unknown agent']);
   });
 
   void it('a hidden view drops pushes until the next ready, which re-posts the snapshot', () => {

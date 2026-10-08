@@ -1,10 +1,11 @@
 // Behavior of the webview entry point (src/webview/main.ts) as shipped: dist/webview.js runs in a
 // node:vm context against fake DOM globals (test/support/fakeDom.ts). Covers the integer-scaling
-// layout, the dark clear, resize and zoom handling, listener cleanup, crash containment
-// (invariant 4), and (M2, plan test note 10) the host channel: one acquireVsCodeApi call and one
+// layout, the dark boot clear, resize and zoom handling, listener cleanup, crash containment
+// (invariant 4), (M2, plan test note 10) the host channel: one acquireVsCodeApi call and one
 // `ready` per boot, the message listener registered first, invalid host messages dropped
-// silently, and the single crash reporter. Requires `npm run build`; test/build/bundles.test.ts
-// checks dist/ is fresh.
+// silently, and the single crash reporter, and (M4) the engine wiring: one animation-frame
+// request at boot, a dark first frame, the loop pausing while hidden, and cleanup on pagehide.
+// Requires `npm run build`; test/build/bundles.test.ts checks dist/ is fresh.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { parseWebviewMessage } from '../../src/shared/protocol';
@@ -89,7 +90,7 @@ void describe('webview main: canvas setup', () => {
     assert.equal(canvas.context?.imageSmoothingEnabled, false);
   });
 
-  void it('clears the whole canvas once with a dark colour', () => {
+  void it('clears the whole canvas once with a dark colour at boot, before any frame runs', () => {
     const { canvas } = boot(800, 600, 1);
     const fills = canvas.context?.fills ?? [];
     assert.equal(fills.length, 1);
@@ -99,6 +100,20 @@ void describe('webview main: canvas setup', () => {
       { x: 0, y: 0, w: 320, h: 180 },
     );
     assert.ok(relativeLuminance(fill?.style ?? '') < 0.02, `${fill?.style} is not dark`);
+  });
+
+  void it('the first engine frame clears the whole canvas with a dark stage colour first', () => {
+    const run = runWebviewBundle(new FakeWindow(800, 600, 1), new FakeCanvas());
+    run.window.runFrame(1000);
+    const fills = run.canvas?.context?.fills ?? [];
+    // fills[0] is the boot clear; fills[1] is the frame's clear (the renderer's first call).
+    const clear = fills[1];
+    assert.deepEqual(
+      { x: clear?.x, y: clear?.y, w: clear?.w, h: clear?.h },
+      { x: 0, y: 0, w: 320, h: 180 },
+    );
+    assert.ok(relativeLuminance(clear?.style ?? '') < 0.02, `${clear?.style} is not dark`);
+    assert.deepEqual(run.errors, []);
   });
 
   void it('reports no error on a normal boot', () => {
@@ -126,10 +141,12 @@ void describe('webview main: integer scaling', () => {
     });
   }
 
-  void it('picks the largest fitting integer scale across many sizes and zoom levels', () => {
-    for (const dpr of [1, 1.25, 1.5, 1.75, 2, 2.5, 3]) {
-      for (let width = 120; width <= 2600; width += 97) {
-        for (let height = 60; height <= 1500; height += 71) {
+  // Each boot now builds the whole engine (sprites, strips), so the bundle sweep is coarse; the
+  // dense sweep runs against computeIntegerScale in test/game/layout.test.ts.
+  void it('picks the largest fitting integer scale across sizes and zoom levels', () => {
+    for (const dpr of [1, 1.5, 2, 3]) {
+      for (let width = 120; width <= 2600; width += 620) {
+        for (let height = 60; height <= 1500; height += 360) {
           const { window, canvas } = boot(width, height, dpr);
           assertBestIntegerScale(canvas, window, dpr);
         }
@@ -176,15 +193,160 @@ void describe('webview main: resize and zoom', () => {
     assert.equal(canvas.context?.fills.length, 1);
   });
 
-  void it('removes its resize, message, and pagehide listeners on pagehide', () => {
-    const { window } = boot(640, 360, 1);
+  void it('removes its resize, message, pagehide, and visibilitychange listeners on pagehide', () => {
+    const run = runWebviewBundle(new FakeWindow(640, 360, 1), new FakeCanvas());
+    const { window, document } = run;
     assert.equal(window.listenerCount('resize'), 1);
     assert.equal(window.listenerCount('message'), 1);
     assert.equal(window.listenerCount('pagehide'), 1);
+    assert.equal(document.listenerCount('visibilitychange'), 1);
     window.dispatch('pagehide');
     assert.equal(window.listenerCount('resize'), 0);
     assert.equal(window.listenerCount('message'), 0);
     assert.equal(window.listenerCount('pagehide'), 0);
+    assert.equal(document.listenerCount('visibilitychange'), 0);
+  });
+});
+
+function engineRun(hidden = false): WebviewRun {
+  return runWebviewBundle(new FakeWindow(1280, 300, 2), new FakeCanvas(), 'present', { hidden });
+}
+
+void describe('webview main: the engine loop (M4)', () => {
+  void it('requests exactly one animation frame at boot and runs none by itself', () => {
+    const run = engineRun();
+    assert.equal(run.window.frameRequests.length, 1);
+    assert.equal(run.window.pendingFrames.size, 1);
+    assert.equal(run.canvas?.context?.draws.length, 0, 'nothing is drawn before a frame runs');
+  });
+
+  void it('keeps exactly one frame pending after every frame (the loop never stops)', () => {
+    const run = engineRun();
+    for (let i = 0; i < 30; i += 1) {
+      run.window.runFrame(1000 + i * 17);
+      assert.equal(run.window.pendingFrames.size, 1, `frame ${i}`);
+    }
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('draws the lit room each frame with one multiply blit and restores the composite', () => {
+    const run = engineRun();
+    run.window.runFrame(1000);
+    const context = run.canvas?.context;
+    const draws = context?.draws ?? [];
+    assert.ok(draws.length > 3, `only ${draws.length} draws`);
+    assert.equal(draws.filter((d) => d.composite === 'multiply').length, 1);
+    assert.equal(context?.globalCompositeOperation, 'source-over');
+    assert.equal(context?.globalAlpha, 1);
+    assert.equal(context?.imageSmoothingEnabled, false);
+  });
+
+  void it('builds sprites with putImageData on offscreen canvases (no blob or data URLs)', () => {
+    const run = engineRun();
+    const created = run.document.created;
+    assert.ok(created.length > 20, `only ${created.length} offscreen canvases`);
+    const puts = created.reduce((sum, canvas) => sum + (canvas.context?.puts.length ?? 0), 0);
+    assert.ok(puts > 20, `only ${puts} putImageData calls`);
+  });
+
+  void it('draws heroes after a host agent message, and removes them after despawned', () => {
+    const run = engineRun();
+    const draws = (): number => run.canvas?.context?.draws.length ?? 0;
+    run.window.runFrames(3);
+    const empty = draws();
+    const send = (state: string, timestamp: number): void =>
+      run.window.dispatchMessage({
+        data: runInBundleRealm(
+          run,
+          `{ type: 'agentState', agent: { id: 'sim-0-0', name: 'Sim A', state: '${state}', toolName: null, timestamp: ${timestamp} } }`,
+        ),
+      });
+    send('working', 1);
+    run.window.runFrames(120);
+    const perFrameWithHero = (draws() - empty) / 120;
+    const before = draws();
+    run.window.runFrames(1);
+    const oneFrameWithHero = draws() - before;
+    run.window.runFrames(1);
+    send('despawned', 2);
+    // 1.8 s of game time at 60 fps removes the exiting hero.
+    run.window.runFrames(200);
+    const after = draws();
+    run.window.runFrames(1);
+    const oneFrameAfter = draws() - after;
+    assert.ok(perFrameWithHero > 0);
+    assert.ok(
+      oneFrameWithHero > oneFrameAfter,
+      `hero frame ${oneFrameWithHero} vs empty ${oneFrameAfter}`,
+    );
+    assert.deepEqual(run.errors, []);
+    assert.equal(run.api.posted.length, 1, 'only `ready` was ever posted');
+  });
+
+  void it('does not request frames while the document is hidden at boot', () => {
+    const run = engineRun(true);
+    assert.equal(run.window.frameRequests.length, 0);
+    run.document.setHidden(false);
+    assert.equal(run.window.pendingFrames.size, 1);
+  });
+
+  void it('cancels the pending frame when hidden and resumes when visible again', () => {
+    const run = engineRun();
+    run.window.runFrame(1000);
+    run.document.setHidden(true);
+    assert.equal(run.window.pendingFrames.size, 0);
+    assert.equal(run.window.frameCancels.length, 1);
+    run.document.setHidden(false);
+    assert.equal(run.window.pendingFrames.size, 1);
+    run.window.runFrame(60_000);
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('stops the loop on pagehide: the pending frame is cancelled and none is requested', () => {
+    const run = engineRun();
+    run.window.runFrame(1000);
+    run.window.dispatch('pagehide');
+    assert.equal(run.window.pendingFrames.size, 0);
+    const requests = run.window.frameRequests.length;
+    run.document.setHidden(false);
+    run.window.runFrame(2000);
+    assert.equal(run.window.frameRequests.length, requests);
+  });
+
+  void it('a drawing failure is reported once and the loop keeps running (invariant 4)', () => {
+    const run = engineRun();
+    const context = run.canvas?.context;
+    assert.ok(context);
+    context.drawImage = (): never => {
+      throw new Error('draw boom');
+    };
+    for (let i = 0; i < 5; i += 1) {
+      assert.doesNotThrow(() => run.window.runFrame(1000 + i * 17));
+      assert.equal(run.window.pendingFrames.size, 1);
+    }
+    assert.equal(run.errors.length, 1, JSON.stringify(run.errors));
+    assert.match(run.errors[0] ?? '', /^Pixel Agents webview error: draw boom$/);
+  });
+
+  void it('an engine that cannot boot is reported once; messages and `ready` still work', () => {
+    const window = new FakeWindow(1280, 300, 2);
+    const broken = runWebviewBundle(window, new FakeCanvas(), 'present', {
+      failOffscreenContext: true,
+    });
+    assert.ok(broken.document.created.length > 0, 'the engine tried to build sprites');
+    assert.equal(broken.errors.length, 1, JSON.stringify(broken.errors));
+    assert.equal(broken.api.posted.length, 1, '`ready` is still posted');
+    assert.equal(window.pendingFrames.size, 0, 'no loop without an engine');
+    assert.equal(window.listenerCount('message'), 1);
+    assert.doesNotThrow(() =>
+      window.dispatchMessage({
+        data: runInBundleRealm(
+          broken,
+          `{ type: 'agentList', agents: [{ id: 'a', name: 'A', state: 'idle', toolName: null, timestamp: 1 }] }`,
+        ),
+      }),
+    );
+    assert.equal(broken.errors.length, 1);
   });
 });
 

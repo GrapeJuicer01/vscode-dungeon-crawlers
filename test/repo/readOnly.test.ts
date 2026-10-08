@@ -1,6 +1,7 @@
 // Structural guards for Core invariants 3 (read-only, reveal-only), 4 (crash isolation), and
 // 7 (transcript privacy). M1 banned every message API; M2 (plan test note 9) replaces that with
-// "each messaging API lives in exactly one planned place". M3 adds the full monitor suite.
+// "each messaging API lives in exactly one planned place". M3 (test/repo/monitorReadOnly.test.ts)
+// extends the scan to src/monitor/** and pins the terminal and reveal wiring.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readText } from '../support/repo';
@@ -57,14 +58,20 @@ void describe('src/** is observe-only (invariants 3 and 7)', () => {
     });
   }
 
-  void it('touches no terminal at all in M2 (reveal arrives with TerminalSource in M3)', () => {
-    const pattern =
-      /\.(terminals|activeTerminal|onDidOpenTerminal|onDidCloseTerminal|onDidChangeActiveTerminal)\b|\bTerminal\b/;
-    assert.deepEqual(filesMatching(files, pattern), []);
+  void it('the vscode terminal API is used only in the M3 terminal adapter', () => {
+    // The vscode API forms: window.terminals / activeTerminal, the two events, and exitStatus.
+    const vscodeForms =
+      /\bwindow\.(terminals|activeTerminal|onDidOpenTerminal|onDidCloseTerminal|onDidChangeActiveTerminal)\b|\bexitStatus\b|\bvscode\.Terminal\b/;
+    assert.deepEqual(filesMatching(files, vscodeForms), [
+      'src/monitor/adapters/vscodeTerminals.ts',
+    ]);
   });
 
-  void it('wires focusAgent to no reveal capability in M2', () => {
-    assert.match(code('src/extension.ts'), /revealAgentTerminal:\s*null\s*,/);
+  void it('wires focusAgent only to monitor.revealAgentTerminal, with the null fallback (M3)', () => {
+    assert.match(
+      code('src/extension.ts'),
+      /revealAgentTerminal:\s*monitor === null \? null : \(agentId\) => monitor\.revealAgentTerminal\(agentId\),/,
+    );
   });
 });
 
@@ -120,8 +127,11 @@ void describe('M2: each messaging API lives in exactly one planned place', () =>
     );
   });
 
-  void it('requestAnimationFrame is still absent everywhere in src/ (no loop until M4)', () => {
-    assert.deepEqual(filesMatching(files, /\brequestAnimationFrame\b/), []);
+  void it('requestAnimationFrame appears only in src/webview/main.ts (M4: handed to GameHost as a scheduler)', () => {
+    assert.deepEqual(filesMatching(files, /\brequestAnimationFrame\b/), ['src/webview/main.ts']);
+    assert.deepEqual(filesMatching(files, /\bcancelAnimationFrame\b/), ['src/webview/main.ts']);
+    // The engine and the host loop never name it; they get request/cancel injected.
+    assert.match(code('src/webview/main.ts'), /scheduler:\s*\{[\s\S]*requestAnimationFrame/);
   });
 
   void it('the webview never persists state (no getState / setState): it is not a source of truth', () => {

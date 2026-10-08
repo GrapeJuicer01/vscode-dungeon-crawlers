@@ -1,0 +1,398 @@
+// Validates the art against the contract in docs/design/sprite-spec.md section 7 and
+// docs/architecture/data-model.md section 3. Pure. Tests run it over all shipped art, so invalid
+// art fails the test, not the user's panel. Error strings contain only template ids, animation
+// names, and indexes, never pixels or agent data.
+import { hexToRgb, heroBounds, heroFrameNames, heroFrameRows } from './spriteFactory';
+import type { ArtSet } from './spriteFactory';
+import type { Palette } from './palettes';
+import type { HeroLayerSet, SpriteTemplate, StageSprites } from './spriteTypes';
+
+/** Required hero animation name -> frame count (docs/design/sprite-spec.md section 3). */
+export const REQUIRED_HERO_ANIMATIONS: Readonly<Record<string, number>> = {
+  idle: 2,
+  walk: 4,
+  attack: 3,
+  sit: 2,
+  eat: 2,
+  sleep: 2,
+  polish: 2,
+  read: 2,
+  warmHands: 2,
+  victory: 2,
+};
+
+/** Hero animations must never imply damage or defeat (Core invariant 1 at the asset level). */
+const FORBIDDEN_HERO_ANIMATION = /hurt|downed|death|dead|die|dying/i;
+const HERO_CHARS = 'oshecdbkmwa';
+const MAX_HERO_COLORS = 12;
+const MAX_STAGE_COLORS = 8;
+const TILE_SIZE = 16;
+const BACKDROP_SIZE = 128;
+const REQUIRED_PROPS = [
+  'barrel',
+  'crate',
+  'bonePile',
+  'puddle',
+  'cobweb',
+  'chains',
+  'torch',
+  'doorFrame',
+] as const;
+const MIN_TILE_VARIANTS: Readonly<Record<keyof StageSprites['tiles'], number>> = {
+  wallTop: 2,
+  wallMid: 4,
+  wallBase: 2,
+  floorBack: 3,
+  floorFront: 3,
+  foreground: 2,
+};
+
+/**
+ * Checks one template: sizes, anchor, rows, characters, optional allowed-character set, and the
+ * colour limit.
+ */
+export function validateTemplate(
+  t: SpriteTemplate,
+  palette: Palette,
+  allowedChars: string | null,
+  maxColors: number,
+): readonly string[] {
+  const errors: string[] = [];
+  const id = t.id;
+  if (!Number.isInteger(t.w) || !Number.isInteger(t.h) || t.w < 1 || t.h < 1) {
+    errors.push(`${id}: size must be positive integers`);
+    return errors;
+  }
+  if (
+    !Number.isInteger(t.anchor.x) ||
+    !Number.isInteger(t.anchor.y) ||
+    t.anchor.x < 0 ||
+    t.anchor.y < 0 ||
+    t.anchor.x >= t.w ||
+    t.anchor.y >= t.h
+  ) {
+    errors.push(`${id}: anchor outside the sprite`);
+  }
+  const names = Object.keys(t.animations);
+  if (names.length === 0) {
+    errors.push(`${id}: no animations`);
+  }
+  const used = new Set<string>();
+  for (const name of names) {
+    const frames = t.animations[name] ?? [];
+    if (frames.length === 0) {
+      errors.push(`${id}: animation ${name} has no frames`);
+    }
+    frames.forEach((rows, f) => {
+      if (rows.length !== t.h) {
+        errors.push(`${id}: animation ${name} frame ${f} has ${rows.length} rows, expected ${t.h}`);
+        return;
+      }
+      let badWidth = false;
+      let unknown = false;
+      let outside = false;
+      for (const row of rows) {
+        if (row.length !== t.w) {
+          badWidth = true;
+          continue;
+        }
+        for (const ch of row) {
+          if (ch === '.') {
+            continue;
+          }
+          if (palette[ch] === undefined) {
+            unknown = true;
+            continue;
+          }
+          used.add(ch);
+          if (allowedChars !== null && !allowedChars.includes(ch)) {
+            outside = true;
+          }
+        }
+      }
+      if (badWidth) {
+        errors.push(`${id}: animation ${name} frame ${f} has a row of the wrong width`);
+      }
+      if (unknown) {
+        errors.push(
+          `${id}: animation ${name} frame ${f} uses a character missing from the palette`,
+        );
+      }
+      if (outside) {
+        errors.push(`${id}: animation ${name} frame ${f} uses a character outside the stage set`);
+      }
+    });
+  }
+  if (used.size > maxColors) {
+    errors.push(`${id}: uses ${used.size} colors, limit ${maxColors}`);
+  }
+  return errors;
+}
+
+function layerEntries(layers: HeroLayerSet): readonly (readonly [string, SpriteTemplate])[] {
+  const out: (readonly [string, SpriteTemplate])[] = [
+    ['body', layers.body],
+    ['head', layers.head],
+  ];
+  if (layers.gear !== null) {
+    out.push(['gear', layers.gear]);
+  }
+  out.push(['weapon', layers.weapon]);
+  return out;
+}
+
+/** Checks a hero layer set: every layer, required animations and counts, names, composite colours. */
+export function validateHeroLayers(layers: HeroLayerSet, palette: Palette): readonly string[] {
+  const errors: string[] = [];
+  const entries = layerEntries(layers);
+  for (const [, t] of entries) {
+    errors.push(...validateTemplate(t, palette, null, MAX_HERO_COLORS));
+  }
+  const bodyNames = Object.keys(layers.body.animations).sort();
+  for (const [slot, t] of entries) {
+    const names = Object.keys(t.animations);
+    if (names.slice().sort().join() !== bodyNames.join()) {
+      errors.push(`${t.id}: ${slot} layer animation names differ from the body layer`);
+    }
+    for (const name of names) {
+      if (FORBIDDEN_HERO_ANIMATION.test(name)) {
+        errors.push(`${t.id}: forbidden hero animation name ${name}`);
+      }
+    }
+    for (const [name, count] of Object.entries(REQUIRED_HERO_ANIMATIONS)) {
+      const frames = t.animations[name];
+      if (frames === undefined) {
+        errors.push(`${t.id}: missing required animation ${name}`);
+      } else if (frames.length !== count) {
+        errors.push(`${t.id}: animation ${name} has ${frames.length} frames, expected ${count}`);
+      }
+    }
+  }
+  for (const name of bodyNames) {
+    const counts = new Set(entries.map(([, t]) => t.animations[name]?.length ?? -1));
+    if (counts.size > 1) {
+      errors.push(`${layers.body.id}: layers disagree on the frame count of ${name}`);
+    }
+  }
+  if (errors.length === 0) {
+    // The composited default hero stays within 12 colors (skin and hair swaps replace, not add).
+    const used = new Set<string>();
+    const bounds = heroBounds(layers);
+    const w = bounds.left + bounds.right + 1;
+    for (const name of heroFrameNames(layers)) {
+      const count = layers.body.animations[name]?.length ?? 0;
+      for (let i = 0; i < count; i++) {
+        for (const row of heroFrameRows(layers, name, i)) {
+          if (row.length !== w) {
+            errors.push(`${layers.body.id}: composite width mismatch`);
+          }
+          for (const ch of row) {
+            if (ch !== '.') {
+              used.add(ch);
+            }
+          }
+        }
+      }
+    }
+    if (used.size > MAX_HERO_COLORS) {
+      errors.push(`${layers.body.id}: composited hero uses ${used.size} colors, limit 12`);
+    }
+  }
+  return errors;
+}
+
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function column(t: SpriteTemplate, x: number): string {
+  return (t.animations['idle']?.[0] ?? []).map((row) => row.charAt(x)).join('');
+}
+
+function row(t: SpriteTemplate, y: number): string {
+  return t.animations['idle']?.[0]?.[y] ?? '';
+}
+
+function validateTileSet(
+  stageId: string,
+  setName: string,
+  tiles: readonly SpriteTemplate[],
+  min: number,
+  stackable: boolean,
+  palette: Palette,
+  chars: string,
+): string[] {
+  const errors: string[] = [];
+  if (tiles.length < min) {
+    errors.push(`${stageId}: tile set ${setName} has ${tiles.length} variants, need ${min}`);
+  }
+  for (const t of tiles) {
+    errors.push(...validateTemplate(t, palette, chars, MAX_STAGE_COLORS));
+    if (t.w !== TILE_SIZE || t.h !== TILE_SIZE) {
+      errors.push(`${t.id}: tile must be ${TILE_SIZE}x${TILE_SIZE}`);
+    }
+    if (Object.keys(t.animations).join() !== 'idle') {
+      errors.push(`${t.id}: stage templates use only the idle animation`);
+    }
+  }
+  const first = tiles[0];
+  if (first !== undefined) {
+    for (const t of tiles) {
+      if (
+        column(t, 0) !== column(first, 0) ||
+        column(t, TILE_SIZE - 1) !== column(first, TILE_SIZE - 1)
+      ) {
+        errors.push(`${t.id}: edge columns differ from the first variant of ${setName}`);
+      }
+      if (
+        stackable &&
+        (row(t, 0) !== row(first, 0) || row(t, TILE_SIZE - 1) !== row(first, TILE_SIZE - 1))
+      ) {
+        errors.push(`${t.id}: edge rows differ from the first variant of ${setName}`);
+      }
+    }
+  }
+  return errors;
+}
+
+function validateStageSprites(
+  stageId: string,
+  sprites: StageSprites,
+  palette: Palette,
+  chars: string,
+): string[] {
+  const errors: string[] = [];
+  const stackable: Readonly<Record<keyof StageSprites['tiles'], boolean>> = {
+    wallTop: true,
+    wallMid: true,
+    wallBase: true,
+    floorBack: false,
+    floorFront: false,
+    foreground: false,
+  };
+  for (const setName of Object.keys(MIN_TILE_VARIANTS) as (keyof StageSprites['tiles'])[]) {
+    errors.push(
+      ...validateTileSet(
+        stageId,
+        setName,
+        sprites.tiles[setName],
+        MIN_TILE_VARIANTS[setName],
+        stackable[setName],
+        palette,
+        chars,
+      ),
+    );
+  }
+  const hasWindow = sprites.tiles.wallMid.some((t) =>
+    (t.animations['idle']?.[0] ?? []).some((r) => r.includes('.')),
+  );
+  if (!hasWindow) {
+    errors.push(`${stageId}: no wallMid variant has transparent pixels for the backdrop`);
+  }
+  errors.push(...validateTemplate(sprites.backdrop, palette, chars, MAX_STAGE_COLORS));
+  if (sprites.backdrop.w !== BACKDROP_SIZE || sprites.backdrop.h !== BACKDROP_SIZE) {
+    errors.push(`${sprites.backdrop.id}: backdrop must be ${BACKDROP_SIZE}x${BACKDROP_SIZE}`);
+  }
+  for (const key of REQUIRED_PROPS) {
+    if (sprites.props[key] === undefined) {
+      errors.push(`${stageId}: missing required prop ${key}`);
+    }
+  }
+  for (const t of Object.values(sprites.props)) {
+    errors.push(...validateTemplate(t, palette, chars, MAX_STAGE_COLORS));
+    if (Object.keys(t.animations).join() !== 'idle') {
+      errors.push(`${t.id}: stage templates use only the idle animation`);
+    }
+  }
+  const torch = sprites.props['torch'];
+  if (torch !== undefined && (torch.animations['idle']?.length ?? 0) < 2) {
+    errors.push(`${torch.id}: torch needs a flame loop`);
+  }
+  return errors;
+}
+
+/** Everything above plus the palette, swaps, campfire, particles, and stage checks. */
+export function validateArtSet(art: ArtSet): readonly string[] {
+  const errors: string[] = [];
+  const palette = art.palette;
+  for (const [key, value] of Object.entries(palette)) {
+    if (key.length !== 1 || key === '.') {
+      errors.push(`palette: key at ${key.length} characters or '.' is not allowed`);
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+      errors.push('palette: a value is not #rrggbb');
+    }
+  }
+  for (const ch of HERO_CHARS) {
+    if (palette[ch] === undefined) {
+      errors.push(`palette: hero character ${ch} is not defined`);
+    }
+  }
+  if (art.skinTones.length !== 4) {
+    errors.push(`palette: ${art.skinTones.length} skin tones, expected 4`);
+  }
+  if (art.hairColors.length !== 6) {
+    errors.push(`palette: ${art.hairColors.length} hair colors, expected 6`);
+  }
+  art.skinTones.forEach((s, i) => {
+    if (Object.keys(s).join() !== 's') {
+      errors.push(`palette: skin tone ${i} must override only s`);
+    }
+  });
+  art.hairColors.forEach((s, i) => {
+    if (Object.keys(s).join() !== 'h') {
+      errors.push(`palette: hair color ${i} must override only h`);
+    }
+  });
+  errors.push(...validateHeroLayers(art.baseHero, palette));
+  for (const t of [art.campfire.logs, art.campfire.flameSmall, art.campfire.flameLarge]) {
+    errors.push(...validateTemplate(t, palette, null, MAX_HERO_COLORS));
+    if (Object.keys(t.animations).join() !== 'idle') {
+      errors.push(`${t.id}: campfire templates use only the idle animation`);
+    }
+  }
+  for (const t of [art.campfire.flameSmall, art.campfire.flameLarge]) {
+    if ((t.animations['idle']?.length ?? 0) < 3) {
+      errors.push(`${t.id}: flame needs at least 3 frames`);
+    }
+  }
+  for (const [kind, ramp] of Object.entries(art.particlePalette)) {
+    if (ramp.length < 2 || ramp.some((ch) => palette[ch] === undefined)) {
+      errors.push(`palette: particle ramp ${kind} is too short or uses an unknown character`);
+    }
+  }
+  for (const ch of [art.lightChars.torch, art.lightChars.campfire]) {
+    if (palette[ch] === undefined) {
+      errors.push('palette: a light character is not defined');
+    }
+  }
+  for (const [stageId, sprites] of Object.entries(art.stageSprites)) {
+    const chars = art.stageTileChars[stageId];
+    if (chars === undefined || chars.length > MAX_STAGE_COLORS) {
+      errors.push(`${stageId}: tile characters missing or more than ${MAX_STAGE_COLORS}`);
+      continue;
+    }
+    for (const ch of chars) {
+      if (palette[ch] === undefined) {
+        errors.push(`${stageId}: tile character ${ch} is not in the master palette`);
+      }
+    }
+    const clear = art.stageClearChar[stageId];
+    const ambient = art.stageAmbientChar[stageId];
+    const clearHex = clear === undefined ? undefined : palette[clear];
+    if (clearHex === undefined) {
+      errors.push(`${stageId}: clear character missing`);
+    } else if (luminance(clearHex) >= 0.02) {
+      errors.push(`${stageId}: clear color is not near-black`);
+    }
+    if (ambient === undefined || palette[ambient] === undefined) {
+      errors.push(`${stageId}: ambient character missing`);
+    }
+    errors.push(...validateStageSprites(stageId, sprites, palette, chars));
+  }
+  return errors;
+}

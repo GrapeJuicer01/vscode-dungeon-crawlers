@@ -137,7 +137,8 @@
     "lint": "eslint . --max-warnings 0 && prettier --check . && markdownlint-cli2",
     "format": "prettier --write .",
     "test": "node test/run.mjs",
-    "test:integration": "node test/integration/run.mjs"
+    "test:integration": "node test/integration/run.mjs",
+    "docs:tables": "node scripts/docs-tables.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -34,6 +34,12 @@ jobs:
       - name: Test
         run: npm run test
 
+      # Generated doc tables must be committed: regenerate, then fail on any diff.
+      - name: Check generated docs
+        run: |
+          npm run docs:tables
+          git diff --exit-code -- docs
+
       # Downloads a VS Code build into .vscode-test/ and runs the extension inside it.
       # xvfb-run provides the virtual display Electron needs on the headless Linux runner.
       - name: Integration test (VS Code stable)

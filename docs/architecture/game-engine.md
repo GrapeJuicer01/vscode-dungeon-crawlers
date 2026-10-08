@@ -3,7 +3,7 @@
 Purpose: the design contract for the webview game runtime in `src/game/**` and its thin webview host: components, room layout, the fixed-step loop and crash isolation, how host agent events drive heroes, the hero phase machine, rendering order, lighting, particles, pathfinding, sprite consumption, and the performance budget. Written for M4 (engine); later milestones extend it at the seams named in section 14.
 Related: [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [data model](data-model.md), [M4 plan](plans/m4-engine.md), [H1 plan](plans/h1-classes.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0008 DOM-free engine](adr/0008-dom-free-engine-behind-ports.md), [ADR 0009 hero lifecycle isolation](adr/0009-hero-lifecycle-isolation.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [security and safety](security-and-safety.md), [art style guide](../design/art-style-guide.md), [sprite spec](../design/sprite-spec.md), [testing strategy](../engineering/testing-strategy.md), [coding standards](../engineering/coding-standards.md), [glossary](../glossary.md), [CLAUDE.md](../../CLAUDE.md).
 
-Status: M4 as built (H1 additions are marked "(H1)" and are planned in [the H1 plan](plans/h1-classes.md), not yet built); synced to commit b320b00 on `feat/m4-engine`; drift is listed in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Where this file and the code disagree, fix one of them in the same change.
+Status: M4 as built (H1 additions are marked "(H1)" and are built to [the H1 plan](plans/h1-classes.md) and synced to HEAD ec76b05 on `feat/h1-classes`, see section 13.1); M4 parts synced to commit b320b00 on `feat/m4-engine`; drift is listed in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Where this file and the code disagree, fix one of them in the same change.
 
 ## 1. Principles
 
@@ -82,7 +82,8 @@ flowchart TB
 | `src/game/entities/Hero.ts`, `Campfire.ts`, `Prop.ts`, `Entity.ts` | entities (all extend `GuardedEntity`) and the per-entity guard | no |
 | `src/game/entities/ClassHero.ts` (H1) | `ClassHero extends Hero` driven by a `ClassDef` row (strike and ability effect shots, a hidden ability timer) and `createHero`, the default `HeroFactory` (`classFor(id)`) | no |
 | `src/game/Effects.ts` (H1) | `EffectPool`: pooled cosmetic sprites (projectiles, bursts) spawned by class hooks; no collision, no targets | no |
-| `src/game/data/classes.ts`, `classMap.ts`, `effects.ts` (H1) | class rows, `classFor(id)`, effect ids ([data model](data-model.md#6-hero-identity-and-classes-m4-h1)) | no |
+| `src/game/entities/Summon.ts`, `src/game/Summons.ts` (H2 design) | `Summon` (a `GuardedEntity`, not a hero) and `SummonPool`: cosmetic allies of summoning classes, leased by the owner each update, y-sorted by the renderer; no hero reference, no target, no health ([ADR 0011](adr/0011-summons-are-leased-cosmetic-entities.md)) | no |
+| `src/game/data/classes.ts`, `classMap.ts`, `effects.ts` (H1), `summons.ts` (H2) | class rows, `classFor(id)`, effect ids, summon ids ([data model](data-model.md#6-hero-identity-and-classes-m4-h1-h2)) | no |
 | `src/game/data/stages.ts`, `animations.ts`, `tuning.ts` | typed tables and constants ([data model](data-model.md)) | no |
 | `src/game/sprites/palettes.ts`, `spriteTemplates.ts` (and other template files) | art data (pixel-artist) | no |
 | `src/game/sprites/artSet.ts` | `SHIPPED_ART`: gathers the artist's exports into the `ArtSet` (developer glue) | no |
@@ -237,6 +238,7 @@ The diagram is cosmetic. Every arrow labelled "lifecycle ..." is evaluated by th
 
 - **Non-interruptible phases.** `warpIn`, `victory`, and `warpOut` finish before any other phase, except that a `despawned` lifecycle interrupts `warpIn` and `travel` at once. A `working` or `idle` event during `warpIn` updates `lifecycle` immediately; the hero begins to travel when the warp finishes.
 - **Identity.** Skin tone (4) and hair color (6) come from `hashId(id)` (`lookFor`); the class-less base hero uses `accent: null` (the master `a` colour; a CSS `#rrggbb` overrides `a`). From H1 the **class** is chosen by `classFor(id)` (a pure hash of the session id over the delivered classes, [H1 plan](plans/h1-classes.md#1-goal)), set in `HeroLook.classId` by `createHero`, and recolors the hero through a class partial palette applied before skin and hair; it never changes for an id. `Hero` exposes `x`, `y`, `faceRight`, `warpBeam`, `classId`, a protected `heroLayers(world)` hook, and (H1) the protected hooks `onAttackStrike`, `shouldCastAbility`, and `onAbilityRelease`, which receive only a `World` (no roster, so no path to `applyAgentState`). Name labels are not drawn in M4 (no pixel font until U1; the M7 roster shows names).
+- **Summons and auras (H2 design, [H2 plan](plans/h2-classes.md)).** A class row may declare a summon (the Necromancer's skeleton). While the owner's phase is `advance`, `attack`, or `ability`, `ClassHero.update` renews a short lease in `SummonPool` (`SUMMON_LEASE_MS` 250) with plain numbers; the ability raises it. When renewals stop for any reason (idle, despawned, replaced, quarantined, removed) the lease expires and the summon sinks and is freed in about 0.55 s. The summon follows the owner's cosmetic phase, never the reverse: it holds no hero reference, is not in the roster, is never a target, and has no health. Buffs and "heals" (Cleric Blessing, Paladin Radiant Smite, Bard Chorus) are one-shot cosmetic effects from `EffectPool` centered on the caster; there is no persistent aura, icon, or restore.
 - **No gauges, no health, no hit reactions.** Nothing is drawn over or under a hero except its fixed-size shadow, which the renderer draws. Hero drawing calls only `drawBitmap`/`drawBitmapRegion`.
 
 ## 7. Campfire, seats, formation
@@ -259,7 +261,7 @@ The diagram is cosmetic. Every arrow labelled "lifecycle ..." is evaluated by th
 3. Environment strips: alcove (x 0), door (x 128), corridor view (x 144). Static wall and floor props are baked into the strips.
 4. Live props: animated props (torches, ripples), clipped to their zone; corridor props are drawn at the scroll offset and at plus and minus one segment.
 5. **Light pass**: `Lighting.compose(surface)` multiplies the environment (steps 2-4) by the light map. Torch lights flicker; the campfire light is added last.
-6. Shadows, then entities sorted by foot y (heroes, campfire, solid alcove props), stable order. A warp beam is drawn right after the hero it belongs to.
+6. Shadows, then entities sorted by foot y (heroes, summons from H2, campfire, solid alcove props), stable order. A warp beam is drawn right after the hero it belongs to.
 6b. (H1) Effects: `EffectPool.draw` (class projectiles and bursts), unlit, in its own guarded pass (fault counter, scope `render`, disabled after 3 faults).
 7. Foreground: `nearForeground` (alcove and door) and the corridor foreground view.
 8. Particles.
@@ -301,12 +303,31 @@ The diagram is cosmetic. Every arrow labelled "lifecycle ..." is evaluated by th
 - **`spriteValidator.ts`** (developer): row lengths, frame sizes, characters in the palette, at most 12 colors per template and per composited default hero, required hero animation names and frame counts, equal frame counts across layers, anchor inside bounds, and no animation name matching hurt, downed, death, or dead (Core invariant 1 at the asset level). Tests run it over all shipped art (`validateArtSet(SHIPPED_ART)`); invalid art fails the test, not the user's panel. The engine does not run it at boot.
 - **Boot failure.** `Game`'s constructor validates the stage table (`validateStages`, including connectivity) and builds the stage and campfire sheets. If that throws (`RangeError`, fixed text), `main.ts` reports it once, skips the game (`SceneFeed` gets a `null` sink), and keeps mirroring host state; the canvas keeps its boot clear colour (palette `n`) and agents are unaffected. Hero bitmaps and `Lighting` are built lazily on first draw and fall under the draw and render guards instead.
 
+### 13.1 H1 as built (HEAD ec76b05)
+
+Drift from the plan, in full in [H1 plan section 13](plans/h1-classes.md#13-as-built-drift-checked-against-head-ec76b05-on-feat-h1-classes). Engine-relevant points:
+
+- `createHero` lives in `entities/ClassHero.ts`; `Game` only imports it as the default `heroFactory`.
+- `Game` dedupes error reports per scope and message across the whole game (a bounded set, `MAX_REPORTED` 64), not per hero; the per-entity once-per-message rule in `Entity.ts` sits underneath it.
+- `World.effects` is the `EffectPool`. `Game` updates it in its own try/catch (`#updateEffects`, scope `update`) and clears the pool on a fault. The renderer's effects pass stops after `EFFECT_FAULT_LIMIT` (3) faults.
+- Moving effects loop their frames at `EFFECT_FRAME_MS` (90 ms); static effects play once and hold the last frame. Effects use master colours (the class palette is not applied).
+- A class with no class layers draws the base hero recoloured by the class palette.
+- `validateArtSet` reports the shared hero/body fault once, not once per class look.
+- `HERO_POSES`, `HERO_HEAD`, and `HeroPose` are exported for art files only; the engine must not import them.
+
+### 13.2 H2 design (not yet built)
+
+- `ArtSet.summons` (`SummonSpriteId` to a single `SpriteTemplate`); `SpriteCache.summon(id)` builds every animation of the template with the master palette (no class palette, no swaps), cached by template id, `null` when absent (the draw is skipped).
+- A summon template has exactly `idle 2, walk 4, attack 3, rise 4, sink 3` frames, at most 24x24 and 8 colors, no animation name matching the forbidden hero pattern; `validateSummonArt` enforces it (tests only, not at boot). `rise` and `sink` play once (`onceFrameIndex`); the rest loop.
+- `classFor` runs over eight delivered classes in H2; the H1 four keep indexes 0 to 3 ([H2 plan section 3.6](plans/h2-classes.md#36-classfor-with-eight-classes)).
+
 ## 14. Seams for later milestones
 
 | Milestone | Seam | What it adds |
 |---|---|---|
 | H1 (built to the [H1 plan](plans/h1-classes.md)) | `HeroFactory` default `createHero`; `HeroLook.classId`; class layers and palettes in `ArtSet`; protected `Hero` hooks; `EffectPool` in `World` | data-driven `ClassHero` (attack strike shots, `ability` phase), never `lifecycle`; E1 replaces fixed shot velocities with targets read from `Combat` through the same two hooks |
-| H2-H3 | the same seams | subclasses only where code is needed (summons), never `lifecycle` |
+| H2 (to the [H2 plan](plans/h2-classes.md)) | `World.summons: SummonPool`; `ClassDef.summon`; `ClassHero` renew/raise; renderer sort buffer | data-driven summons (no subclass file), never `lifecycle`; E1 must keep summons out of `Combat` targets and `Collision` |
+| H3 | the same seams | Druid beast and Artificer turret are rows plus `SUMMON_IDS` entries and art; subclasses only where code is genuinely needed, never `lifecycle` |
 | E1 | `Engagement` interface; `World` gains enemies; `Combat.ts`; spatial hash in `Collision.ts`; `Camera` shake | enemies, bosses, hit flash on heroes (cosmetic fields only), persisted progress ([data model](data-model.md)) |
 | E1-E5 | `StageDef` rows and `AmbientEffect` union members | new stages are data plus art |
 | M7 | `ConfigSnapshot` fields, `Particles` density, `Camera` motion scale | reduce-motion, UI overlay drawn after particles |
@@ -318,7 +339,7 @@ Target: 60 fps with 8+ heroes (M4) and 30+ enemies (E3 onward), 320x180 internal
 
 | Budget | Value (8 heroes, Stage 1) |
 |---|---|
-| `drawBitmap` + `drawBitmapRegion` calls per frame | at most 120 through M4 (strip blits 3, backdrop 2-4, 8 heroes, flame, props, torches, light blit 1); 144 from H1 (plus at most `EFFECT_CAPACITY` 24 live effects) |
+| `drawBitmap` + `drawBitmapRegion` calls per frame | at most 120 through M4 (strip blits 3, backdrop 2-4, 8 heroes, flame, props, torches, light blit 1); 144 from H1 (plus at most `EFFECT_CAPACITY` 24 live effects); 152 from H2 (plus at most `SUMMON_CAPACITY` 8 summons) |
 | `fillRect` calls per frame | at most 450 (shadows, warp beams, particles at capacity) |
 | fixed step plus render CPU on the reference machine | under 4 ms median, no frame over 33 ms in 60 s |
 | per-frame allocations | none in `update`, `render`, `Lighting`, `Particles`, `Pathfinding` steady state |

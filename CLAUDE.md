@@ -52,16 +52,20 @@ src/webview/                index.html.ts (host-side HTML + CSP builder), main.t
                             (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); ui.ts (M7), audio.ts (M8)
 src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, layout, rng, Game, Roster, Engagement,
                             Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Ambience, Stage; Effects (H1, cosmetic
-                            effect pool); Combat (E1)
+                            effect pool); Summons (H2, SummonPool: leased cosmetic allies, ADR 0011); Combat (E1)
 src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero + createHero (H1, data-driven: the
-                            12 classes are rows, subclass files only where code is needed), Summon (H2), Enemy, Boss (E1)
-src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1); enemies,
-                            drops (E1); achievements (M7)
+                            12 classes are rows, subclass files only where code is needed), Summon (H2, not a hero,
+                            never in the roster), Enemy, Boss (E1)
+src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1), summons (H2);
+                            enemies, drops (E1); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,
-                            campfireTemplates, stage1Templates; engine (developer): spriteFactory,
-                            spriteValidator, artSet (SHIPPED_ART glue)
-scripts/                    (H1) generate-doc-tables.ts + docs-tables.mjs (esbuild runner behind `npm run docs:tables`)
+                            campfireTemplates, stage1Templates, classTemplates (H1, CLASS_LAYERS), effectTemplates
+                            (H1, EFFECT_SPRITES), classTemplatesH2, effectTemplatesH2, summon templates (H2,
+                            SUMMON_SPRITES); engine (developer): spriteFactory, spriteValidator, artSet
+                            (SHIPPED_ART glue)
+scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
+                            the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
 test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); game/ engine suites
                             incl. the hero-invariant test (M4);
                             support/ helpers and fakes (fakeVscode, fakeDom; monitor fakes from M3; engine fakes M4);
@@ -75,7 +79,8 @@ docs/                       architecture/ (incl. adr/, plans/) design/ engineeri
 .vscode/                    launch.json (F5), tasks.json, extensions.json, settings.json
 (root)                      package.json, esbuild.mjs, tsconfig.base/json/webview/tools, eslint.config.mjs,
                             .prettierrc.json, .markdownlint-cli2.jsonc, .vscodeignore, .nvmrc, .editorconfig
-dist/, out/                 build and test output (git-ignored; only dist/*.js ships)
+dist/, out/                 build and test output (git-ignored; only dist/*.js ships); out/test/ and out/scripts/ are
+                            esbuild outputs of the test runner and docs:tables
 .vscode-test/               VS Code downloaded by @vscode/test-electron (git-, package-, and lint-ignored)
 ```
 
@@ -94,7 +99,7 @@ dist/, out/                 build and test output (git-ignored; only dist/*.js s
 | Agent | Writes | Never writes |
 |---|---|---|
 | architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
-| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
 | developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
 | tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
 | reviewer | nothing (read-only) | everything |

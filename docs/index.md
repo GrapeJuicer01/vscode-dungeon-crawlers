@@ -31,6 +31,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [m3-monitor](architecture/plans/m3-monitor.md) | M3 Monitor (checked against M2 as built; includes decisions for the human) |
 | [m4-engine](architecture/plans/m4-engine.md) | M4 Engine (checked against M3 as built; includes the exact A0 art list and decisions for the human) |
 | [h1-classes](architecture/plans/h1-classes.md) | H1 Warrior, Mage, Archer, Rogue (checked against M4 as built; class assignment from the session id, ability phase, effect pool, `docs:tables`, exact art list, decisions H1-1 to H1-10) |
+| [h2-classes](architecture/plans/h2-classes.md) | H2 Cleric, Paladin, Necromancer, Bard (checked against H1 as built; summon convention, cosmetic buffs, eight-class `classFor`, art list, decisions H2-1 to H2-11) |
 
 ### ADRs
 
@@ -46,6 +47,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [0008](architecture/adr/0008-dom-free-engine-behind-ports.md) | the game engine is DOM-free and clock-free; canvas, frame loop, and visibility live in a thin webview host behind ports |
 | [0009](architecture/adr/0009-hero-lifecycle-isolation.md) | hero lifecycle separated from animation phase, one mutator fed by queued host events, quarantine instead of removal on faults |
 | [0010](architecture/adr/0010-split-room-stage-layout.md) | fixed 320x180 split room: static campfire alcove plus scrolling corridor on a 16 px tile grid |
+| [0011](architecture/adr/0011-summons-are-leased-cosmetic-entities.md) | summons are pooled cosmetic entities outside the roster, kept alive by an owner-renewed lease, never targets, with no hero reference |
 
 ## Engineering
 

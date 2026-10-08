@@ -3,7 +3,7 @@
 Purpose: the typed data tables of the game (stages now; classes, enemies, drops, achievements later), the art data the engine consumes, the startup validators, and the rules for persisted progress. Defines what is data versus code, who owns each table, and what is checked at startup.
 Related: [game engine](game-engine.md), [M4 plan](plans/m4-engine.md), [H1 plan](plans/h1-classes.md), [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [security and safety](security-and-safety.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [coding standards](../engineering/coding-standards.md#9-data-tables-and-configuration), [sprite spec](../design/sprite-spec.md), [art style guide](../design/art-style-guide.md), [roadmap](../engineering/roadmap.md), [glossary](../glossary.md).
 
-Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Sections marked "planned" are constraints already decided, to be detailed in their own milestone plan.
+Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). H1 sections are synced to HEAD ec76b05 on `feat/h1-classes` (drift in [H1 plan section 13](plans/h1-classes.md#13-as-built-drift-checked-against-head-ec76b05-on-feat-h1-classes)). Sections marked "planned" are constraints already decided, to be detailed in their own milestone plan.
 
 ## 1. Principles
 
@@ -131,16 +131,16 @@ From E1, `enemies.ts` adds its own validator (50 unique ids, 5 per stage, one bo
 | Hero | `WALK_PX_PER_S` 40, `WARP_IN_MS` 600, `WARP_OUT_MS` 600, `VICTORY_MS` 1200, `REST_POSE_MIN_MS` 9000, `REST_POSE_MAX_MS` 16000, `SLEEP_AFTER_REST_MS` 30000, `SKIN_TONE_COUNT` 4, `HAIR_COLOR_COUNT` 6, `HERO_SHADOW_WIDTH_PX` 10, `PATH_RETRY_MS` 1000, `WARP_SPARKS_PER_S` 40 (`VISIBLE_SLOTS` 32 lives in `layout.ts`) |
 | Engagement | `ADVANCE_MS` 5000, `ENGAGE_MS` 2400, `SCROLL_PX_PER_S` 24, `SCROLL_EASE_MS` 300, `ATTACK_STAGGER_MAX_MS` 400 |
 | Campfire | `FLAME_LARGE_AT_RESTING` 3, `EMBER_BASE_PER_S` 4 plus `EMBER_PER_RESTING_PER_S` 3 per resting hero, light radius `FIRE_LIGHT_BASE_PX` 40 plus `FIRE_LIGHT_PER_RESTING_PX` 6 per resting hero (cap `FIRE_LIGHT_MAX_PX` 72), `FIRE_LIGHT_INTENSITY` 0.9, `FIRE_FLICKER_MS` 120, `FIRE_SHADOW_WIDTH_PX` 30 |
-| Classes (H1, planned) | `EFFECT_CAPACITY` 24, `ABILITY_INTERVAL_MIN_MS` 4000, `ABILITY_INTERVAL_MAX_MS` 8000, `ATTACK_STRIKE_FRAME` 1, `ABILITY_RELEASE_FRAME` 1, `EFFECT_FRAME_MS` 90, `EFFECT_CULL_MARGIN_PX` 32, `HERO_FRAME_MS.ability` 120/140/200 |
+| Classes (H1) | `EFFECT_FAULT_LIMIT` 3, `EFFECT_CAPACITY` 24, `ABILITY_INTERVAL_MIN_MS` 4000, `ABILITY_INTERVAL_MAX_MS` 8000, `ATTACK_STRIKE_FRAME` 1, `ABILITY_RELEASE_FRAME` 1, `EFFECT_FRAME_MS` 90, `EFFECT_CULL_MARGIN_PX` 32, `HERO_FRAME_MS.ability` 120/140/200 |
 | Effects | `PARTICLE_CAPACITY` 384, `MAX_LIGHTS` 16, light map `LIGHT_MAP_WIDTH` 80 by `LIGHT_MAP_HEIGHT` 45 at `LIGHT_MAP_SCALE` 4, `LIGHT_RADIUS_STEP_PX` 8, `LIGHT_RADIUS_MAX_PX` 96, `LIGHT_BANDS` 4, `TORCH_FLICKER_MS` 140, `BACKDROP_PARALLAX` 0.25, `BACKDROP_WIDTH_PX` 128, `DRIP_GRAVITY_PX_PER_S2` 360, `DRIP_FALL_HEIGHT_PX` 44 |
 
 `animations.ts` also exports `FLAME_FRAME_MS` 110, `TORCH_FRAME_MS` 130, and `PROP_FRAME_MS` 500 (other looping props), plus the allocation-free `heroFrameIndex` and `loopFrameIndex`. Fixed room geometry (campfire position, nav cell size, slot formulas) lives in `layout.ts`, not in `tuning.ts`.
 
-## 6. Hero identity and classes (M4, H1)
+## 6. Hero identity and classes (M4, H1, H2)
 
 There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % SKIN_TONE_COUNT`, `hairIndex = (hashId(id) >>> 8) % HAIR_COLOR_COUNT`, `accent: null` (implemented by the exported `lookFor(id)` in `Roster.ts`).
 
-**Classes (planned in the [H1 plan](plans/h1-classes.md), not yet built).** `classes.ts` holds `CLASSES: readonly ClassDef[]`, one compact row per class: `id`, `name`, `role`, `colors`, `silhouette` (the last two are documentation text for the generated table), `strike` (a list of cosmetic `EffectShot`), and `ability` (id, name, effect shots). A row has no health, mana, power, or cooldown field and none may be added without a Core invariant review; the structural test pins the key set. `effects.ts` lists the `EffectId` union. `classMap.ts` exports `DELIVERED_CLASSES` and the pure `classFor(id)`: `DELIVERED_CLASSES[(hashId(id) >>> 16) % length]`. The class is therefore sticky by construction, stable across webview reloads, held nowhere, and never persisted (persisting it would store session ids, Core invariant 7). H1 delivers four classes; H2 and H3 extend `CLASS_IDS` to 12, and the validator then requires exactly 12 unique ids with complete template sets.
+**Classes (built to the [H1 plan](plans/h1-classes.md)).** `classes.ts` holds `CLASSES: readonly ClassDef[]`, one compact row per class: `id`, `name`, `role`, `colors`, `silhouette` (the last two are documentation text for the generated table), `strike` (a list of cosmetic `EffectShot`), and `ability` (id, name, effect shots). A row has no health, mana, power, or cooldown field and none may be added without a Core invariant review; the structural test pins the key set. `effects.ts` lists the `EffectId` union. `classMap.ts` exports `DELIVERED_CLASSES` and the pure `classFor(id)`: `DELIVERED_CLASSES[(hashId(id) >>> 16) % length]`. The class is therefore sticky by construction, stable across webview reloads, held nowhere, and never persisted (persisting it would store session ids, Core invariant 7). H1 delivers four classes; H2 and H3 extend `CLASS_IDS` to 12, and the validator then requires exactly 12 unique ids with complete template sets.
 
 | Check (`validateClasses`, `validateClassArt`; tests only) | Rule |
 |---|---|
@@ -149,7 +149,26 @@ There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) %
 | art | every class has layers (eleven animations, 26 frames per layer, equal counts) and a partial palette overriding only `a c d b k m` |
 | composited look | at most 12 colors per class look under every skin and hair swap |
 
-`npm run docs:tables` regenerates the class table in `docs/design/classes.md` from `classes.ts` between generated-region markers; it never reads art.
+`npm run docs:tables` regenerates the class table in `docs/design/classes.md` from `classes.ts` between generated-region markers; it never reads art. The table opens with `Delivered classes: N of 12.` (12 is hardcoded as `PLANNED_CLASS_COUNT` in the script).
+
+**H1 as built (HEAD ec76b05; full list in [H1 plan section 13](plans/h1-classes.md#13-as-built-drift-checked-against-head-ec76b05-on-feat-h1-classes)).**
+
+- `validateClasses(defs)` takes no art parameter. The art cross-check is `validateClassArt(art, classIds, effectIds)` in `spriteValidator.ts`.
+- Simulator ids `sim-0-0` to `sim-7-0` map to rogue, warrior, warrior, mage, rogue, mage, archer, mage.
+- Effect sprite ids are the local union `EffectSpriteId` in `sprites/spriteTypes.ts` until `EFFECT_SPRITES` is keyed by `EffectId` from `data/effects.ts`.
+- Effects are drawn with master colours; class palettes apply to hero looks only.
+- `HERO_POSES`, `HERO_HEAD`, and `HeroPose` (in `heroTemplates.ts`) are exported for art files only; the engine must not import them.
+- Static effects play once at 90 ms per frame and hold the last frame; moving effects loop. A class without class layers falls back to the base hero recoloured by its class palette.
+
+**H2 design (to the [H2 plan](plans/h2-classes.md); not yet built).**
+
+- `CLASS_IDS` appends `cleric paladin necromancer bard` (H1 order unchanged); `DELIVERED_CLASSES` is all eight; `classFor` keeps its form. About half of all ids keep their H1 class and half reshuffle once on update (the H1 four keep indexes 0 to 3); stable within a running extension.
+- `ClassDef` gains one required key, `summon: SummonDef | null` with `SummonDef = { kind: SummonId, dx, dy }`. The key set becomes `id name role colors silhouette strike ability summon`. Only the Necromancer has a non-null summon (`skeleton`). No health, mana, power, or cooldown field is added, and none may be.
+- `data/summons.ts` holds `SUMMON_IDS` (`skeleton` in H2; `beast`, `turret` in H3) and `SummonId`. `EFFECT_IDS` appends `buffSparkle note blessGlow holyBurst soulWisp`.
+- Art contract additions: `ArtSet.summons` (id to a single `SpriteTemplate`, ids `summons/<name>`), `SpriteTemplate` unchanged; required summon animations `idle 2, walk 4, attack 3, rise 4, sink 3`, at most 24x24 and 8 colors, master palette, no forbidden animation name; `CLASS_PALETTES` and class layers extend to eight.
+- Tuning (`tuning.ts`, units in names): `SUMMON_CAPACITY` 8, `SUMMON_LEASE_MS` 250, `SUMMON_SHADOW_WIDTH_PX` 8. `animations.ts`: `SUMMON_FRAME_MS` (`idle` 400, `walk` 130, `attack` 140/90/160, `rise` 110 per frame, `sink` 100 per frame) and `onceFrameIndex`.
+- Checks (tests only): `validateClasses` also checks `summon` shape and range; `validateSummonArt` checks the summon templates; the structural word ban grows by `heal regen restore revive resurrect`. The Necromancer ability is named "Bone Call" because the ban already covers `dead`.
+- `docs:tables` renders the Necromancer ability cell with "summons a skeleton"; the header reads `Delivered classes: 8 of 12.`
 
 ## 7. Persisted progress (planned, E1)
 

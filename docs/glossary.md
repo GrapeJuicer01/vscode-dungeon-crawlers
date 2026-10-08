@@ -10,8 +10,8 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | agent session | one running Claude Code session the extension observes. Identified by a session id; never controlled by the extension (Core invariant 3). |
 | agent state | the lifecycle state of an agent session as reported by the host: `spawned`, `working`, `idle`, or `despawned`. The only input that changes a hero's state (Core invariant 2). |
 | hero | the pixel-art character that represents one agent session. Invulnerable: no HP, mana, damage, death, or gauges (Core invariant 1, [ADR 0002](architecture/adr/0002-no-hero-health.md)). |
-| class | a hero's look and attack style (Warrior, Mage, and 10 more), picked from the agent's tool activity and sticky per session (H1-H3). |
-| summon | a cosmetic ally of a summoning class (skeleton, beast, turret); no health shown, no effect on hero state (H2, H3). |
+| class | a hero's look and attack style (Warrior, Mage, and 10 more), picked from the session id by `classFor` and sticky per id (H1-H3). |
+| summon | a cosmetic ally of a summoning class (skeleton, beast, turret); no health, never a target, no effect on hero state; exists only while its owner keeps fighting (H2, H3, [ADR 0011](architecture/adr/0011-summons-are-leased-cosmetic-entities.md)). |
 | enemy | a monster heroes fight while their agent is working. Only enemies have health. 50 types from a compact data table (E1-E5). |
 | boss | the one special enemy per stage, with intro pose, telegraph, and phases. |
 | stage | one of the 10 dungeon levels heroes progress through by cumulative work, each with 4 regular enemies and 1 boss. |
@@ -113,6 +113,9 @@ Full design in [game engine](architecture/game-engine.md) and [data model](archi
 | ability (H1) | a class hero's 3-frame signature animation, played from the `attack` phase when a hidden seeded timer fires. Cosmetic: it spawns effects and changes nothing about the hero or the host. |
 | effect, `EffectPool` (H1) | a small pooled sprite (arrow, orb, burst, whirl, dagger, smoke) spawned by a class hook and drawn after the entities; it has no collision and no target until E1. |
 | delivered classes | the classes present in `classes.ts` so far; `classFor` hashes over this set. |
+| lease (H2) | the short timer (`SUMMON_LEASE_MS`) a summoning hero renews every update while it fights; when renewals stop the summon sinks and is freed. The summon system's only link to its owner, and it carries no hero data. |
+| `SummonPool` (H2) | the fixed-size pool of `Summon` entities in `World.summons`; keyed by hero slot, updated and drawn under the entity guards, outside the `Roster`. |
+| aura, buff (H2) | not an engine feature: a one-shot cosmetic effect burst (blessing glow, holy burst, notes) centered on the casting hero. Never a persistent icon, bar, or restore. |
 
 ## Process
 

@@ -128,6 +128,8 @@ void describe('bundle boundaries for the new folders', () => {
       'src/webview/hostChannel.ts',
       'src/webview/hostMessages.ts',
       'src/webview/hostState.ts',
+      'src/webview/sceneFeed.ts',
+      'src/webview/gameHost.ts',
     ]) {
       assert.doesNotMatch(code(file), /\b(window|document|acquireVsCodeApi|globalThis)\b/, file);
     }

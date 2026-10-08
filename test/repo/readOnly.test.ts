@@ -127,8 +127,11 @@ void describe('M2: each messaging API lives in exactly one planned place', () =>
     );
   });
 
-  void it('requestAnimationFrame is still absent everywhere in src/ (no loop until M4)', () => {
-    assert.deepEqual(filesMatching(files, /\brequestAnimationFrame\b/), []);
+  void it('requestAnimationFrame appears only in src/webview/main.ts (M4: handed to GameHost as a scheduler)', () => {
+    assert.deepEqual(filesMatching(files, /\brequestAnimationFrame\b/), ['src/webview/main.ts']);
+    assert.deepEqual(filesMatching(files, /\bcancelAnimationFrame\b/), ['src/webview/main.ts']);
+    // The engine and the host loop never name it; they get request/cancel injected.
+    assert.match(code('src/webview/main.ts'), /scheduler:\s*\{[\s\S]*requestAnimationFrame/);
   });
 
   void it('the webview never persists state (no getState / setState): it is not a source of truth', () => {

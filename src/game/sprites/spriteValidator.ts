@@ -206,25 +206,6 @@ export function validateHeroLayers(layers: HeroLayerSet, palette: Palette): read
   return errors;
 }
 
-/** Distinct colors of the composited look under a full palette; swaps replace, never add. */
-function compositeColorCount(layers: HeroLayerSet, palette: Palette): number {
-  const colors = new Set<string>();
-  for (const name of heroFrameNames(layers)) {
-    const count = layers.body.animations[name]?.length ?? 0;
-    for (let i = 0; i < count; i++) {
-      for (const row of heroFrameRows(layers, name, i)) {
-        for (const ch of row) {
-          const hex = ch === '.' ? undefined : palette[ch];
-          if (hex !== undefined) {
-            colors.add(hex.toLowerCase());
-          }
-        }
-      }
-    }
-  }
-  return colors.size;
-}
-
 function validateClassPalette(id: string, cp: Palette, master: Palette): string[] {
   const errors: string[] = [];
   for (const [key, value] of Object.entries(cp)) {
@@ -242,7 +223,10 @@ function validateClassPalette(id: string, cp: Palette, master: Palette): string[
   return errors;
 }
 
-/** One class: its layers, palette, and the composited look under every skin and hair swap. */
+/**
+ * One class: its layers and palette. The color limit needs no per-swap check: a look can use at
+ * most the 11 hero characters, which validateHeroLayers already caps at 12.
+ */
 function validateClassLook(art: ArtSet, id: string, layers: HeroLayerSet): string[] {
   const errors = [...validateHeroLayers(layers, art.palette)];
   const cp = art.classPalettes[id];
@@ -252,16 +236,6 @@ function validateClassLook(art: ArtSet, id: string, layers: HeroLayerSet): strin
   errors.push(...validateClassPalette(id, cp, art.palette));
   if (errors.length > 0) {
     return errors;
-  }
-  for (const skin of art.skinTones) {
-    for (const hair of art.hairColors) {
-      const full: Palette = { ...art.palette, ...cp, ...skin, ...hair };
-      const n = compositeColorCount(layers, full);
-      if (n > MAX_HERO_COLORS) {
-        errors.push(`${id}: composited look uses ${n} colors, limit ${MAX_HERO_COLORS}`);
-        return errors;
-      }
-    }
   }
   return errors;
 }

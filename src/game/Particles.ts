@@ -4,15 +4,25 @@ import type { Rng } from './rng';
 import type { Surface } from './ports';
 import { DRIP_GRAVITY_PX_PER_S2 } from './data/tuning';
 
-export type ParticleKind = 'ember' | 'spark' | 'drip' | 'splash' | 'mote';
+export type ParticleKind = 'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp';
 /** Kind -> CSS colour ramp, bright to dim by age. */
 export type ParticleColors = Readonly<Record<ParticleKind, readonly string[]>>;
 
-const KIND_NAMES: readonly ParticleKind[] = ['ember', 'spark', 'drip', 'splash', 'mote'];
+const KIND_NAMES: readonly ParticleKind[] = [
+  'ember',
+  'spark',
+  'drip',
+  'splash',
+  'mote',
+  'bubble',
+  'wisp',
+];
 const KIND_EMBER = 0;
 const KIND_DRIP = 2;
 const KIND_SPLASH = 3;
 const KIND_MOTE = 4;
+const KIND_BUBBLE = 5;
+const KIND_WISP = 6;
 
 function kindIndex(kind: ParticleKind): number {
   return KIND_NAMES.indexOf(kind);
@@ -115,6 +125,12 @@ export class Particles {
         // Dust motes wander gently in both axes (Stage 2 ambient).
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 20 * dt;
         this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 20 * dt;
+      } else if (kind === KIND_BUBBLE) {
+        // Bubbles rise (vy stays negative as emitted) and wobble sideways (Stage 3 ambient).
+        this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 30 * dt;
+      } else if (kind === KIND_WISP) {
+        // Fog wisps drift slowly sideways with a small vertical wander (Stage 4 ambient).
+        this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 6 * dt;
       } else if (kind === KIND_EMBER) {
         // Slow sideways wander so embers do not rise in straight lines.
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 60 * dt;
@@ -150,8 +166,9 @@ export class Particles {
       if (color === undefined) {
         continue;
       }
-      const h = kind === 'drip' ? 2 : 1;
-      surface.fillRect(color, Math.floor(this.#x[i] ?? 0), Math.floor(this.#y[i] ?? 0), 1, h);
+      const w = kind === 'bubble' ? 2 : kind === 'wisp' ? 6 : 1;
+      const h = kind === 'drip' || kind === 'bubble' || kind === 'wisp' ? 2 : 1;
+      surface.fillRect(color, Math.floor(this.#x[i] ?? 0), Math.floor(this.#y[i] ?? 0), w, h);
     }
   }
 

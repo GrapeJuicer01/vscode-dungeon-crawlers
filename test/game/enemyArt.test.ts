@@ -62,8 +62,9 @@ void describe('the shipped E1 art passes every validator', () => {
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
   });
 
-  void it('has exactly ten enemy templates, one per enemy row, with the documented animation sets and sizes', () => {
+  void it('has exactly twenty enemy templates (E1 and E2), one per enemy row, with the documented animation sets and sizes', () => {
     assert.deepEqual(Object.keys(SHIPPED_ART.enemies).sort(), ENEMIES.map((r) => r.id).sort());
+    assert.equal(ENEMIES.length, 20);
     const limit = { minion: 20, elite: 28, boss: 64 } as const;
     for (const row of ENEMIES) {
       const t = SHIPPED_ART.enemies[row.id]!;
@@ -134,10 +135,12 @@ void describe('the shipped E1 art passes every validator', () => {
     assert.deepEqual(Object.keys(mine).sort(), ['1', '2', '3', '4', '5', '6', '7', '8', 'T', 'g']);
   });
 
-  void it('phase palettes exist for exactly the two bosses, each overriding at most four master characters', () => {
+  void it('phase palettes exist for exactly the four bosses, each overriding at most four master characters', () => {
     assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), [
       'goblin-foreman',
+      'ooze-queen',
       'rat-king',
+      'tomb-lich',
     ]);
     for (const list of Object.values(SHIPPED_ART.enemyPhasePalettes)) {
       assert.equal(list.length, 1);
@@ -584,13 +587,13 @@ void describe('per-stage props and palettes (Stage 2 negative cases)', () => {
 
 void describe('new art files carry characters only (invariant 5)', () => {
   const files = listFiles('src/game/sprites').filter((f) =>
-    /(enemiesStage\d|enemyBuilder|enemyTemplates|dropTemplates|stage2Templates|ratKingTemplate|goblinForemanTemplate)\.ts$/.test(
+    /(enemiesStage\d|enemyBuilder|enemyTemplates|dropTemplates|stage[234]Templates|ratKingTemplate|goblinForemanTemplate|oozeQueenTemplate|tombLichTemplate)\.ts$/.test(
       f,
     ),
   );
 
   void it('the new template files exist', () => {
-    assert.ok(files.length >= 6, files.join());
+    assert.ok(files.length >= 10, files.join());
   });
 
   void it('contain no hex colour and no data URI (palettes.ts and palettesE1.ts own the hex values)', () => {

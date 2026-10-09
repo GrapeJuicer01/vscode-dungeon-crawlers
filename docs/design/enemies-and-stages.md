@@ -1,7 +1,7 @@
 # Enemies and stages
 
-Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (two stages, ten enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
-Related: [game design](game-design.md), [classes](classes.md), [art style guide](art-style-guide.md), [sprite spec](sprite-spec.md), [E1 plan](../architecture/plans/e1-enemies.md), [ADR 0002 no hero health](../architecture/adr/0002-no-hero-health.md), [ADR 0012 host-owned versioned progress](../architecture/adr/0012-host-owned-versioned-progress.md), [ADR 0013 enemy health and the hero reaction board](../architecture/adr/0013-enemy-health-and-hero-reaction-board.md), [data model](../architecture/data-model.md), [glossary](../glossary.md).
+Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (four stages, twenty enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
+Related: [game design](game-design.md), [classes](classes.md), [art style guide](art-style-guide.md), [sprite spec](sprite-spec.md), [E1 plan](../architecture/plans/e1-enemies.md), [E2 plan](../architecture/plans/e2-stages-3-4.md), [ADR 0002 no hero health](../architecture/adr/0002-no-hero-health.md), [ADR 0012 host-owned versioned progress](../architecture/adr/0012-host-owned-versioned-progress.md), [ADR 0013 enemy health and the hero reaction board](../architecture/adr/0013-enemy-health-and-hero-reaction-board.md), [data model](../architecture/data-model.md), [glossary](../glossary.md).
 
 ## The rule that does not bend
 
@@ -13,13 +13,15 @@ Heroes are invulnerable. Only enemies have health, and only enemies have a healt
 |---|---|---|---|
 | 1 | The Forgotten Cellar | damp stone, torch orange | dripping water |
 | 2 | Goblin Mine Shafts | timber brown, ore glints, lantern yellow | drifting dust motes |
+| 3 | Toxic Slime Caverns | murky teal rock, acid-green glow, slime accents | rising bubbles |
+| 4 | Ancient Catacombs | bone beige, dusty purple, candle glow | low drifting fog and a few dust motes |
 
-After the last delivered stage the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
+After Stage 4 (the last delivered stage) the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
 
 ## Enemies
 
 <!-- BEGIN GENERATED: enemies -->
-Delivered enemies: 10 of 50.
+Delivered enemies: 20 of 50.
 
 | Stage | Id | Name | Tier | Gait | Health | Pace (px/s) | Drop |
 |---|---|---|---|---|---|---|---|
@@ -33,6 +35,16 @@ Delivered enemies: 10 of 50.
 | 2. Goblin Mine Shafts | `ore-beetle` | Ore Beetle | minion | walk | 18 | 20.8 | ore |
 | 2. Goblin Mine Shafts | `rock-golem` | Rock Golem | elite | walk | 39 | 12 | gem |
 | 2. Goblin Mine Shafts | `goblin-foreman` | Goblin Foreman | boss | walk | 162 | 8.4 | chest |
+| 3. Toxic Slime Caverns | `green-slime` | Green Slime | minion | hop | 18 | 23.4 | coin |
+| 3. Toxic Slime Caverns | `spore-shroom` | Spore Shroom | minion | walk | 22 | 20.8 | coin |
+| 3. Toxic Slime Caverns | `toxic-toad` | Toxic Toad | minion | hop | 16 | 31.2 | coin |
+| 3. Toxic Slime Caverns | `jelly-cube` | Jelly Cube | elite | walk | 57 | 10 | gem |
+| 3. Toxic Slime Caverns | `ooze-queen` | Ooze Queen | boss | walk | 219 | 8.4 | chest |
+| 4. Ancient Catacombs | `bone-soldier` | Bone Soldier | minion | walk | 25 | 26 | coin |
+| 4. Ancient Catacombs | `wailing-ghost` | Wailing Ghost | minion | float | 20 | 31.2 | coin |
+| 4. Ancient Catacombs | `tomb-scarab` | Tomb Scarab | minion | walk | 27 | 23.4 | ore |
+| 4. Ancient Catacombs | `crypt-mummy` | Crypt Mummy | elite | walk | 71 | 12 | gem |
+| 4. Ancient Catacombs | `tomb-lich` | Tomb Lich | boss | walk | 295 | 8.4 | chest |
 <!-- END GENERATED: enemies -->
 
 Every stage has four regular enemies (three minions and one elite) and one boss. Health comes from a small formula, not a hand-written number per enemy: the tier base, times the row's `vigor`, times 1.35 for each stage after the first, plus 25 percent per completed cycle (up to eight), and, for bosses only, plus 35 percent per fighting hero beyond the first (the party counts up to eight). The Health column is the cycle-0, party-of-one value. Pace is walking speed. The table is checked at startup: every delivered stage must have exactly five enemies with exactly one boss, ids must be unique, and every enemy must name an existing stage. An invalid table disables combat for the page load and the party marches in an empty corridor.

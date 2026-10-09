@@ -164,3 +164,21 @@ Stage palette mechanism: a stage sprite is validated against the merged palette 
 - Authoring: `enemyBuilder.ts` (`draft`, `put`, `dots`, `poly`, `ellipse`, `stroke`, `looseLine`, `finish`) draws the fill, `finish` adds the outline, and thin parts (spider and beetle legs) are "loose" pixels added after the outline.
 - Phase palettes: `ENEMY_PHASE_PALETTES[bossId]` is an array of partial palettes for phases 2..n (here one each), overriding at most four characters over master plus stage.
 - Preview tool: `tools/sprite-preview.mjs` (excluded from the package by `tools/**` in `.vscodeignore`).
+
+## 11. Batch E2 art (Stages 3 and 4)
+
+Delivered in steps A-E2-1 to A-E2-6 ([E2 plan section 11](../architecture/plans/e2-stages-3-4.md)). Atomic wiring: the new files exist on their own until the final step edits the barrels, because `Game` and the validators reject art without data rows and data rows without art.
+
+| Export | File | Content |
+|---|---|---|
+| `STAGE_PALETTES['toxic-slime-caverns']`, `['ancient-catacombs']` | `palettesE1.ts` | overrides of `1`-`8`, `g`, `T` only |
+| `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR` entries for both ids | `palettes.ts` | `12345678`, `n`, `g` |
+| `PARTICLE_PALETTE.bubble`, `.wisp` | `palettes.ts` | `['L', 'N', 'Q']`, `['G', 'g', 'P']`; the type is widened to seven kinds |
+| `TOXIC_SLIME_CAVERNS` | `stage3Templates.ts` | `StageSprites`; props `pipe slimeDrape glowShroom(2) toxicBarrel slimePool mushrooms doorFrame`, ids `toxic-slime-caverns/<name>` |
+| `ANCIENT_CATACOMBS` | `stage4Templates.ts` | `StageSprites`; props `skullNiche candelabra(4) crackedPillar sarcophagus urn boneRubble doorFrame`, ids `ancient-catacombs/<name>` |
+| `ENEMIES_STAGE3` | `enemiesStage3.ts` | `green-slime spore-shroom toxic-toad jelly-cube` |
+| `ENEMIES_STAGE4` | `enemiesStage4.ts` | `bone-soldier wailing-ghost tomb-scarab crypt-mummy` |
+| `OOZE_QUEEN`, `TOMB_LICH` | `oozeQueenTemplate.ts`, `tombLichTemplate.ts` | boss templates (11 frames each) |
+| `BOSS_PHASE_PALETTES_E2` | `palettesE2.ts` | phase 2 palettes for `ooze-queen` and `tomb-lich` (four overrides each); merged into `ENEMY_PHASE_PALETTES` by `enemyTemplates.ts` |
+
+Notes: stage props follow the same rules as Stages 1 and 2 (characters `1`-`8` only, at most 8 colors, `idle` only). Light props: `glowShroom` 2 frames (a slow pulse, no flicker) and `candelabra` 4 frames; the developer adds both to `FLAME_PROPS` (`glowShroom: 2`, `candelabra: 4`) and the required-prop lists. Solid alcove props are `toxicBarrel` and `sarcophagus` (foot anchor `(8, 14)`, drawn at foot y 134). Do not name a prop `puddle`. The preview tool accepts `SPRITE_ENTRY=<file.ts>` to preview art that is not wired yet.

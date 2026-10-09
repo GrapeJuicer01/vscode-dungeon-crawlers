@@ -175,3 +175,17 @@ export const MOTE_MIN_Y = 40;
 export const MOTE_MAX_Y = 150;
 export const MOTE_LIFE_MIN_MS = 2500;
 export const MOTE_LIFE_MAX_MS = 4500;
+
+// ---- Stage 3 ambient (rising bubbles) and Stage 4 ambient (low fog), first guesses tuned by eye ----
+export const BUBBLE_MIN_Y = 118;
+export const BUBBLE_MAX_Y = 156;
+export const BUBBLE_RISE_MIN = 12;
+export const BUBBLE_RISE_MAX = 26;
+export const BUBBLE_LIFE_MIN_MS = 1400;
+export const BUBBLE_LIFE_MAX_MS = 2600;
+export const FOG_MIN_Y = 132;
+export const FOG_MAX_Y = 158;
+export const FOG_DRIFT_MIN = 3;
+export const FOG_DRIFT_MAX = 9;
+export const FOG_LIFE_MIN_MS = 4500;
+export const FOG_LIFE_MAX_MS = 7500;

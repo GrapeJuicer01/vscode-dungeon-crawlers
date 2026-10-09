@@ -73,7 +73,9 @@ src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplat
                             (H3: Druid, Monk, Artificer, Berserker; beast and turret); E1: palettesE1 (stage
                             palettes, boss phase palettes), dropTemplates, enemyTemplates (bar frames, ENEMY_SPRITES
                             aggregator), enemyBuilder (authoring helpers), enemiesStage1, enemiesStage2,
-                            ratKingTemplate, goblinForemanTemplate, stage2Templates; engine (developer):
+                            ratKingTemplate, goblinForemanTemplate, stage2Templates; E2: palettesE2 (boss phase
+                            palettes), stage3Templates, stage4Templates, enemiesStage3, enemiesStage4,
+                            oozeQueenTemplate, tombLichTemplate; engine (developer):
                             spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
 scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
                             the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
@@ -112,7 +114,7 @@ dist/, out/                 build and test output (git-ignored; only dist/*.js s
 | Agent | Writes | Never writes |
 |---|---|---|
 | architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
-| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts`, the E2 files `palettesE2.ts`, `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
 | developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
 | tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
 | reviewer | nothing (read-only) | everything |

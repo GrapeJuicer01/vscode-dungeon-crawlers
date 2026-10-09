@@ -235,6 +235,27 @@ All templates are `enemies/<id>`, left-facing, foot anchor on the bottom outline
 | 2 | `rock-golem` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 N G m P Y O` | compact stack of rock slabs, mossy head, glowing eyes, arm held low or back, never overhead |
 | 2 | `goblin-foreman` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 12: `1 N L 6 5 2 m k e w Y O` | big goblin, yellow hard hat with lamp, huge pickaxe, lantern in the far hand |
 
+### Delivered enemies (batch E2, steps A-E2-4 to A-E2-6)
+
+Same contract as above (left-facing, foot anchor, fill plus auto outline in the stage's `1`). Stage 3 enemies are bright and warm or saturated against dark teal rock; Stage 4 enemies are pale or gold against dusty purple stone, outlined in the stage's near-black `1`.
+
+| Stage | id | Tier, size, anchor | Frames | Colors | Silhouette cue |
+|---|---|---|---|---|---|
+| 3 | `green-slime` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 6: `1 L N w e q` | squat dome with a small tip on top, no limbs; `walk` stretches tall then squashes (the engine hops it); `attack` squashes back, lunges flat with a small mouth |
+| 3 | `spore-shroom` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 R D w 7 G e L k` | red spotted umbrella cap on a thin pale stem, two stubby feet; `attack` squeezes the cap and puffs green spores to the front |
+| 3 | `toxic-toad` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 C Z Y R e O` | wide low orange body, big hind haunch, two bulging yellow eyes, red warts; `attack` lunges a pink tongue to the front |
+| 3 | `jelly-cube` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 9: `1 c d Q q e w a Y` | rounded blue block with a glossy rim, a gold coin and a bone suspended inside; `attack` stretches tall, then slams flat and wide |
+| 3 | `ooze-queen` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 9: `1 L N a Y R w e q` | big lime mound with a tall drippy gold crown, large eyes, bubbles rising inside |
+| 4 | `bone-soldier` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 10: `1 7 5 G P Y R D k e` | leaning skeleton, dented iron helmet, amber eyes, round wooden shield in front, rusty red sword behind; thin loose bone legs |
+| 4 | `wailing-ghost` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 5: `1 w q Q e` | tall white sheet with a round head, hollow eyes, a big open mouth, stub arms and a ragged hem trailing back; `attack` raises the arms and wails (pale sound ticks to the front) |
+| 4 | `tomb-scarab` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 8: `1 a Y O k e 8 q` | flat golden beetle, short orange horn, segmented shell, violet gem, spread dark legs |
+| 4 | `crypt-mummy` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 7 5 2 e Y 8` | bandaged shuffler leaning forward, glowing eyes in a dark gap, arms reaching forward at chest height, one trailing wrap; `attack` pulls the arms back, then lunges them forward |
+| 4 | `tomb-lich` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 11: `1 8 2 7 5 a k L N Y e` | hooded skeleton in a violet robe with gold belt and hem, tall spiked gold crown, green eye glow, staff with a floating green gem |
+
+Silhouette separation: Bone Soldier differs from the Necromancer's skeleton summon (helmet, shield, rusty sword, amber eyes, lean, versus the summon's bare upright bones with green eyes); Wailing Ghost differs from Cave Bat (tall pale teardrop with a hem versus a dark wide-winged flyer); within Stage 3 the four read as dome, umbrella, wide low frog, and square block; within Stage 4 as a gear-laden skeleton, a tall sheet, a flat beetle, and a wide bandaged brute. Boss telegraphs: Ooze Queen swells wide with glowing eyes, then tips forward with a wide open mouth (her `attack` is a low lunge with a slime arm); Tomb Lich lifts the staff high while the gem swells and throws out rays (his `attack` winds the staff back, then thrusts it forward).
+
+Phase palettes (`BOSS_PHASE_PALETTES_E2` in `palettesE2.ts`, merged into `ENEMY_PHASE_PALETTES` at wiring; phase 2 is index 0): Ooze Queen overrides `L #ff9a6a`, `N #d8456a`, `a #ff5a1c`, `Y #fff6c0` (hot pink-orange glow, molten crown); Tomb Lich overrides `L #ffffff`, `N #b8e0ff`, `8 #ff5ad8`, `Y #ffffff` (white-hot gem and eyes, hot magenta robe). Same silhouettes.
+
 Boss readability: `telegraph` for both bosses is clearly unlike `attack`. Rat King rears up with both arms raised and the mouth open, then throws his head and one arm back; his `attack` is a low forward claw swipe. Goblin Foreman raises the pickaxe straight overhead, then pulls it back behind him with lantern rays; his `attack` is a low forward swing. `intro` is a stand-tall pose (Rat King spreads both arms and roars, with a crown glint on frame 1; Foreman plants the pick like a cane and lifts the lantern, with glow rays on frame 1).
 
 Phase palettes (`BOSS_PHASE_PALETTES` in `palettesE1.ts`, exported as `ENEMY_PHASE_PALETTES`; phase 2 is index 0): Rat King overrides `d #d8452c`, `b #8f2a1c`, `a #ff9a2e`, `R #ff3a2a` (hot red-orange cape, orange crown, brighter jewel); Goblin Foreman overrides `Y #fff6c0`, `O #ff5a1c`, `6 #ff8a2c` (white-hot lantern, orange hat). Same silhouettes. Red and orange are fine here: bosses are enemies.
@@ -244,6 +265,8 @@ Contrast note: stage 1 enemies avoid the stone grays of floor and wall with mast
 ## 8. Stages
 
 **Per-stage palettes (decision E1-2).** Each stage keeps the eight tile characters `1` to `8`, but their colors are a partial palette per stage (`STAGE_PALETTES` in `palettesE1.ts`), laid over the master palette; it may also override `g` (ambient) and `T` (torch or lantern light). Stage 1 is `{}` (the master values). Stage 2, Goblin Mine Shafts: `1 #1a120d`, `2 #3b2a1e`, `3 #5f4430`, `4 #8c6a46`, `5 #b07a3c`, `6 #ffd24a` lantern yellow, `7 #f2e8c8` chalk, `8 #62d0bc` ore glint, `g #7a6a84`, `T #ffc94a`. Meaning is stable across stages (1 deepest shadow, 2 dark rock, 3 mid rock, 4 lit rock, 5 timber, 6 light source, 7 highlight, 8 accent), so shared sprite logic still reads. No new master characters per stage; the master palette stays at 37 colors (cap 48). The `mote` particle ramp (warm dust, stage 2 ambient) reuses master `a V W`.
+
+Stage 3, Toxic Slime Caverns (batch E2): `1 #0b1816`, `2 #1d3836`, `3 #2f5652`, `4 #4b7d73`, `5 #7b7a3a` olive crust, `6 #b4ff3c` acid glow, `7 #dcf5c6`, `8 #3fd0a0` aqua slime, `g #5a8a80`, `T #8fe84a`. Stage 4, Ancient Catacombs: `1 #150f1c`, `2 #2e2438`, `3 #4f4160`, `4 #76668a`, `5 #b8a67c` bone beige, `6 #b8fff0` cold candle flame, `7 #f2ead2` bone white, `8 #a85cf0` violet, `g #6a5a92`, `T #8fe8d8`. Both keep the clear color `n` (master near-black). The master palette stays at 37 colors. Particle ramps added in E2: `bubble` `L N Q` (lime, green, blue-gray; rising toxic bubbles) and `wisp` `G g P` (dim grays and violet; low fog), master characters only.
 
 Each stage needs a tile palette, floor tiles, back-wall tiles, 6+ props, a parallax backdrop, and an ambient effect.
 
@@ -302,4 +325,44 @@ Tiles: `wallTop` 2 (stalactites), `wallMid` 5 (4 rock variants, two with ore gli
 
 Ambient: `dust` motes use the `mote` ramp `a V W` (warm sand, light wood, dark wood).
 
+### Stage 3 characters and props (delivered, batch E2 step A-E2-2)
+
+Tile palette (`STAGE_TILE_CHARS['toxic-slime-caverns']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` deepest shadow and outline, `2` dark rock, `3` mid rock, `4` lit rock, `5` olive crust and old metal, `6` acid glow, `7` pale highlight, `8` aqua slime. The rock stays dark and dull so the enemies stand out.
+
+Tiles: `wallTop` 2 (stalactites ending in slime drops), `wallMid` 5 (rounded rock lumps from a wrapped Voronoi; slime streaks, an olive pipe stub, plus variant 4, a round metal-framed opening with transparent pixels for the backdrop), `wallBase` 2, `floorBack` 3 and `floorFront` 3 (wet rock; variants 1 and 2 carry thin slime films), `foreground` 2. Backdrop 128x128, period 64: dripping cavern arches with distant glowing growths and slow stalactite drips.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `pipe` | 16x16 | top-left | 1 | wall (olive pipe run with a flange joint and a slime leak; no dial or gauge) |
+| `slimeDrape` | 16x40 | top-left | 1 | wall (slime curtain dripping from the ceiling) |
+| `glowShroom` | 16x16 | top-left | 2 (slow pulse, no flicker) | wall, light source (`T` light) |
+| `toxicBarrel` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove |
+| `slimePool` | 16x8 | `(8, 7)` | 1 | floor, decoration (not named `puddle`, which the engine treats as a drip point) |
+| `mushrooms` | 16x12 | `(8, 10)` | 1 | floor, decoration |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (crusted metal lintel, slime drips) |
+
+Ambient: rising `bubble` particles (`L N Q`).
+
+### Stage 4 characters and props (delivered, batch E2 step A-E2-3)
+
+Tile palette (`STAGE_TILE_CHARS['ancient-catacombs']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` deepest shadow and outline, `2` dark stone, `3` mid stone, `4` lit stone, `5` bone beige, `6` cold candle flame, `7` bone white, `8` violet accent.
+
+Tiles: `wallTop` 2, `wallMid` 5 (4 masonry variants: plain, cracked, a skull set in the wall, violet rune scratches; variant 4 a barred arch with transparent pixels for the backdrop), `wallBase` 2 (bone beige skirting), `floorBack` 3 and `floorFront` 3 (flagstones; variant 1 cracked, variant 2 a violet rune), `foreground` 2 (variant 1 has loose bones above the lip). Masonry is 4 px courses of 8 px blocks, periodic in 16. Backdrop 128x128, period 64: pointed vault arches receding, with pillars at the period edge and a few distant candle glints. Skulls are stylized and cute-spooky, no gore.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `skullNiche` | 16x32 | top-left | 1 | wall (three stacked skull recesses) |
+| `candelabra` | 16x20 | top-left | 4 (flame sway and height flicker) | wall, light source (`T` light, flicker on) |
+| `crackedPillar` | 16x112 | top-left | 1 | wall (fluted column with capital, base, cracks) |
+| `sarcophagus` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove |
+| `urn` | 12x14 | `(6, 12)` | 1 | floor, decoration |
+| `boneRubble` | 16x8 | `(8, 6)` | 1 | floor, decoration (not `bonePile`) |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (bone-beige lintel with a skull, violet marks) |
+
+Ambient: low `wisp` particles (`G g P`) plus warm dust motes.
+
 **Campfire**: logs and seats, a 4-frame flame loop in two sizes (small, large from 3 resting heroes), ember sparks. It grows as more heroes rest and is drawn identically across stages with master characters only. Delivered: `logs` (a stone ring, two crossed logs, a flanking decorative log each side; anchor at the pit's front-edge center), `flameSmall`, `flameLarge`.
+
+## Known look-alike backlog
+
+Ten Stage 3/4 minion pairs are pinned in the `KNOWN_OVER` ratchet in `test/game/stagesE2Art.test.ts` (overlap over the smaller count > 0.85, IoU <= 0.80): green-slime vs cellar-rat, ore-beetle, cave-bat, web-spider, and goblin-scout; spore-shroom vs goblin-scout; toxic-toad vs cave-bat, ore-beetle, and cellar-rat; wailing-ghost vs web-spider. They are to be reworked in a later art pass, after which the pins are removed.

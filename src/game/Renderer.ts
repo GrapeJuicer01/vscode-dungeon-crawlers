@@ -140,6 +140,8 @@ export class Renderer {
       drip: css(art.particlePalette.drip),
       splash: css(art.particlePalette.splash),
       mote: css(art.particlePalette.mote),
+      bubble: css(art.particlePalette.bubble),
+      wisp: css(art.particlePalette.wisp),
     };
     this.#white = art.palette['w'] ?? '#ffffff';
   }

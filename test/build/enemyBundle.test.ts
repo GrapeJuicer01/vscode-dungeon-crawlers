@@ -40,7 +40,9 @@ void describe('enemy code in the bundles (E1)', () => {
       assert.ok(webview.includes(row.name), row.name);
     }
     assert.deepEqual(Object.keys(SHIPPED_ART.enemies).sort(), ENEMIES.map((r) => r.id).sort());
-    assert.ok(webview.includes('goblin-mine-shafts'));
+    for (const id of ['goblin-mine-shafts', 'toxic-slime-caverns', 'ancient-catacombs']) {
+      assert.ok(webview.includes(id), id);
+    }
   });
 
   void it('dist/webview.js contains no host persistence: no ProgressStore, no globalState, no progress key', () => {

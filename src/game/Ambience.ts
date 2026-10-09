@@ -2,8 +2,20 @@
 import { assertNever } from '../shared/assertNever';
 import type { Camera } from './Camera';
 import {
+  BUBBLE_LIFE_MAX_MS,
+  BUBBLE_LIFE_MIN_MS,
+  BUBBLE_MAX_Y,
+  BUBBLE_MIN_Y,
+  BUBBLE_RISE_MAX,
+  BUBBLE_RISE_MIN,
   DRIP_FALL_HEIGHT_PX,
   DRIP_GRAVITY_PX_PER_S2,
+  FOG_DRIFT_MAX,
+  FOG_DRIFT_MIN,
+  FOG_LIFE_MAX_MS,
+  FOG_LIFE_MIN_MS,
+  FOG_MAX_Y,
+  FOG_MIN_Y,
   MOTE_LIFE_MAX_MS,
   MOTE_LIFE_MIN_MS,
   MOTE_MAX_Y,
@@ -17,6 +29,10 @@ const DRIP_FALL_MS = Math.sqrt((2 * DRIP_FALL_HEIGHT_PX) / DRIP_GRAVITY_PX_PER_S
 
 export class Ambience {
   #debt = 0;
+  // Separate debts so the fog and fog-dust rates do not couple (E2).
+  #bubbleDebt = 0;
+  #fogDebt = 0;
+  #fogDustDebt = 0;
 
   update(dtMs: number, world: World, camera: Camera): void {
     const effect = world.stage.def.ambient;
@@ -27,9 +43,68 @@ export class Ambience {
       case 'dust':
         this.#dust(dtMs, effect.perSecond, world);
         return;
+      case 'bubbles':
+        this.#bubbles(dtMs, effect.perSecond, world);
+        return;
+      case 'fog':
+        this.#fog(dtMs, effect.perSecond, effect.dustPerSecond, world);
+        return;
       default:
         assertNever(effect);
     }
+  }
+
+  /** Adds elapsed emissions to a debt, capped at one second's worth (guards a stage switch). */
+  static #accrue(debt: number, dtMs: number, perSecond: number): number {
+    return Math.min(debt + (perSecond * dtMs) / 1000, Math.max(1, perSecond));
+  }
+
+  /** Bubbles rise from the floor band anywhere in the corridor view; not scrolled. */
+  #bubbles(dtMs: number, perSecond: number, world: World): void {
+    this.#bubbleDebt = Ambience.#accrue(this.#bubbleDebt, dtMs, perSecond);
+    while (this.#bubbleDebt >= 1) {
+      this.#bubbleDebt -= 1;
+      world.particles.emit(
+        'bubble',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        BUBBLE_MIN_Y + world.rng() * (BUBBLE_MAX_Y - BUBBLE_MIN_Y),
+        0,
+        -(BUBBLE_RISE_MIN + world.rng() * (BUBBLE_RISE_MAX - BUBBLE_RISE_MIN)),
+        BUBBLE_LIFE_MIN_MS + world.rng() * (BUBBLE_LIFE_MAX_MS - BUBBLE_LIFE_MIN_MS),
+      );
+    }
+  }
+
+  /** Low fog wisps drifting left, plus a few dust motes with their own debt. */
+  #fog(dtMs: number, perSecond: number, dustPerSecond: number, world: World): void {
+    this.#fogDebt = Ambience.#accrue(this.#fogDebt, dtMs, perSecond);
+    while (this.#fogDebt >= 1) {
+      this.#fogDebt -= 1;
+      world.particles.emit(
+        'wisp',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        FOG_MIN_Y + world.rng() * (FOG_MAX_Y - FOG_MIN_Y),
+        -(FOG_DRIFT_MIN + world.rng() * (FOG_DRIFT_MAX - FOG_DRIFT_MIN)),
+        0,
+        FOG_LIFE_MIN_MS + world.rng() * (FOG_LIFE_MAX_MS - FOG_LIFE_MIN_MS),
+      );
+    }
+    this.#fogDustDebt = Ambience.#accrue(this.#fogDustDebt, dtMs, dustPerSecond);
+    while (this.#fogDustDebt >= 1) {
+      this.#fogDustDebt -= 1;
+      this.#emitMote(world);
+    }
+  }
+
+  #emitMote(world: World): void {
+    world.particles.emit(
+      'mote',
+      CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+      MOTE_MIN_Y + world.rng() * (MOTE_MAX_Y - MOTE_MIN_Y),
+      -6 + (world.rng() - 0.5) * 8,
+      (world.rng() - 0.5) * 6,
+      MOTE_LIFE_MIN_MS + world.rng() * (MOTE_LIFE_MAX_MS - MOTE_LIFE_MIN_MS),
+    );
   }
 
   /** Slow motes anywhere in the corridor view; they drift on their own and are not scrolled. */
@@ -37,14 +112,7 @@ export class Ambience {
     this.#debt += (perSecond * dtMs) / 1000;
     while (this.#debt >= 1) {
       this.#debt -= 1;
-      world.particles.emit(
-        'mote',
-        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
-        MOTE_MIN_Y + world.rng() * (MOTE_MAX_Y - MOTE_MIN_Y),
-        -6 + (world.rng() - 0.5) * 8,
-        (world.rng() - 0.5) * 6,
-        MOTE_LIFE_MIN_MS + world.rng() * (MOTE_LIFE_MAX_MS - MOTE_LIFE_MIN_MS),
-      );
+      this.#emitMote(world);
     }
   }
 

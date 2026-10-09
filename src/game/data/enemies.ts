@@ -1,7 +1,7 @@
 // The compact enemy table and its scaling formulas (enemy side, E1 plan section 3.3,
 // data-model.md section 6). Each enemy is one small row; health, speed, and attack timing come from
 // the tier base and the formulas below, so the 50 enemies of the finished game are never 50
-// hand-written objects. E1 delivers ten rows (stages 1 and 2); the validator runs in the
+// hand-written objects. E1 delivered ten rows (stages 1 and 2), E2 ten more (stages 3 and 4); the validator runs in the
 // incremental mode of roadmap A3: five rows and exactly one boss per delivered stage. E5 pins the
 // full contract (ten stages, 50 unique ids) and removes the incremental mode.
 //
@@ -40,7 +40,8 @@ export const PACE_MIN = 0.5;
 export const PACE_MAX = 1.6;
 
 /**
- * Stage 1: Forgotten Cellar. Stage 2: Goblin Mine Shafts. Numbers are first guesses (decision
+ * Stage 1: Forgotten Cellar. Stage 2: Goblin Mine Shafts. Stage 3: Toxic Slime Caverns. Stage 4:
+ * Ancient Catacombs (E2). Numbers are first guesses (decision
  * E1-11) tuned by eye in the manual benchmark.
  */
 export const ENEMIES = [
@@ -138,6 +139,106 @@ export const ENEMIES = [
     id: 'goblin-foreman',
     name: 'Goblin Foreman',
     stage: 2,
+    tier: 'boss',
+    gait: 'walk',
+    vigor: 1.0,
+    pace: 0.6,
+    drop: 'chest',
+  },
+  {
+    id: 'green-slime',
+    name: 'Green Slime',
+    stage: 3,
+    tier: 'minion',
+    gait: 'hop',
+    vigor: 1.0,
+    pace: 0.9,
+    drop: 'coin',
+  },
+  {
+    id: 'spore-shroom',
+    name: 'Spore Shroom',
+    stage: 3,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.2,
+    pace: 0.8,
+    drop: 'coin',
+  },
+  {
+    id: 'toxic-toad',
+    name: 'Toxic Toad',
+    stage: 3,
+    tier: 'minion',
+    gait: 'hop',
+    vigor: 0.9,
+    pace: 1.2,
+    drop: 'coin',
+  },
+  {
+    id: 'jelly-cube',
+    name: 'Jelly Cube',
+    stage: 3,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 1.3,
+    pace: 0.5,
+    drop: 'gem',
+  },
+  {
+    id: 'ooze-queen',
+    name: 'Ooze Queen',
+    stage: 3,
+    tier: 'boss',
+    gait: 'walk',
+    vigor: 1.0,
+    pace: 0.6,
+    drop: 'chest',
+  },
+  {
+    id: 'bone-soldier',
+    name: 'Bone Soldier',
+    stage: 4,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.0,
+    pace: 1.0,
+    drop: 'coin',
+  },
+  {
+    id: 'wailing-ghost',
+    name: 'Wailing Ghost',
+    stage: 4,
+    tier: 'minion',
+    gait: 'float',
+    vigor: 0.8,
+    pace: 1.2,
+    drop: 'coin',
+  },
+  {
+    id: 'tomb-scarab',
+    name: 'Tomb Scarab',
+    stage: 4,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.1,
+    pace: 0.9,
+    drop: 'ore',
+  },
+  {
+    id: 'crypt-mummy',
+    name: 'Crypt Mummy',
+    stage: 4,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 1.2,
+    pace: 0.6,
+    drop: 'gem',
+  },
+  {
+    id: 'tomb-lich',
+    name: 'Tomb Lich',
+    stage: 4,
     tier: 'boss',
     gait: 'walk',
     vigor: 1.0,

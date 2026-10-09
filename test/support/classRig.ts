@@ -80,12 +80,17 @@ export function artWithoutEffects(): ArtSet {
   return { ...SHIPPED_ART, effects: {} };
 }
 
-export function makeWorld(art: ArtSet = SHIPPED_ART, seed: number = ENGINE_SEED): ClassWorld {
+/** `stageIndex` is 1-based (E2: the same world, built for any shipped stage). */
+export function makeWorld(
+  art: ArtSet = SHIPPED_ART,
+  seed: number = ENGINE_SEED,
+  stageIndex = 1,
+): ClassWorld {
   const bitmaps = new FakeBitmaps();
   bitmaps.recordOffscreen = false;
   const cache = new SpriteCache(bitmaps, art);
   const rng = mulberry32(seed);
-  const stage = STAGES[0];
+  const stage = STAGES[stageIndex - 1];
   if (stage === undefined) {
     throw new Error('no stage');
   }

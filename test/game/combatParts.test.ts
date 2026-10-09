@@ -571,11 +571,30 @@ void describe('StageDirector (the dark fade swap)', () => {
     for (let t = 0; t < 2 * STAGE_FADE_MS + 40; t += STEP_MS) d.update(STEP_MS);
     assert.equal(d.runtime.def.id, 'goblin-mine-shafts', 'the second begin did nothing');
     d.show(3);
-    assert.equal(d.runtime.def.id, 'forgotten-cellar');
+    assert.equal(d.runtime.def.id, 'toxic-slime-caverns');
     d.show(4);
+    assert.equal(d.runtime.def.id, 'ancient-catacombs');
+    d.show(5);
+    assert.equal(d.runtime.def.id, 'forgotten-cellar', 'index 5 wraps to Stage 1 of 4');
+    d.show(6);
     assert.equal(d.runtime.def.id, 'goblin-mine-shafts');
     d.show(0);
-    assert.equal(d.runtime.def.id, 'goblin-mine-shafts');
+    assert.equal(d.runtime.def.id, 'ancient-catacombs', 'index 0 wraps to the last stage');
+  });
+
+  void it('walks Stage 1 to 4 by fades and then wraps to Stage 1 by a fade (E2)', () => {
+    const { d, swaps } = director();
+    for (const next of [2, 3, 4, 1]) {
+      d.begin(next);
+      for (let t = 0; t < 2 * STAGE_FADE_MS + 40; t += STEP_MS) d.update(STEP_MS);
+      assert.equal(d.transitioning, false);
+    }
+    assert.deepEqual(swaps, [
+      'goblin-mine-shafts',
+      'toxic-slime-caverns',
+      'ancient-catacombs',
+      'forgotten-cellar',
+    ]);
   });
 
   void it('update with no fade or a non-positive step does nothing', () => {
@@ -598,7 +617,11 @@ void describe('StageDirector (the dark fade swap)', () => {
 
   void it('the director is handed no hero: its constructor takes builders and stages only', () => {
     assert.equal(StageDirector.length >= 2, true);
-    assert.ok(STAGES.length === 2 && SHIPPED_ART.stageSprites['goblin-mine-shafts'] !== undefined);
+    assert.ok(
+      STAGES.length === 4 &&
+        SHIPPED_ART.stageSprites['toxic-slime-caverns'] !== undefined &&
+        SHIPPED_ART.stageSprites['ancient-catacombs'] !== undefined,
+    );
   });
 });
 

@@ -139,12 +139,13 @@ Each batch delivers two stages: per stage 4 regular enemies plus exactly 1 boss,
 
 #### E2. Stage 3 Toxic Slime Caverns, Stage 4 Ancient Catacombs
 
-- **Scope**: two stages of rows, scaling verified, any new enemy behaviors (for example splitting slimes) as data-driven variants of `Enemy`.
-- **Files**: `enemies.ts`, `stages.ts`, `drops.ts`, enemy entity files only if a new behavior type is needed, regenerated `docs/design/enemies-and-stages.md`. Pixel-artist: per-stage template files, palettes, art docs.
-- **Art (batch E2)**: Stage 3 and Stage 4 tile palettes, tiles, 6+ props each, backdrops, ambients (rising bubbles; low fog and dust), four enemies and a boss per stage with distinct silhouettes.
+- **Plan**: [E2 plan](../architecture/plans/e2-stages-3-4.md) (E1 assumptions audited against the code, the atomic art-then-data switch, interfaces, task list, test notes, art steps A-E2-1 to A-E2-6, decisions E2-1 to E2-10).
+- **Scope**: two stages of rows (10 enemies, 20 of 50 delivered), scaling verified with the E1 formulas, per-stage palette overrides, two cosmetic ambients (`bubbles`, `fog` with dust) as new `AmbientEffect` and particle kinds. No new enemy mechanic by default (splitting slimes deferred, decision E2-2). Progression wraps after Stage 4 with no code change (`Progression` takes the stage count).
+- **Files**: `enemies.ts` (rows), `stages.ts` (rows, `AmbientEffect`), `tuning.ts`, `Ambience.ts`, `Particles.ts`, `Renderer.ts` (colour map), `spriteValidator.ts` (`REQUIRED_PROPS`, `FLAME_PROPS`), regenerated `docs/design/enemies-and-stages.md`; `Combat`, `Enemy`, `Boss`, `Progression`, `StageDirector` unchanged. Pixel-artist: per-stage template files, palettes, art docs.
+- **Art (batch E2)**: six steps (A-E2-1 stage palettes, char tables, `bubble` and `wisp` ramps; A-E2-2 Stage 3 environment; A-E2-3 Stage 4 environment; A-E2-4 Stage 3 enemies; A-E2-5 Stage 4 enemies; A-E2-6 Ooze Queen, Tomb Lich, then barrel wiring). Tile palettes, tiles, 6+ props each, backdrops, ambients (rising bubbles; low fog and dust), four enemies and a boss per stage with distinct silhouettes. No new drops, no new master characters.
 - **Depends on**: E1.
 - **Done when**: G1-G7; validator passes for stages 1-4 (20 enemies); progression wraps after Stage 4; hero-invariant test still covers all new behaviors.
-- Status: todo
+- Status: done
 
 #### E3. Stage 5 Enchanted Forest Ruins, Stage 6 Molten Core
 
@@ -242,7 +243,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 11 | M6 enemies | E4 stages 7-8 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 12 | M6 enemies | E5 stages 9-10 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

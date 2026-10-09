@@ -577,11 +577,11 @@ void describe('the boss (E1 plan 3.4.4 step 4 and 13.1)', () => {
     assert.equal(surface.bitmapDraws, 0, 'every drop faded away');
   });
 
-  void it('a boss defeat in the last delivered stage wraps: Stage 2 clear returns to Stage 1 with cycle + 1', () => {
-    const rig = makeCombat({ fighters: 8, stage: 2, config: { killsPerStage: 2 } });
+  void it('a boss defeat in the last delivered stage wraps: Stage 4 clear returns to Stage 1 with cycle + 1', () => {
+    const rig = makeCombat({ fighters: 8, stage: 4, config: { killsPerStage: 2 } });
     rig.progression.load({
       schemaVersion: 1,
-      stageIndex: 2,
+      stageIndex: 4,
       killsInStage: 0,
       totalKills: 10,
       bossesDefeated: 1,
@@ -592,6 +592,26 @@ void describe('the boss (E1 plan 3.4.4 step 4 and 13.1)', () => {
     assert.equal(snap.stageIndex, 1);
     assert.equal(snap.cycle, 1);
     assert.equal(snap.killsInStage, 0);
+  });
+
+  void it('boss defeats in Stages 1 to 3 advance one stage each with no new cycle (E2: the wrap moved to Stage 4)', () => {
+    for (const from of [1, 2, 3]) {
+      const rig = makeCombat({ fighters: 8, stage: from, config: { killsPerStage: 2 } });
+      rig.progression.load({
+        schemaVersion: 1,
+        stageIndex: from,
+        killsInStage: 0,
+        totalKills: 10,
+        bossesDefeated: 0,
+        cycle: 0,
+      });
+      untilBossDefeated(rig, 1);
+      const snap = rig.progression.snapshot();
+      assert.equal(snap.stageIndex, from + 1, `from stage ${from}`);
+      assert.equal(snap.cycle, 0, `from stage ${from}`);
+      assert.equal(snap.killsInStage, 0);
+      assert.equal(snap.totalKills >= 10, true, 'counters are kept');
+    }
   });
 
   void it('enemy health follows the cycle when it spawns (New Game+ looping): more strikes to defeat', () => {

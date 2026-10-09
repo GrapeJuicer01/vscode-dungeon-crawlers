@@ -38,7 +38,11 @@ export interface PropPlacement {
 export type AmbientEffect =
   | { readonly kind: 'drip'; readonly perSecond: number }
   /** Drifting motes (E1, Stage 2). */
-  | { readonly kind: 'dust'; readonly perSecond: number };
+  | { readonly kind: 'dust'; readonly perSecond: number }
+  /** Rising bubbles (E2, Stage 3). */
+  | { readonly kind: 'bubbles'; readonly perSecond: number }
+  /** Low drifting fog wisps plus a few dust motes (E2, Stage 4). */
+  | { readonly kind: 'fog'; readonly perSecond: number; readonly dustPerSecond: number };
 
 export interface StageDef {
   /** Kebab-case; matches the StageSprites key. */
@@ -53,6 +57,11 @@ export interface StageDef {
 const TORCH_LIGHT: LightDef = { radius: 56, intensity: 0.85, colorChar: 'T', flicker: true };
 /** Lanterns light Stage 2 like torches do Stage 1 (same light character; the stage palette recolors `T`). */
 const LANTERN_LIGHT: LightDef = { radius: 52, intensity: 0.85, colorChar: 'T', flicker: true };
+
+/** Glow shrooms (Stage 3): a slow pulse, no flicker. */
+const SHROOM_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', flicker: false };
+/** Candelabra (Stage 4) flicker like torches. */
+const CANDLE_LIGHT: LightDef = { radius: 52, intensity: 0.8, colorChar: 'T', flicker: true };
 
 function wall(
   prop: string,
@@ -135,5 +144,66 @@ export const STAGES: readonly StageDef[] = [
       floor('rubble', 'corridor', 300, 148),
     ],
     ambient: { kind: 'dust', perSecond: 6 },
+  },
+  /**
+   * Stage 3, "Toxic Slime Caverns". Same room geometry as Stages 1 and 2. The toxic barrel is the
+   * only solid prop (alcove, foot y 134, never on a seat or slot). Glow shrooms light the stage
+   * with the stage-recolored `T` character; their 2-frame pulse does not flicker (decision E2-10).
+   */
+  {
+    id: 'toxic-slime-caverns',
+    index: 3,
+    name: 'Toxic Slime Caverns',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('slimeDrape', 'alcove', 0, 16),
+      wall('pipe', 'alcove', 52, 44),
+      wall('glowShroom', 'alcove', 28, 40, SHROOM_LIGHT),
+      wall('glowShroom', 'alcove', 92, 40, SHROOM_LIGHT),
+      wall('pipe', 'alcove', 108, 72),
+      floor('toxicBarrel', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('slimePool', 'alcove', 60, 150),
+      floor('mushrooms', 'alcove', 88, 146),
+      wall('glowShroom', 'corridor', 60, 40, SHROOM_LIGHT),
+      wall('glowShroom', 'corridor', 252, 40, SHROOM_LIGHT),
+      wall('slimeDrape', 'corridor', 150, 16),
+      wall('slimeDrape', 'corridor', 330, 16),
+      wall('pipe', 'corridor', 190, 72),
+      wall('pipe', 'corridor', 120, 44),
+      floor('slimePool', 'corridor', 100, 152),
+      floor('mushrooms', 'corridor', 200, 148),
+      floor('slimePool', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'bubbles', perSecond: 7 },
+  },
+  /**
+   * Stage 4, "Ancient Catacombs". The sarcophagus is the only solid prop (alcove, foot y 134, a
+   * 12 x 5 footprint under a 16 px sprite). Candelabra flicker like torches and lanterns.
+   */
+  {
+    id: 'ancient-catacombs',
+    index: 4,
+    name: 'Ancient Catacombs',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('crackedPillar', 'alcove', 0, 16),
+      wall('skullNiche', 'alcove', 52, 60),
+      wall('candelabra', 'alcove', 28, 40, CANDLE_LIGHT),
+      wall('candelabra', 'alcove', 92, 40, CANDLE_LIGHT),
+      wall('skullNiche', 'alcove', 108, 72),
+      floor('sarcophagus', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('boneRubble', 'alcove', 60, 152),
+      floor('urn', 'alcove', 92, 148),
+      wall('candelabra', 'corridor', 60, 40, CANDLE_LIGHT),
+      wall('candelabra', 'corridor', 252, 40, CANDLE_LIGHT),
+      wall('crackedPillar', 'corridor', 150, 16),
+      wall('crackedPillar', 'corridor', 330, 16),
+      wall('skullNiche', 'corridor', 190, 72),
+      wall('skullNiche', 'corridor', 110, 60),
+      floor('boneRubble', 'corridor', 100, 152),
+      floor('urn', 'corridor', 200, 148),
+      floor('boneRubble', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'fog', perSecond: 4, dustPerSecond: 3 },
   },
 ];

@@ -1,7 +1,7 @@
 // Sprite data for the engine (the import point). Owned by the pixel-artist.
 // Template types live in spriteTypes.ts; art lives in one file per subject so batches stay small:
-// heroTemplates.ts (BASE_HERO), classTemplates.ts + classTemplatesH2.ts + classTemplatesH3.ts (merged CLASS_LAYERS here), effectTemplates.ts + effectTemplatesH2.ts + effectTemplatesH3.ts (merged EFFECT_SPRITES; palettes merged in palettes.ts), summonTemplates.ts + summonTemplatesH3.ts (SUMMON_SPRITES), campfireTemplates.ts (CAMPFIRE), stage1Templates.ts and stage2Templates.ts (one file per
-// stage), enemyTemplates.ts + enemiesStage1.ts/ratKingTemplate.ts/enemiesStage2.ts/goblinForemanTemplate.ts (E1 enemies). Format: docs/design/sprite-spec.md.
+// heroTemplates.ts (BASE_HERO), classTemplates.ts + classTemplatesH2.ts + classTemplatesH3.ts (merged CLASS_LAYERS here), effectTemplates.ts + effectTemplatesH2.ts + effectTemplatesH3.ts (merged EFFECT_SPRITES; palettes merged in palettes.ts), summonTemplates.ts + summonTemplatesH3.ts (SUMMON_SPRITES), campfireTemplates.ts (CAMPFIRE), stage1Templates.ts to stage4Templates.ts (one file per
+// stage), enemyTemplates.ts + enemiesStage1.ts/ratKingTemplate.ts/enemiesStage2.ts/goblinForemanTemplate.ts (E1 enemies), enemiesStage3.ts/oozeQueenTemplate.ts/enemiesStage4.ts/tombLichTemplate.ts (E2 enemies; boss phase palettes in palettesE2.ts). Format: docs/design/sprite-spec.md.
 
 import { CAMPFIRE } from './campfireTemplates';
 import { EFFECT_SPRITES, EFFECT_SPRITES_H1 } from './effectTemplates';
@@ -19,6 +19,8 @@ import { SUMMON_SPRITES } from './summonTemplates';
 import { BASE_HERO } from './heroTemplates';
 import { FORGOTTEN_CELLAR } from './stage1Templates';
 import { GOBLIN_MINE_SHAFTS } from './stage2Templates';
+import { TOXIC_SLIME_CAVERNS } from './stage3Templates';
+import { ANCIENT_CATACOMBS } from './stage4Templates';
 import type { HeroLayerSet, StageSprites } from './spriteTypes';
 
 export type {
@@ -62,4 +64,6 @@ export { EFFECT_SPRITES_H1, EFFECT_SPRITES_H2, EFFECT_SPRITES_H3 };
 export const STAGE_SPRITES: Readonly<Record<string, StageSprites>> = {
   'forgotten-cellar': FORGOTTEN_CELLAR,
   'goblin-mine-shafts': GOBLIN_MINE_SHAFTS,
+  'toxic-slime-caverns': TOXIC_SLIME_CAVERNS,
+  'ancient-catacombs': ANCIENT_CATACOMBS,
 };

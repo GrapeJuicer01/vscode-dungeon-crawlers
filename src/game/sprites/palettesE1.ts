@@ -21,6 +21,33 @@ export const STAGE_PALETTES: Readonly<Record<string, Palette>> = {
     g: '#7a6a84', // ambient tint, warmer than the cellar
     T: '#ffc94a', // lantern light
   },
+  // Toxic Slime Caverns (batch E2): murky teal rock, olive crust, acid-green glow, aqua slime.
+  // Rock stays darker and less saturated than the stage's enemies.
+  'toxic-slime-caverns': {
+    '1': '#0b1816', // deepest shadow
+    '2': '#1d3836', // dark rock
+    '3': '#2f5652', // mid rock
+    '4': '#4b7d73', // lit rock
+    '5': '#7b7a3a', // olive crust and old metal
+    '6': '#b4ff3c', // acid glow
+    '7': '#dcf5c6', // pale highlight
+    '8': '#3fd0a0', // aqua slime accent
+    g: '#5a8a80', // ambient tint, teal gray
+    T: '#8fe84a', // glow light
+  },
+  // Ancient Catacombs (batch E2): dusty purple stone, bone beige, cold mint candle light.
+  'ancient-catacombs': {
+    '1': '#150f1c', // deepest shadow
+    '2': '#2e2438', // dark stone
+    '3': '#4f4160', // mid stone
+    '4': '#76668a', // lit stone
+    '5': '#b8a67c', // bone beige
+    '6': '#b8fff0', // cold candle flame
+    '7': '#f2ead2', // bone white
+    '8': '#a85cf0', // violet accent
+    g: '#6a5a92', // ambient tint, dusty violet
+    T: '#8fe8d8', // candle light
+  },
 };
 
 /**

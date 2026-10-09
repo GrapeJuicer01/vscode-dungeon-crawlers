@@ -177,18 +177,29 @@ void describe('the boot gate (awaitProgress)', () => {
     assert.ok(spy.updates() > 0);
   });
 
-  void it('a stored stage above the delivered count wraps instead of failing (stageIndex 10 -> Stage 2)', () => {
-    const spy = spyCombat();
-    const rig = gameRig();
-    party(rig, 4);
-    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: 10 });
-    steps(rig, 5000);
-    const rows = spy
-      .combat()!
-      .entities()
-      .map((e) => (e as unknown as { row: EnemyRow }).row.stage);
-    assert.ok(rows.length > 0 && rows.every((s) => s === 2), rows.join());
-    assert.deepEqual(rig.errors, []);
+  void it('a stored stage above the delivered count wraps instead of failing (E2: four stages; 10 -> 2, 5 -> 1, 6 -> 2; 3 and 4 stay)', () => {
+    for (const [stored, expected] of [
+      [10, 2],
+      [5, 1],
+      [6, 2],
+      [3, 3],
+      [4, 4],
+    ] as const) {
+      const spy = spyCombat();
+      const rig = gameRig();
+      party(rig, 4);
+      rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: stored });
+      steps(rig, 5000);
+      const rows = spy
+        .combat()!
+        .entities()
+        .map((e) => (e as unknown as { row: EnemyRow }).row.stage);
+      assert.ok(
+        rows.length > 0 && rows.every((st) => st === expected),
+        `stored ${stored}: ${rows.join()}`,
+      );
+      assert.deepEqual(rig.errors, []);
+    }
   });
 });
 

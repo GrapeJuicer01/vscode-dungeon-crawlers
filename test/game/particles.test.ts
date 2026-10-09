@@ -13,6 +13,8 @@ const COLORS: ParticleColors = {
   drip: ['#d1', '#d2'],
   splash: ['#p1', '#p2'],
   mote: ['#m1', '#m2'],
+  bubble: ['#b1', '#b2', '#b3'],
+  wisp: ['#w1', '#w2', '#w3'],
 };
 
 void describe('Particles', () => {

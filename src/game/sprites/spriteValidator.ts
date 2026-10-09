@@ -69,9 +69,32 @@ const REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
     'rubble',
     'doorFrame',
   ],
+  'toxic-slime-caverns': [
+    'pipe',
+    'slimeDrape',
+    'glowShroom',
+    'toxicBarrel',
+    'slimePool',
+    'mushrooms',
+    'doorFrame',
+  ],
+  'ancient-catacombs': [
+    'skullNiche',
+    'candelabra',
+    'crackedPillar',
+    'sarcophagus',
+    'urn',
+    'boneRubble',
+    'doorFrame',
+  ],
 };
 /** Animated light props: prop name -> minimum idle frames of the flame loop. */
-const FLAME_PROPS: Readonly<Record<string, number>> = { torch: 2, lantern: 4 };
+const FLAME_PROPS: Readonly<Record<string, number>> = {
+  torch: 2,
+  lantern: 4,
+  glowShroom: 2,
+  candelabra: 4,
+};
 const ENEMY_MAX_SIZE: Readonly<Record<EnemyTier, number>> = { minion: 16, elite: 24, boss: 48 };
 const ENEMY_ANIMATIONS: Readonly<Record<string, number>> = { idle: 2, walk: 2, attack: 3 };
 const BOSS_EXTRA_ANIMATIONS: Readonly<Record<string, number>> = { telegraph: 2, intro: 2 };
@@ -562,6 +585,17 @@ export function validateEnemyArt(art: ArtSet): readonly string[] {
   for (const key of Object.keys(art.enemies)) {
     if (!rows.has(key)) {
       errors.push(`${key}: enemy template for an unknown enemy`);
+    }
+  }
+  for (const row of rows.values()) {
+    if (row.tier !== 'boss') {
+      continue;
+    }
+    const phases = Object.hasOwn(art.enemyPhasePalettes, row.id)
+      ? art.enemyPhasePalettes[row.id]
+      : undefined;
+    if (phases === undefined || phases.length === 0) {
+      errors.push(`${row.id}: boss has no phase palette`);
     }
   }
   for (const [id, list] of Object.entries(art.enemyPhasePalettes)) {

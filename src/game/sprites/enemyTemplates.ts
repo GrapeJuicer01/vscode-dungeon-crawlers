@@ -10,11 +10,16 @@
 
 import { ENEMIES_STAGE1 } from './enemiesStage1';
 import { ENEMIES_STAGE2 } from './enemiesStage2';
+import { ENEMIES_STAGE3 } from './enemiesStage3';
+import { ENEMIES_STAGE4 } from './enemiesStage4';
 import { GOBLIN_FOREMAN } from './goblinForemanTemplate';
+import { OOZE_QUEEN } from './oozeQueenTemplate';
 import type { Palette } from './palettes';
 import { BOSS_PHASE_PALETTES } from './palettesE1';
+import { BOSS_PHASE_PALETTES_E2 } from './palettesE2';
 import { RAT_KING } from './ratKingTemplate';
 import type { SpriteTemplate } from './spriteTypes';
+import { TOMB_LICH } from './tombLichTemplate';
 
 function frame(id: string, w: number, h: number): SpriteTemplate {
   const rows: string[] = [];
@@ -40,17 +45,23 @@ export const ENEMY_BAR: {
   backChar: 'P',
 };
 
-/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Filled by steps A-E1-2 to A-E1-6. */
+/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Stages 1 and 2 (E1), stages 3 and 4 (E2). */
 export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   ...ENEMIES_STAGE1,
   ...ENEMIES_STAGE2,
+  ...ENEMIES_STAGE3,
+  ...ENEMIES_STAGE4,
   'rat-king': RAT_KING,
   'goblin-foreman': GOBLIN_FOREMAN,
+  'ooze-queen': OOZE_QUEEN,
+  'tomb-lich': TOMB_LICH,
 };
 
 /**
  * Boss id -> palettes for phases 2..n (partial overrides of at most four characters, applied over
  * the master). Filled with the bosses in steps A-E1-3 and A-E1-6.
  */
-export const ENEMY_PHASE_PALETTES: Readonly<Record<string, readonly Palette[]>> =
-  BOSS_PHASE_PALETTES;
+export const ENEMY_PHASE_PALETTES: Readonly<Record<string, readonly Palette[]>> = {
+  ...BOSS_PHASE_PALETTES,
+  ...BOSS_PHASE_PALETTES_E2,
+};

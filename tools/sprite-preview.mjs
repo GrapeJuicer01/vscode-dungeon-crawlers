@@ -3,6 +3,8 @@
 // repo's esbuild. Usage:
 //   node tools/sprite-preview.mjs enemies <stage id|all> <out.png> [scale]
 //   node tools/sprite-preview.mjs stage <stage id> <out.png> [scale]
+// SPRITE_ENTRY=<path to a .ts file> previews art that is not wired into spriteTemplates.ts yet
+// (the file must export the same names: ENEMY_SPRITES, ENEMY_PHASE_PALETTES, STAGE_SPRITES, STAGE_PALETTES).
 // `enemies` draws every enemy of the stage as rows of animation frames on a floor-colored
 // background, then the same frames as black silhouettes. `stage` draws the tile sets, the props,
 // the backdrop, and a mock 320x180 room.
@@ -26,7 +28,7 @@ const root = resolve(import.meta.dirname, '..');
 const dir = mkdtempSync(join(tmpdir(), 'sprite-preview-'));
 const bundle = join(dir, 'art.mjs');
 await build({
-  entryPoints: [join(root, 'src/game/sprites/spriteTemplates.ts')],
+  entryPoints: [process.env.SPRITE_ENTRY ?? join(root, 'src/game/sprites/spriteTemplates.ts')],
   bundle: true,
   format: 'esm',
   platform: 'node',
@@ -122,16 +124,25 @@ function png(cv) {
   ]);
 }
 
-const stageIds = ['forgotten-cellar', 'goblin-mine-shafts'];
+const ENEMY_STAGE = {
+  'forgotten-cellar': ['cellar-rat', 'cave-bat', 'web-spider', 'crate-mimic', 'rat-king'],
+  'goblin-mine-shafts': [
+    'goblin-miner',
+    'goblin-scout',
+    'ore-beetle',
+    'rock-golem',
+    'goblin-foreman',
+  ],
+  'toxic-slime-caverns': ['green-slime', 'spore-shroom', 'toxic-toad', 'jelly-cube', 'ooze-queen'],
+  'ancient-catacombs': ['bone-soldier', 'wailing-ghost', 'tomb-scarab', 'crypt-mummy', 'tomb-lich'],
+};
 const palFor = (stageId, phase) => ({
   ...MASTER_PALETTE,
   ...(art.STAGE_PALETTES[stageId] ?? {}),
   ...(phase ?? {}),
 });
 const enemyStage = (id) =>
-  stageIds[0] && /^(cellar-rat|cave-bat|web-spider|crate-mimic|rat-king)$/.test(id)
-    ? stageIds[0]
-    : stageIds[1];
+  Object.keys(ENEMY_STAGE).find((k) => ENEMY_STAGE[k].includes(id)) ?? 'forgotten-cellar';
 
 if (mode === 'enemies') {
   const ids = Object.keys(art.ENEMY_SPRITES).filter(
@@ -260,6 +271,33 @@ if (mode === 'enemies') {
     floorProp('minecart', 14, 134);
     floorProp('rubble', 96, 150);
     floorProp('rubble', 250, 152);
+  } else if (stageArg === 'toxic-slime-caverns') {
+    wallProp('doorFrame', 128, 0);
+    wallProp('slimeDrape', 40, 16);
+    wallProp('slimeDrape', 214, 16);
+    wallProp('pipe', 4, 56);
+    wallProp('pipe', 20, 56);
+    wallProp('pipe', 232, 80);
+    wallProp('glowShroom', 76, 90, 0);
+    wallProp('glowShroom', 186, 90, 1);
+    wallProp('glowShroom', 290, 70, 0);
+    floorProp('toxicBarrel', 24, 134);
+    floorProp('slimePool', 96, 152);
+    floorProp('mushrooms', 70, 140);
+    floorProp('mushrooms', 250, 150);
+  } else if (stageArg === 'ancient-catacombs') {
+    wallProp('doorFrame', 128, 0);
+    wallProp('crackedPillar', 4, 8);
+    wallProp('crackedPillar', 230, 8);
+    wallProp('skullNiche', 50, 40);
+    wallProp('skullNiche', 190, 40);
+    wallProp('candelabra', 30, 56, 0);
+    wallProp('candelabra', 100, 56, 1);
+    wallProp('candelabra', 270, 56, 2);
+    floorProp('sarcophagus', 24, 134);
+    floorProp('urn', 84, 150);
+    floorProp('boneRubble', 62, 150);
+    floorProp('boneRubble', 256, 152);
   } else {
     wallProp('doorFrame', 128, 0);
     wallProp('torch', 28, 40);

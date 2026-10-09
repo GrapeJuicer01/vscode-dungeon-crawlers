@@ -334,12 +334,12 @@ void describe('docs/design/enemies-and-stages.md', () => {
 });
 
 void describe('renderEnemyTable (E1 plan note 12)', () => {
-  void it('is deterministic, says "Delivered enemies: 10 of 50.", and has one row per enemy', () => {
+  void it('is deterministic, says "Delivered enemies: 20 of 50.", and has one row per enemy', () => {
     const a = renderEnemyTable(ENEMIES, STAGES);
     assert.equal(a, renderEnemyTable(ENEMIES, STAGES));
     const lines = a.split('\n');
-    assert.equal(lines[0], 'Delivered enemies: 10 of 50.');
-    assert.equal(ENEMIES.length, 10);
+    assert.equal(lines[0], 'Delivered enemies: 20 of 50.');
+    assert.equal(ENEMIES.length, 20);
     assert.equal(
       lines.filter((l) => l.startsWith('| ')).length,
       ENEMIES.length + 1,
@@ -352,7 +352,7 @@ void describe('renderEnemyTable (E1 plan note 12)', () => {
     const rows = renderEnemyTable(ENEMIES, STAGES)
       .split('\n')
       .filter((l) => l.startsWith('| ') && !l.startsWith('| Stage'));
-    assert.equal(rows.length, 10);
+    assert.equal(rows.length, 20);
     for (const row of ENEMIES) {
       const line = rows.find((l) => l.includes(`\`${row.id}\``));
       assert.ok(line !== undefined, row.id);
@@ -400,7 +400,7 @@ void describe('main with the enemy doc (E1)', () => {
   void it('--check returns 1 for a stale count line, a changed health cell, or a missing row, and does not rewrite', () => {
     for (const edit of [
       (d: string): string =>
-        d.replace('Delivered enemies: 10 of 50.', 'Delivered enemies: 9 of 50.'),
+        d.replace(`Delivered enemies: ${ENEMIES.length} of 50.`, 'Delivered enemies: 9 of 50.'),
       (d: string): string =>
         d.replace('| Cellar Rat | minion | walk | 10 |', '| Cellar Rat | minion | walk | 11 |'),
       (d: string): string => d.replace(/\| 2\. Goblin Mine Shafts \| `rock-golem`.*\n/, ''),
@@ -417,7 +417,7 @@ void describe('main with the enemy doc (E1)', () => {
 
   void it('without --check it fixes a stale enemy table; a second run changes nothing; the class doc is untouched', () => {
     const root = scratchRoot(undefined, (d) =>
-      d.replace('Delivered enemies: 10 of 50.', 'Delivered enemies: 3 of 50.'),
+      d.replace(`Delivered enemies: ${ENEMIES.length} of 50.`, 'Delivered enemies: 3 of 50.'),
     );
     assert.equal(quietly(() => main([], root)).result, 0);
     assert.equal(readFileSync(path.join(root, ENEMIES_DOC), 'utf8'), readText(ENEMIES_DOC));

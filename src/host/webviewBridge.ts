@@ -5,7 +5,7 @@
 // Core invariant 3: the only outward capability is `revealAgentTerminal`, called at most once
 // per valid focusAgent and only for a live agent in the host's own list. Core invariant 4:
 // every entry point catches and logs; nothing is rethrown across the event boundary.
-// Logs are fixed reason strings (plus error name and message); never a payload (invariant 7).
+// Logs are fixed reason strings (plus the error name only, never its message); never a payload (invariant 7).
 import { assertNever } from '../shared/assertNever';
 import {
   createAgentListMessage,

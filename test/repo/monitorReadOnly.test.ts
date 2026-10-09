@@ -334,13 +334,41 @@ void describe('monitor: module boundaries', () => {
 });
 
 void describe('monitor: storage and persistence', () => {
-  void it('no src file touches globalState, workspaceState, globalStorageUri, storageUri, logUri, or secrets (M3 persists nothing)', () => {
+  void it('no src file touches workspaceState, globalStorageUri, storageUri, logUri, or secrets', () => {
+    assert.deepEqual(
+      filesMatching(all, /\b(workspaceState|globalStorageUri|storageUri|logUri|secrets)\b/),
+      [],
+    );
+  });
+
+  void it('globalState appears only in src/extension.ts, only as .get and .update (E1 progress store, ADR 0012)', () => {
+    assert.deepEqual(filesMatching(all, /\bglobalState\b/), ['src/extension.ts']);
+    const members = [...code('src/extension.ts').matchAll(/\bglobalState\.(\w+)/g)].map(
+      (match) => match[1],
+    );
+    assert.deepEqual(members.sort(), ['get', 'update']);
+    assert.deepEqual(filesMatching(all, /\bsetKeysForSync\b/), []);
+  });
+
+  void it('the monitor core and adapters know nothing about progress or storage (strictly read-only)', () => {
+    const monitorOnly = all.filter((file) => file.startsWith('src/monitor/'));
+    assert.ok(monitorOnly.length > 10);
     assert.deepEqual(
       filesMatching(
-        all,
-        /\b(globalState|workspaceState|globalStorageUri|storageUri|logUri|secrets)\b/,
+        monitorOnly,
+        /\b(globalState|Memento|ProgressStore|saveProgress|PROGRESS_KEY|DEFAULT_PROGRESS)\b|shared\/progress|host\/progress/,
       ),
       [],
+    );
+  });
+
+  void it('the only vscode-free store writes go through the KeyValueStore port in src/host/progressStore.ts', () => {
+    const hostFiles = all.filter((file) => file.startsWith('src/host/'));
+    assert.deepEqual(filesMatching(hostFiles, /\.update\s*\(/), ['src/host/progressStore.ts']);
+    const calls = [...code('src/host/progressStore.ts').matchAll(/(\w+(?:\.\w+)*)\.update\s*\(/g)];
+    assert.deepEqual(
+      calls.map((match) => match[1]),
+      ['deps.store'],
     );
   });
 });

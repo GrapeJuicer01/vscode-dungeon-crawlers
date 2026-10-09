@@ -1,7 +1,8 @@
 // Pixel Agents webview entry point. Sizes the canvas and keeps it integer-scaled (M1), opens the
 // host channel and sends `ready` on every document load (M2, ADR 0007), and runs the dungeon
 // engine (M4, ADR 0008): host messages go to the mirror and the engine through SceneFeed, and
-// GameHost drives the frame loop. If the engine cannot boot, the failure is reported once and the
+// GameHost drives the frame loop. E1 adds `saveProgress` (ADR 0012): the engine's numeric progress
+// callback goes through ProgressSaver, which sends nothing until the host's `progress` arrived. If the engine cannot boot, the failure is reported once and the
 // mirror keeps working (Core invariant 4). This file and canvasSurface.ts are the only webview
 // files that touch the DOM; requestAnimationFrame appears only here.
 import { Game } from '../game/Game';
@@ -12,10 +13,12 @@ import { SHIPPED_ART } from '../game/sprites/artSet';
 import { createCanvasBitmaps, createCanvasSurface } from './canvasSurface';
 import { GameHost } from './gameHost';
 import { createHostChannel } from './hostChannel';
-import type { VsCodeWebviewApi } from './hostChannel';
+import type { HostChannel, VsCodeWebviewApi } from './hostChannel';
 import { handleHostMessage } from './hostMessages';
 import { HostStateMirror } from './hostState';
+import { ProgressSaver } from './progressSaver';
 import { SceneFeed } from './sceneFeed';
+import { createSaveProgressMessage } from '../shared/protocol';
 
 /** Injected by VS Code into the webview; may be called only once per document. */
 declare function acquireVsCodeApi(): VsCodeWebviewApi;
@@ -75,6 +78,20 @@ function boot(): void {
   const ctx = canvas.getContext('2d', { alpha: false });
   // Rebuilt from the host snapshot on every load (invariant 4); only host messages change it.
   const mirror = new HostStateMirror();
+  // Assigned at the end of boot; a save before then cannot happen (the saver waits for `progress`).
+  let channel: HostChannel | null = null;
+  const saver = new ProgressSaver(
+    (progress) => {
+      const message = createSaveProgressMessage(progress);
+      if (message !== undefined) {
+        channel?.send(message);
+      }
+    },
+    {
+      set: (run, ms) => window.setTimeout(run, ms),
+      clear: (handle) => window.clearTimeout(handle as number),
+    },
+  );
   let game: Game | null = null;
   let host: GameHost | null = null;
   if (ctx !== null) {
@@ -88,6 +105,8 @@ function boot(): void {
         onError: (error) => reportError(error),
         seed: ENGINE_SEED,
         agentSource: () => mirror.agents(),
+        awaitProgress: true,
+        onProgress: (progress, urgent) => saver.submit(progress, urgent),
       });
       host = new GameHost({
         game,
@@ -117,7 +136,7 @@ function boot(): void {
       reportError(error);
     }
   };
-  const feed = new SceneFeed(mirror, game);
+  const feed = new SceneFeed(mirror, game, () => saver.markLoaded());
   const onMessage = (event: MessageEvent<unknown>): void => {
     try {
       handleHostMessage(event.data, feed);
@@ -138,6 +157,8 @@ function boot(): void {
     window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('visibilitychange', onVisibility);
     try {
+      saver.flush();
+      saver.dispose();
       host?.stop();
       game?.dispose();
     } catch (error: unknown) {
@@ -153,7 +174,7 @@ function boot(): void {
 
   // Sent on every boot, never deferred or skipped: it is also the host-observable signal that
   // this script ran (M2 plan section 1.2).
-  const channel = createHostChannel(acquireVsCodeApi());
+  channel = createHostChannel(acquireVsCodeApi());
   channel.send({ type: 'ready' });
 }
 

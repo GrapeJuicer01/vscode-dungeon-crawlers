@@ -11,9 +11,11 @@ import {
   createAgentListMessage,
   createAgentStateMessage,
   createConfigMessage,
+  createProgressMessage,
   parseWebviewMessage,
 } from '../shared/protocol';
 import type { AgentInfo, ConfigSnapshot, HostToWebviewMessage } from '../shared/protocol';
+import type { Progress } from '../shared/progress';
 
 /** Narrow view of vscode.Webview. vscode's Thenable<boolean> is structurally a PromiseLike<boolean>. */
 export interface WebviewPort {
@@ -32,15 +34,22 @@ export type RevealAgentTerminal = (agentId: string) => void;
 export interface WebviewBridgeDeps {
   readonly getAgents: () => readonly AgentInfo[];
   readonly getConfig: () => ConfigSnapshot;
+  /** Defaults used for the `ready` answer when getConfig throws; never throws. */
+  readonly getFallbackConfig: () => ConfigSnapshot;
   /** null until M3 wires TerminalSource; focusAgent is then dropped. */
   readonly revealAgentTerminal: RevealAgentTerminal | null;
+  /** The stored progress (E1, ADR 0012); the host store caches its first load. */
+  readonly getProgress: () => Progress;
+  /** Receives a validated `saveProgress` (the store applies the monotonic rule and coalescing). */
+  readonly saveProgress: (progress: Progress) => void;
   readonly logger: BridgeLogger;
 }
 
 export type BridgeState = 'detached' | 'loading' | 'ready';
 
+/** Name only: messages from dependencies may carry file paths (transcript privacy, invariant 7). */
 function describeError(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : 'non-error thrown';
+  return error instanceof Error ? error.name : 'non-error thrown';
 }
 
 export class WebviewBridge {
@@ -90,11 +99,16 @@ export class WebviewBridge {
         case 'ready':
           // Every ready is answered (idempotent; covers "Developer: Reload Webviews").
           this.#state = 'ready';
-          this.#post(createConfigMessage(this.#deps.getConfig()));
+          this.#postReadyConfig();
           this.#post(createAgentListMessage(this.#deps.getAgents()));
+          this.#postProgress();
           return;
         case 'focusAgent':
           this.#focusAgent(message.agentId);
+          return;
+        case 'saveProgress':
+          // Reaches only the extension's own storage; names no agent, terminal, or command.
+          this.#deps.saveProgress(message.progress);
           return;
         default:
           assertNever(message);
@@ -113,6 +127,53 @@ export class WebviewBridge {
       const message = createAgentStateMessage(agent);
       if (message === undefined) {
         this.#deps.logger.error('refused to post agent: invalid fields');
+        return;
+      }
+      this.#post(message);
+    } catch (error: unknown) {
+      this.#logError(error);
+    }
+  }
+
+  /**
+   * First answer to `ready`. A throwing getConfig must not suppress the agent list: fall back to
+   * the optional fallback snapshot (defaults); without one the error propagates to handleMessage.
+   */
+  #postReadyConfig(): void {
+    try {
+      this.#post(createConfigMessage(this.#deps.getConfig()));
+    } catch (error: unknown) {
+      this.#logError(error);
+      // Its own guard: a failing fallback must never suppress the agentList and progress answers.
+      try {
+        this.#post(createConfigMessage(this.#deps.getFallbackConfig()));
+      } catch (fallbackError: unknown) {
+        this.#logError(fallbackError);
+      }
+    }
+  }
+
+  /** Re-posts the config snapshot after a setting change. Dropped unless state === 'ready'. */
+  postConfig(): void {
+    try {
+      if (this.#state !== 'ready') {
+        return;
+      }
+      this.#post(createConfigMessage(this.#deps.getConfig()));
+    } catch (error: unknown) {
+      this.#logError(error);
+    }
+  }
+
+  /**
+   * The third answer to `ready`. Its own try/catch, so a failing store still leaves `config` and
+   * `agentList` posted (the webview then plays on defaults and never saves: fail closed).
+   */
+  #postProgress(): void {
+    try {
+      const message = createProgressMessage(this.#deps.getProgress());
+      if (message === undefined) {
+        this.#deps.logger.error('refused to post progress: invalid fields');
         return;
       }
       this.#post(message);

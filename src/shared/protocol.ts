@@ -3,15 +3,18 @@
 // This file is two allow-lists at once:
 //   - the privacy allow-list (Core invariant 7): AgentInfo carries exactly id, name, state,
 //     toolName, and timestamp, and nothing else ever crosses the wire about a session;
-//   - the complete list of webview-to-host messages (Core invariant 3): `ready` and `focusAgent`
-//     (reveal only). No message may stop, write to, signal, or send input to a session.
+//   - the complete list of webview-to-host messages (Core invariant 3): `ready`, `focusAgent`
+//     (reveal only), and `saveProgress` (five stage counters into the extension's own storage,
+//     ADR 0012). No message may stop, write to, signal, or send input to a session.
 // Any change here needs an architect plan and a matching update to
 // docs/architecture/host-webview-protocol.md in the same change.
 //
 // Validators and creators are total: they never throw and never mutate or return their input.
-// Imports nothing (src/shared/ boundary, coding-standards.md section 3).
+// Imports only ./progress (src/shared/ boundary, coding-standards.md section 3).
+import { isProgress, toProgress } from './progress';
+import type { Progress } from './progress';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export const AGENT_STATES = ['spawned', 'working', 'idle', 'despawned'] as const;
 export type AgentState = (typeof AGENT_STATES)[number];
@@ -41,9 +44,20 @@ export const AGENT_ID_PATTERN: RegExp = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 /** 1..128 characters; fits `Bash`, `Read`, `mcp__server__tool`. No spaces, so free text cannot ride in it. */
 export const TOOL_NAME_PATTERN: RegExp = /^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,127}$/;
 
-/** Webview-relevant configuration. M2 carries only the protocol version; M7 and M8 add fields. */
+export const MIN_KILLS_PER_STAGE = 5;
+export const MAX_KILLS_PER_STAGE = 500;
+export const MIN_MAX_ENEMIES = 1;
+export const MAX_MAX_ENEMIES = 12;
+
+/** Webview-relevant configuration. E1 adds the three game settings; M7 and M8 add more. */
 export interface ConfigSnapshot {
   readonly protocolVersion: typeof PROTOCOL_VERSION;
+  /** `pixelAgents.enemies`: false = the party marches in an empty corridor. */
+  readonly enemiesEnabled: boolean;
+  /** `pixelAgents.killsPerStage`: MIN_KILLS_PER_STAGE..MAX_KILLS_PER_STAGE. */
+  readonly killsPerStage: number;
+  /** `pixelAgents.maxEnemies`: MIN_MAX_ENEMIES..MAX_MAX_ENEMIES. */
+  readonly maxEnemies: number;
 }
 
 // ---- Host to webview ----
@@ -63,7 +77,14 @@ export interface AgentStateMessage {
   readonly agent: AgentInfo;
 }
 
-export type HostToWebviewMessage = ConfigMessage | AgentListMessage | AgentStateMessage;
+/** The stored progress, sent after `config` and `agentList` on every `ready` (ADR 0012). */
+export interface ProgressMessage {
+  readonly type: 'progress';
+  readonly progress: Progress;
+}
+
+export type HostToWebviewMessage =
+  ConfigMessage | AgentListMessage | AgentStateMessage | ProgressMessage;
 
 // ---- Webview to host ----
 
@@ -77,10 +98,19 @@ export interface FocusAgentMessage {
   readonly agentId: string;
 }
 
-export type WebviewToHostMessage = ReadyMessage | FocusAgentMessage;
+/**
+ * Five stage counters for the extension's own globalState (ADR 0012). Names no agent, terminal,
+ * or command; the host validates and ignores a save that would lower totalKills.
+ */
+export interface SaveProgressMessage {
+  readonly type: 'saveProgress';
+  readonly progress: Progress;
+}
 
-export const HOST_TO_WEBVIEW_TYPES = ['config', 'agentList', 'agentState'] as const;
-export const WEBVIEW_TO_HOST_TYPES = ['ready', 'focusAgent'] as const;
+export type WebviewToHostMessage = ReadyMessage | FocusAgentMessage | SaveProgressMessage;
+
+export const HOST_TO_WEBVIEW_TYPES = ['config', 'agentList', 'agentState', 'progress'] as const;
+export const WEBVIEW_TO_HOST_TYPES = ['ready', 'focusAgent', 'saveProgress'] as const;
 
 // ---- Compile-time proofs (exported so noUnusedLocals does not flag them) ----
 
@@ -101,7 +131,13 @@ export type AgentInfoKeysComplete = AssertTrue<
 const READY_KEYS = ['type'] as const;
 const FOCUS_AGENT_KEYS = ['type', 'agentId'] as const;
 const CONFIG_MESSAGE_KEYS = ['type', 'config'] as const;
-const CONFIG_SNAPSHOT_KEYS = ['protocolVersion'] as const;
+const CONFIG_SNAPSHOT_KEYS = [
+  'protocolVersion',
+  'enemiesEnabled',
+  'killsPerStage',
+  'maxEnemies',
+] as const;
+const PROGRESS_MESSAGE_KEYS = ['type', 'progress'] as const;
 const AGENT_LIST_KEYS = ['type', 'agents'] as const;
 const AGENT_STATE_KEYS = ['type', 'agent'] as const;
 
@@ -226,6 +262,13 @@ export function parseWebviewMessage(raw: unknown): WebviewToHostMessage | undefi
         const agentId = raw['agentId'];
         return isAgentId(agentId) ? { type: 'focusAgent', agentId } : undefined;
       }
+      case 'saveProgress': {
+        if (!hasExactKeys(raw, PROGRESS_MESSAGE_KEYS)) {
+          return undefined;
+        }
+        const progress = copyProgress(raw['progress']);
+        return progress === undefined ? undefined : { type: 'saveProgress', progress };
+      }
       default:
         return undefined;
     }
@@ -257,6 +300,13 @@ export function parseHostMessage(raw: unknown): HostToWebviewMessage | undefined
         const agent = toAgentInfoFromUnknown(raw['agent']);
         return agent === undefined ? undefined : { type: 'agentState', agent };
       }
+      case 'progress': {
+        if (!hasExactKeys(raw, PROGRESS_MESSAGE_KEYS)) {
+          return undefined;
+        }
+        const progress = copyProgress(raw['progress']);
+        return progress === undefined ? undefined : { type: 'progress', progress };
+      }
       default:
         return undefined;
     }
@@ -265,15 +315,36 @@ export function parseHostMessage(raw: unknown): HostToWebviewMessage | undefined
   }
 }
 
+/** Validates, then copies into a new frozen-shape object (never returns the input). */
+function copyProgress(value: unknown): Progress | undefined {
+  return isProgress(value) ? toProgress(value) : undefined;
+}
+
+function isIntegerInRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
+}
+
 function parseConfigMessage(raw: Record<string, unknown>): ConfigMessage | undefined {
   const config = raw['config'];
   if (!isPlainObject(config) || !hasExactKeys(config, CONFIG_SNAPSHOT_KEYS)) {
     return undefined;
   }
   // A version mismatch (only possible mid-`watch`) makes the message invalid.
-  return config['protocolVersion'] === PROTOCOL_VERSION
-    ? { type: 'config', config: { protocolVersion: PROTOCOL_VERSION } }
-    : undefined;
+  const enemiesEnabled = config['enemiesEnabled'];
+  const killsPerStage = config['killsPerStage'];
+  const maxEnemies = config['maxEnemies'];
+  if (
+    config['protocolVersion'] !== PROTOCOL_VERSION ||
+    typeof enemiesEnabled !== 'boolean' ||
+    !isIntegerInRange(killsPerStage, MIN_KILLS_PER_STAGE, MAX_KILLS_PER_STAGE) ||
+    !isIntegerInRange(maxEnemies, MIN_MAX_ENEMIES, MAX_MAX_ENEMIES)
+  ) {
+    return undefined;
+  }
+  return {
+    type: 'config',
+    config: { protocolVersion: PROTOCOL_VERSION, enemiesEnabled, killsPerStage, maxEnemies },
+  };
 }
 
 function parseAgentListMessage(raw: Record<string, unknown>): AgentListMessage | undefined {
@@ -323,7 +394,27 @@ export function toAgentInfo(source: AgentInfo): AgentInfo | undefined {
 }
 
 export function createConfigMessage(config: ConfigSnapshot): ConfigMessage {
-  return { type: 'config', config: { protocolVersion: config.protocolVersion } };
+  return {
+    type: 'config',
+    config: {
+      protocolVersion: config.protocolVersion,
+      enemiesEnabled: config.enemiesEnabled,
+      killsPerStage: config.killsPerStage,
+      maxEnemies: config.maxEnemies,
+    },
+  };
+}
+
+/** Undefined when the progress is not valid; the host then posts nothing for it. */
+export function createProgressMessage(progress: Progress): ProgressMessage | undefined {
+  const copy = toProgress(progress);
+  return copy === undefined ? undefined : { type: 'progress', progress: copy };
+}
+
+/** Webview side: the only way the webview builds a save. Undefined when invalid. */
+export function createSaveProgressMessage(progress: Progress): SaveProgressMessage | undefined {
+  const copy = toProgress(progress);
+  return copy === undefined ? undefined : { type: 'saveProgress', progress: copy };
 }
 
 /** Skips invalid entries, keeps the first of duplicate ids, caps at MAX_AGENTS. */

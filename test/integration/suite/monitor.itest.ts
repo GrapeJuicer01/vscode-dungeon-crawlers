@@ -181,13 +181,27 @@ describe('monitor: configuration reached the host (plan note 16 launcher)', () =
     assert.ok(!transcriptRoot().startsWith(realClaude), 'the root is not under the real ~/.claude');
   });
 
-  it('attaching the fake view: ready is answered with config then an empty agentList (simulator off)', async () => {
+  it('attaching the fake view: ready is answered with config, an empty agentList (simulator off), then the default progress (E1)', async () => {
     await attachFakeView();
     assert.deepEqual(
       posts.map((post) => structuredClone(post)),
       [
-        { type: 'config', config: { protocolVersion: 1 } },
+        {
+          type: 'config',
+          config: { protocolVersion: 2, enemiesEnabled: true, killsPerStage: 30, maxEnemies: 6 },
+        },
         { type: 'agentList', agents: [] },
+        {
+          type: 'progress',
+          progress: {
+            schemaVersion: 1,
+            stageIndex: 1,
+            killsInStage: 0,
+            totalKills: 0,
+            bossesDefeated: 0,
+            cycle: 0,
+          },
+        },
       ],
     );
   });

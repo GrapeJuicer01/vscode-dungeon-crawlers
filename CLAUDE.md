@@ -38,32 +38,42 @@ Only the human may edit this section. No agent adds, removes, or weakens an inva
 
 ```text
 src/extension.ts            activation, view provider (thin vscode glue); output channel, bridge wiring (M2);
-                            monitor adapters, settings and workspace listeners, reveal wiring (M3); commands, status bar (M7)
-src/host/                   (M2) vscode-free host logic, imports only src/shared/: webviewBridge.ts (M2),
-                            progress store (E1)
+                            monitor adapters, settings and workspace listeners, reveal wiring (M3); progress store over
+                            globalState and settings re-post (E1); commands, status bar (M7)
+src/host/                   (M2) vscode-free host logic, imports only src/shared/: webviewBridge.ts (M2);
+                            progressStore.ts (globalState store behind a KeyValueStore port), progressMigrations.ts
+                            (forward-only migrations), gameConfig.ts (pixelAgents.* game settings reader) (E1)
 src/monitor/                (M3) vscode- and Node-free core, imports only src/shared/: AgentMonitor, AgentRegistry,
                             sessionMachine, Transcript/Terminal/Simulator sources, ports, config, paths, logging
 src/monitor/adapters/       (M3) the only monitor files touching Node or vscode: nodeFileSystem (read-only fs),
                             nodeRuntime (clock, timers, path), vscodeTerminals (terminal events, show() only)
 src/shared/                 (M2) both bundles, imports nothing outside src/shared/: protocol.ts (typed
-                            host <-> webview messages, validators, creators), assertNever.ts
+                            host <-> webview messages, validators, creators), assertNever.ts; progress.ts (E1,
+                            Progress schema v1 and validator, numeric only)
 src/webview/                index.html.ts (host-side HTML + CSP builder), main.ts (boot; message pump M2; builds the
                             engine M4); hostChannel.ts, hostMessages.ts, hostState.ts (M2); sceneFeed.ts, gameHost.ts
-                            (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); ui.ts (M7), audio.ts (M8)
+                            (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); progressSaver.ts (E1,
+                            DOM-free throttle for saveProgress); ui.ts (M7), audio.ts (M8)
 src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, layout, rng, Game, Roster, Engagement,
                             Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Ambience, Stage; Effects (H1, cosmetic
-                            effect pool); Summons.ts (H2, SummonPool: leased cosmetic allies, ADR 0011); Combat (E1)
+                            effect pool); Summons.ts (H2, SummonPool: leased cosmetic allies, ADR 0011); E1 (ADR 0013):
+                            enemy side Combat, Progression, StageDirector, Drops, and the two buffers Fighters
+                            (FighterBuffer, numbers in) and HitReactions (cosmetic board out)
 src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero + createHero (H1, data-driven: the
                             12 classes are rows, subclass files only where code is needed), Summon.ts (H2, not a
-                            hero, never in the roster), Enemy, Boss (E1)
+                            hero, never in the roster), Enemy, Boss (E1, enemy side: only enemies have health)
 src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1),
-                            summons.ts (H2, SUMMON_IDS); enemies, drops (E1); achievements (M7)
+                            summons.ts (H2, SUMMON_IDS); enemies.ts (compact table, scaling, validateEnemies),
+                            drops.ts (E1, enemy side); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,
                             campfireTemplates, stage1Templates, classTemplates (H1, CLASS_LAYERS), effectTemplates
                             (H1, EFFECT_SPRITES), classTemplatesH2, effectTemplatesH2, summon templates (H2,
                             SUMMON_SPRITES), palettesH2/H3, classTemplatesH3, effectTemplatesH3, summonTemplatesH3
-                            (H3: Druid, Monk, Artificer, Berserker; beast and turret); engine (developer):
+                            (H3: Druid, Monk, Artificer, Berserker; beast and turret); E1: palettesE1 (stage
+                            palettes, boss phase palettes), dropTemplates, enemyTemplates (bar frames, ENEMY_SPRITES
+                            aggregator), enemyBuilder (authoring helpers), enemiesStage1, enemiesStage2,
+                            ratKingTemplate, goblinForemanTemplate, stage2Templates; engine (developer):
                             spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
 scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
                             the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
@@ -74,8 +84,9 @@ test/                       node:test suites (*.test.ts) + run.mjs (esbuild-comp
                             fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3)
 test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
                             --disable-extensions); support/ in-host harness and providerSpy
-tools/                      (optional, none yet) dev-only sprite preview (never shipped)
-docs/                       architecture/ (incl. adr/, plans/) design/ engineering/ + index, glossary; development/ (M9)
+tools/                      sprite-preview.mjs (dev-only sprite preview, never shipped)
+docs/                       architecture/ (incl. adr/, plans/) design/ (incl. classes.md and enemies-and-stages.md,
+                            whose tables are generated by docs:tables) engineering/ + index, glossary; development/ (M9)
 .claude/agents/             architect, developer, tester, reviewer, pixel-artist
 .github/                    workflows (ci, release), issue templates, PR template, CODEOWNERS
 .vscode/                    launch.json (F5), tasks.json, extensions.json, settings.json
@@ -101,7 +112,7 @@ dist/, out/                 build and test output (git-ignored; only dist/*.js s
 | Agent | Writes | Never writes |
 |---|---|---|
 | architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
-| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
 | developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
 | tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
 | reviewer | nothing (read-only) | everything |

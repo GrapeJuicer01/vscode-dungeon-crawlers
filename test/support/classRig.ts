@@ -13,6 +13,11 @@ import {
   SUMMON_CAPACITY,
 } from '../../src/game/data/tuning';
 import { EffectPool } from '../../src/game/Effects';
+import { HitReactions } from '../../src/game/HitReactions';
+import { Camera } from '../../src/game/Camera';
+import { MAX_AGENTS } from '../../src/shared/protocol';
+import type { DrawContext } from '../../src/game/entities/Entity';
+import type { Surface } from '../../src/game/ports';
 import { Campfire } from '../../src/game/entities/Campfire';
 import type { World } from '../../src/game/entities/Entity';
 import type { Engagement } from '../../src/game/Engagement';
@@ -59,6 +64,8 @@ export interface ClassWorld {
   readonly effects: EffectPool;
   readonly particles: Particles;
   readonly summons: SummonPool;
+  /** The cosmetic reaction board Hero.draw reads (E1); empty unless a test flashes a slot. */
+  readonly reactions: HitReactions;
   /** Every EffectPool.spawn call on this world, in order. */
   readonly spawns: SpawnRecord[];
 }
@@ -109,7 +116,25 @@ export function makeWorld(art: ArtSet = SHIPPED_ART, seed: number = ENGINE_SEED)
     rng,
     cache,
   };
-  return { world, bitmaps, engagement, effects, particles, summons, spawns };
+  return {
+    world,
+    bitmaps,
+    engagement,
+    effects,
+    particles,
+    summons,
+    reactions: new HitReactions(MAX_AGENTS),
+    spawns,
+  };
+}
+
+/** The context Renderer hands every entity's draw (E1 added the reaction board). */
+export function drawContext(
+  surface: Surface,
+  w: ClassWorld,
+  camera: Camera = new Camera(),
+): DrawContext {
+  return { surface, camera, world: w.world, reactions: w.reactions };
 }
 
 /** One 60 Hz step of the pieces a hero test needs besides the hero itself. */

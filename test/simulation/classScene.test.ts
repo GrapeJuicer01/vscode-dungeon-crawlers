@@ -29,7 +29,7 @@ function connect(count: number) {
   });
   const game = gameRig();
   const mirror = new HostStateMirror();
-  const feed = new SceneFeed(mirror, game.game);
+  const feed = new SceneFeed(mirror, game.game, () => undefined);
   let delivered = 0;
   const deliver = (): void => {
     while (delivered < host.posts.length) {

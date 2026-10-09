@@ -1,9 +1,13 @@
 // Structural checks for the engine (M4 plan test note 10; Core invariants 1 to 4):
 // the hero carries no health, mana, death, or retreat vocabulary and no gauge; lifecycle has one
 // writer; the engine is DOM-free and deterministic; the webview glue never talks to the host.
+// E1 (ADR 0013): the vocabulary ban runs over every file that is not on the enemy side (a literal
+// list in test/support/sides.ts; a new file is hero side by default), and the enemy side keeps its
+// own, smaller ban.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { listFiles } from '../support/repo';
+import { ENEMY_SIDE, ENEMY_SIDE_BANNED, HERO_SIDE_BANNED } from '../support/sides';
 import { blockAt, code, filesMatching, importSpecifiers } from '../support/source';
 import path from 'node:path';
 
@@ -32,14 +36,38 @@ void describe('hero structure (invariant 1)', () => {
     }
   });
 
-  void it('no hero, roster, or engine code names hp, health, mana, dead, downed, retreat, damage, or gauge', () => {
-    const banned = /\b(hp|health|mana|dead|downed|retreat|damage|gauge|hurt|dying)\b/i;
-    const offenders = gameFiles.filter((f) => f !== VALIDATOR).filter((f) => banned.test(code(f)));
+  void it('no hero, roster, or engine code names hp, health, mana, dead, downed, retreat, damage, or gauge (every file except the eight enemy-side files and the validator)', () => {
+    const offenders = gameFiles
+      .filter((f) => f !== VALIDATOR && !ENEMY_SIDE.includes(f))
+      .filter((f) => HERO_SIDE_BANNED.test(code(f)));
     assert.deepEqual(offenders, []);
   });
 
+  void it('the enemy side is exactly eight files, all of which exist', () => {
+    assert.equal(ENEMY_SIDE.length, 8);
+    assert.equal(new Set(ENEMY_SIDE).size, 8);
+    for (const f of ENEMY_SIDE) {
+      assert.ok(gameFiles.includes(f), f);
+    }
+  });
+
+  void it('the enemy side may say health but never mana, dead, downed, retreat, hurt, dying, gauge, heal, regen, restore, revive, or resurrect', () => {
+    for (const f of ENEMY_SIDE) {
+      assert.doesNotMatch(code(f), ENEMY_SIDE_BANNED, f);
+    }
+    // And it really is the only place the health vocabulary lives.
+    const withHealth = gameFiles
+      .filter((f) => f !== VALIDATOR)
+      .filter((f) => /\b(hp|health|damage)\b/i.test(code(f)));
+    assert.ok(
+      withHealth.every((f) => ENEMY_SIDE.includes(f)),
+      withHealth.join(),
+    );
+    assert.ok(withHealth.includes('src/game/entities/Enemy.ts'));
+  });
+
   void it('the hero-named files also have no health-bar vocabulary (bar, meter, healthbar)', () => {
-    for (const f of heroFiles) {
+    for (const f of heroFiles.filter((file) => !ENEMY_SIDE.includes(file))) {
       assert.doesNotMatch(code(f), /\b(healthbar|hpbar|manabar|meter|progressbar)\b/i, f);
     }
   });
@@ -47,8 +75,16 @@ void describe('hero structure (invariant 1)', () => {
   void it('the validator uses the banned words only to reject animation names', () => {
     const src = code(VALIDATOR);
     assert.match(src, /FORBIDDEN_HERO_ANIMATION\s*=\s*\/hurt\|downed\|death\|dead\|die\|dying\/i/);
+    assert.match(
+      src,
+      /FORBIDDEN_ENEMY_ANIMATION\s*=\s*\/hit\|death\|dead\|die\|dying\|hurt\|downed\/i/,
+    );
     const uses = src.split('\n').filter((l) => /\b(hurt|downed|death|dead|dying)\b/.test(l));
-    assert.equal(uses.length, 1, uses.join('\n'));
+    assert.equal(uses.length, 2, uses.join('\n'));
+    assert.ok(
+      uses.every((l) => /FORBIDDEN_(HERO|ENEMY)_ANIMATION\s*=/.test(l)),
+      uses.join('\n'),
+    );
   });
 
   void it('Hero and Campfire draw only bitmaps: no fillRect, strokeRect, arc, or text', () => {
@@ -223,7 +259,11 @@ void describe('engine purity (invariants 3, 4; ADR 0008)', () => {
 
 void describe('webview glue (invariants 3, 4)', () => {
   void it('sceneFeed.ts and gameHost.ts are DOM-free and never touch the host channel', () => {
-    for (const f of ['src/webview/sceneFeed.ts', 'src/webview/gameHost.ts']) {
+    for (const f of [
+      'src/webview/sceneFeed.ts',
+      'src/webview/gameHost.ts',
+      'src/webview/progressSaver.ts',
+    ]) {
       const src = code(f);
       assert.doesNotMatch(
         src,
@@ -234,12 +274,31 @@ void describe('webview glue (invariants 3, 4)', () => {
     }
   });
 
-  void it('channel.send is called only in main.ts and only with ready', () => {
+  void it('channel.send is called only in main.ts: once with ready, once with a message built by createSaveProgressMessage (E1)', () => {
     const sends = listFiles('src/webview')
       .filter((f) => f.endsWith('.ts'))
       .flatMap((f) => [...code(f).matchAll(/\.send\s*\(([^)]*)\)/g)].map((m) => `${f}: ${m[1]}`));
-    assert.equal(sends.length, 1, sends.join('\n'));
-    assert.match(sends[0] ?? '', /^src\/webview\/main\.ts: \{ type: 'ready' \}$/);
+    assert.equal(sends.length, 2, sends.join('\n'));
+    // Source order: the saver closure (defined first in main.ts) and then the boot-time ready.
+    assert.deepEqual(
+      [...sends].sort(),
+      ['src/webview/main.ts: message', "src/webview/main.ts: { type: 'ready' }"].sort(),
+    );
+    const main = code('src/webview/main.ts');
+    // The second send's argument can only come from the validating creator, inside the saver closure.
+    assert.match(
+      main,
+      /new ProgressSaver\(\s*\(progress\)\s*=>\s*\{\s*const message = createSaveProgressMessage\(progress\);\s*if \(message !== undefined\) \{\s*channel\?\.send\(message\);/,
+    );
+    assert.equal((main.match(/createSaveProgressMessage\(/g) ?? []).length, 1);
+    // The literal 'saveProgress' is never written by hand in the webview.
+    for (const f of listFiles('src/webview').filter((x) => x.endsWith('.ts'))) {
+      assert.doesNotMatch(code(f), /type:\s*'saveProgress'/, f);
+    }
+    // The saver and the feed never see the channel.
+    for (const f of ['src/webview/progressSaver.ts', 'src/webview/sceneFeed.ts']) {
+      assert.doesNotMatch(code(f), /\bHostChannel\b|hostChannel|\.send\s*\(|\bchannel\b/, f);
+    }
     assert.deepEqual(
       filesMatching(gameFiles, /\.send\s*\(|\bHostChannel\b|\bcreateHostChannel\b/),
       [],

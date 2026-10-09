@@ -1,6 +1,7 @@
-// Generated docs (H1 plan test note 11, gate G2): docs/design/classes.md holds the class table
-// between markers, the table equals what the generator produces now, --check detects a stale
-// file, and the generator is pure data in, one docs file out.
+// Generated docs (H1 plan test note 11, E1 plan test note 12, gate G2): docs/design/classes.md holds
+// the class table and docs/design/enemies-and-stages.md holds the enemy table, each between
+// markers; each table equals what the generator produces now, --check detects a stale file, and
+// the generator is pure data in, two docs files out.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,13 +10,21 @@ import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { CLASSES } from '../../src/game/data/classes';
 import type { ClassDef } from '../../src/game/data/classes';
+import { ENEMIES, healthOf } from '../../src/game/data/enemies';
+import type { EnemyRow } from '../../src/game/data/enemies';
+import { STAGES } from '../../src/game/data/stages';
 import {
   BEGIN_MARKER,
   CLASSES_DOC,
   END_MARKER,
+  ENEMIES_DOC,
+  ENEMY_BEGIN_MARKER,
+  ENEMY_END_MARKER,
   applyClassTable,
+  applyEnemyTable,
   main,
   renderClassTable,
+  renderEnemyTable,
 } from '../../scripts/generate-doc-tables';
 import { REPO_ROOT, readJson, readText, repoPath } from '../support/repo';
 import { code, importSpecifiers } from '../support/source';
@@ -29,12 +38,19 @@ afterEach(() => {
   }
 });
 
-/** A scratch repo root holding only docs/design/classes.md (a copy of the real one). */
-function scratchRoot(transform: (doc: string) => string = (d) => d): string {
+/**
+ * A scratch repo root holding only the two generated docs (copies of the real ones); `transform`
+ * edits classes.md and `transformEnemies` edits enemies-and-stages.md.
+ */
+function scratchRoot(
+  transform: (doc: string) => string = (d) => d,
+  transformEnemies: (doc: string) => string = (d) => d,
+): string {
   const root = mkdtempSync(path.join(tmpdir(), 'pixel-agents-docs-'));
   temps.push(root);
   mkdirSync(path.join(root, 'docs', 'design'), { recursive: true });
   writeFileSync(path.join(root, CLASSES_DOC), transform(readText(CLASSES_DOC)));
+  writeFileSync(path.join(root, ENEMIES_DOC), transformEnemies(readText(ENEMIES_DOC)));
   return root;
 }
 
@@ -212,7 +228,7 @@ void describe('main (the generator entry point)', () => {
     assert.equal(readFileSync(path.join(root, CLASSES_DOC), 'utf8'), fixed);
   });
 
-  void it('writes only docs/design/classes.md', () => {
+  void it('writes only the two generated docs', () => {
     const root = scratchRoot((d) => d.replace('| Mage |', '| Mage (old) |'));
     writeFileSync(path.join(root, 'docs', 'other.md'), 'untouched');
     quietly(() => main([], root));
@@ -221,7 +237,11 @@ void describe('main (the generator entry point)', () => {
       .filter((e) => e.isFile())
       .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
       .sort();
-    assert.deepEqual(files, ['docs/design/classes.md', 'docs/other.md']);
+    assert.deepEqual(files, [
+      'docs/design/classes.md',
+      'docs/design/enemies-and-stages.md',
+      'docs/other.md',
+    ]);
   });
 
   void it('returns 2 with a fixed message for a missing file or missing markers', () => {
@@ -230,6 +250,9 @@ void describe('main (the generator entry point)', () => {
     const missing = quietly(() => main(['--check'], empty));
     assert.equal(missing.result, 2);
     assert.match(missing.stderr, /does not exist/);
+    const onlyClasses = scratchRoot();
+    rmSync(path.join(onlyClasses, ENEMIES_DOC));
+    assert.equal(quietly(() => main(['--check'], onlyClasses)).result, 2, 'enemy doc missing');
     const noMarkers = scratchRoot(() => '# classes\n\nno markers here\n');
     const broken = quietly(() => main([], noMarkers));
     assert.equal(broken.result, 2);
@@ -249,12 +272,14 @@ void describe('the generator source', () => {
     assert.deepEqual([...new Set(importSpecifiers(src))].sort(), [
       '../src/game/data/classMap',
       '../src/game/data/classes',
+      '../src/game/data/enemies',
+      '../src/game/data/stages',
       'node:fs',
       'node:path',
     ]);
   });
 
-  void it('has no network, process spawn, or eval, and one single write to the classes file', () => {
+  void it('has no network, process spawn, or eval, and one single write, to the file being regenerated', () => {
     assert.doesNotMatch(
       src,
       /\b(fetch|XMLHttpRequest|WebSocket|child_process|spawn|exec|eval|http|https|net)\b/,
@@ -262,7 +287,12 @@ void describe('the generator source', () => {
     assert.doesNotMatch(src, /\bnew\s+Function\b/);
     assert.equal(count(src, 'writeFileSync('), 1);
     assert.match(src, /writeFileSync\(file,/);
-    assert.match(src, /const file = path\.join\(root, CLASSES_DOC\)/);
+    assert.match(src, /const file = path\.join\(root, target\.doc\)/);
+    // The only two targets are the class doc and the enemy doc.
+    assert.deepEqual(
+      [...src.matchAll(/\bdoc:\s*([A-Z_]+)\b/g)].map((m) => m[1]),
+      ['CLASSES_DOC', 'ENEMIES_DOC'],
+    );
   });
 
   void it('the class data files it imports are pure (no imports of art, engine, DOM, or node)', () => {
@@ -279,6 +309,132 @@ void describe('the generator source', () => {
   });
 });
 
+void describe('docs/design/enemies-and-stages.md', () => {
+  const doc = readText(ENEMIES_DOC);
+
+  void it('contains the enemy markers exactly once each, in order', () => {
+    assert.equal(count(doc, ENEMY_BEGIN_MARKER), 1);
+    assert.equal(count(doc, ENEMY_END_MARKER), 1);
+    assert.ok(doc.indexOf(ENEMY_BEGIN_MARKER) < doc.indexOf(ENEMY_END_MARKER));
+    assert.equal(ENEMY_BEGIN_MARKER, '<!-- BEGIN GENERATED: enemies -->');
+    assert.equal(ENEMY_END_MARKER, '<!-- END GENERATED: enemies -->');
+  });
+
+  void it('the generated region equals what the generator produces now', () => {
+    const begin = doc.indexOf(ENEMY_BEGIN_MARKER) + ENEMY_BEGIN_MARKER.length;
+    const region = doc.slice(begin, doc.indexOf(ENEMY_END_MARKER));
+    assert.equal(region, `\n${renderEnemyTable(ENEMIES, STAGES)}\n`);
+    assert.equal(applyEnemyTable(doc, renderEnemyTable(ENEMIES, STAGES)), doc);
+  });
+
+  void it('starts with a purpose line and links to related docs', () => {
+    assert.match(doc, /^# .+\n\nPurpose: /);
+    assert.match(doc, /\nRelated: .*\]\(/);
+  });
+});
+
+void describe('renderEnemyTable (E1 plan note 12)', () => {
+  void it('is deterministic, says "Delivered enemies: 10 of 50.", and has one row per enemy', () => {
+    const a = renderEnemyTable(ENEMIES, STAGES);
+    assert.equal(a, renderEnemyTable(ENEMIES, STAGES));
+    const lines = a.split('\n');
+    assert.equal(lines[0], 'Delivered enemies: 10 of 50.');
+    assert.equal(ENEMIES.length, 10);
+    assert.equal(
+      lines.filter((l) => l.startsWith('| ')).length,
+      ENEMIES.length + 1,
+      'header + rows',
+    );
+    assert.match(a, /\n\|---\|---\|---\|---\|---\|---\|---\|---\|\n/, 'compact delimiter row');
+  });
+
+  void it('the Health column equals healthOf(row, stage, cycle 0, party 1) for every row', () => {
+    const rows = renderEnemyTable(ENEMIES, STAGES)
+      .split('\n')
+      .filter((l) => l.startsWith('| ') && !l.startsWith('| Stage'));
+    assert.equal(rows.length, 10);
+    for (const row of ENEMIES) {
+      const line = rows.find((l) => l.includes(`\`${row.id}\``));
+      assert.ok(line !== undefined, row.id);
+      const cells = line.split('|').map((c) => c.trim());
+      assert.equal(cells[1]?.startsWith(`${row.stage}.`), true, row.id);
+      assert.equal(Number(cells[6]), healthOf(row, row.stage, 0, 1), `${row.id} health`);
+      assert.equal(cells[4], row.tier);
+      assert.equal(cells[8], row.drop);
+    }
+  });
+
+  void it('changing an enemy row changes the table, and the count line follows the row count', () => {
+    const changed: EnemyRow[] = ENEMIES.map((r) =>
+      r.id === 'cellar-rat' ? { ...r, vigor: 2 } : r,
+    );
+    assert.notEqual(renderEnemyTable(changed, STAGES), renderEnemyTable(ENEMIES, STAGES));
+    assert.match(renderEnemyTable(changed, STAGES), /\| Cellar Rat \| minion \| walk \| 20 \|/);
+    assert.match(renderEnemyTable(ENEMIES.slice(0, 5), STAGES), /^Delivered enemies: 5 of 50\./);
+  });
+
+  void it('applyEnemyTable replaces only the region and throws a fixed message for bad markers', () => {
+    const base = `head\n${ENEMY_BEGIN_MARKER}\nold\n${ENEMY_END_MARKER}\ntail\n`;
+    assert.equal(
+      applyEnemyTable(base, 'new'),
+      `head\n${ENEMY_BEGIN_MARKER}\nnew\n${ENEMY_END_MARKER}\ntail\n`,
+    );
+    for (const bad of [
+      'none',
+      `${ENEMY_BEGIN_MARKER}\nonly`,
+      `${ENEMY_END_MARKER}\n${ENEMY_BEGIN_MARKER}`,
+      `${ENEMY_BEGIN_MARKER}\n${ENEMY_BEGIN_MARKER}\n${ENEMY_END_MARKER}`,
+    ]) {
+      assert.throws(
+        () => applyEnemyTable(bad, 't'),
+        (e: unknown) =>
+          e instanceof Error &&
+          e.message ===
+            'enemies-and-stages.md needs exactly one BEGIN and one END marker, in order',
+      );
+    }
+  });
+});
+
+void describe('main with the enemy doc (E1)', () => {
+  void it('--check returns 1 for a stale count line, a changed health cell, or a missing row, and does not rewrite', () => {
+    for (const edit of [
+      (d: string): string =>
+        d.replace('Delivered enemies: 10 of 50.', 'Delivered enemies: 9 of 50.'),
+      (d: string): string =>
+        d.replace('| Cellar Rat | minion | walk | 10 |', '| Cellar Rat | minion | walk | 11 |'),
+      (d: string): string => d.replace(/\| 2\. Goblin Mine Shafts \| `rock-golem`.*\n/, ''),
+    ]) {
+      const root = scratchRoot(undefined, edit);
+      const stale = readFileSync(path.join(root, ENEMIES_DOC), 'utf8');
+      assert.notEqual(stale, readText(ENEMIES_DOC), 'the edit applied');
+      const { result, stderr } = quietly(() => main(['--check'], root));
+      assert.equal(result, 1);
+      assert.equal(stderr, '');
+      assert.equal(readFileSync(path.join(root, ENEMIES_DOC), 'utf8'), stale);
+    }
+  });
+
+  void it('without --check it fixes a stale enemy table; a second run changes nothing; the class doc is untouched', () => {
+    const root = scratchRoot(undefined, (d) =>
+      d.replace('Delivered enemies: 10 of 50.', 'Delivered enemies: 3 of 50.'),
+    );
+    assert.equal(quietly(() => main([], root)).result, 0);
+    assert.equal(readFileSync(path.join(root, ENEMIES_DOC), 'utf8'), readText(ENEMIES_DOC));
+    assert.equal(readFileSync(path.join(root, CLASSES_DOC), 'utf8'), readText(CLASSES_DOC));
+    assert.equal(quietly(() => main(['--check'], root)).result, 0);
+    assert.equal(quietly(() => main([], root)).result, 0);
+    assert.equal(readFileSync(path.join(root, ENEMIES_DOC), 'utf8'), readText(ENEMIES_DOC));
+  });
+
+  void it('returns 2 with a fixed message when the enemy doc has no markers', () => {
+    const root = scratchRoot(undefined, () => '# enemies\n\nno markers\n');
+    const result = quietly(() => main([], root));
+    assert.equal(result.result, 2);
+    assert.match(result.stderr, /exactly one BEGIN and one END marker/);
+  });
+});
+
 void describe('npm run docs:tables', () => {
   void it('is wired in package.json to the runner', () => {
     const pkg = readJson('package.json') as { scripts: Record<string, string> };
@@ -287,12 +443,18 @@ void describe('npm run docs:tables', () => {
 
   void it('leaves no diff: running the real runner changes no committed doc and --check is silent', () => {
     const before = readText(CLASSES_DOC);
+    const beforeEnemies = readText(ENEMIES_DOC);
     const write = spawnSync(process.execPath, [repoPath('scripts/docs-tables.mjs')], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
     });
     assert.equal(write.status, 0, write.stderr);
     assert.equal(readText(CLASSES_DOC), before, 'running docs:tables changed classes.md');
+    assert.equal(
+      readText(ENEMIES_DOC),
+      beforeEnemies,
+      'running docs:tables changed enemies-and-stages.md',
+    );
     const check = spawnSync(process.execPath, [repoPath('scripts/docs-tables.mjs'), '--check'], {
       cwd: REPO_ROOT,
       encoding: 'utf8',

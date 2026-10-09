@@ -296,12 +296,23 @@ void describe('package.json contributes.configuration matches MONITOR_SETTINGS',
   );
   const properties = asRecord(configuration.properties, 'properties');
 
-  void it('has exactly the nine pixelAgents.* keys', () => {
+  /** The three E1 game settings (read by src/host/gameConfig.ts, tested in gameConfig.test.ts). */
+  const GAME_KEYS = ['pixelAgents.enemies', 'pixelAgents.killsPerStage', 'pixelAgents.maxEnemies'];
+
+  void it('has exactly the nine monitor keys plus the three game keys (twelve pixelAgents.* keys)', () => {
     assert.deepEqual(
       Object.keys(properties).sort(),
-      MONITOR_SETTINGS.map((spec) => `pixelAgents.${spec.key}`).sort(),
+      [...MONITOR_SETTINGS.map((spec) => `pixelAgents.${spec.key}`), ...GAME_KEYS].sort(),
     );
     assert.equal(MONITOR_SETTINGS.length, 9);
+    assert.equal(Object.keys(properties).length, 12);
+  });
+
+  void it('the monitor spec table holds no game key (the monitor never reads game settings)', () => {
+    const monitorKeys = MONITOR_SETTINGS.map((spec) => `pixelAgents.${spec.key}`);
+    for (const key of GAME_KEYS) {
+      assert.ok(!monitorKeys.includes(key), key);
+    }
   });
 
   for (const spec of MONITOR_SETTINGS) {

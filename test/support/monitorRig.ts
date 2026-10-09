@@ -10,6 +10,7 @@ import type { MonitorConfig } from '../../src/monitor/monitorConfig';
 import type { ReadOnlyFileSystem, WorkspaceFolderRef } from '../../src/monitor/ports';
 import { encodeProjectDir } from '../../src/monitor/projectPaths';
 import { TranscriptSource } from '../../src/monitor/TranscriptSource';
+import { DEFAULT_PROGRESS } from '../../src/shared/progress';
 import { PROTOCOL_VERSION } from '../../src/shared/protocol';
 import type { AgentInfo, HostToWebviewMessage } from '../../src/shared/protocol';
 import {
@@ -122,7 +123,20 @@ export function monitorRig(options: MonitorRigOptions = {}): MonitorRig {
   };
   const bridge = new WebviewBridge({
     getAgents: () => monitor.getAgents(),
-    getConfig: () => ({ protocolVersion: PROTOCOL_VERSION }),
+    getConfig: () => ({
+      protocolVersion: PROTOCOL_VERSION,
+      enemiesEnabled: true,
+      killsPerStage: 30,
+      maxEnemies: 6,
+    }),
+    getFallbackConfig: () => ({
+      protocolVersion: PROTOCOL_VERSION,
+      enemiesEnabled: true,
+      killsPerStage: 30,
+      maxEnemies: 6,
+    }),
+    getProgress: () => DEFAULT_PROGRESS,
+    saveProgress: () => undefined,
     revealAgentTerminal: (agentId) => monitor.revealAgentTerminal(agentId),
     logger,
   });

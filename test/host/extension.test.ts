@@ -3,16 +3,24 @@
 // nonce. M2 plan section 3.4 and test note 10: a "Pixel Agents" LogOutputChannel, three
 // subscriptions, and the view wired to the WebviewBridge (listener before html, ready answered
 // with config then agentList, hide and dispose handled, old view listeners dropped on re-resolve).
+// E1 (ADR 0012): ready is also answered with the stored progress, saveProgress reaches only the
+// extension's own globalState (coalesced, validated, flushed on dispose), and a settings change
+// re-posts the config to a ready view.
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import type * as vscode from 'vscode';
 import * as extension from '../../src/extension';
 import { activate, deactivate, PixelAgentsViewProvider, VIEW_TYPE } from '../../src/extension';
 import { WebviewBridge } from '../../src/host/webviewBridge';
+import { PROGRESS_KEY } from '../../src/host/progressStore';
+import { DEFAULT_PROGRESS } from '../../src/shared/progress';
+import type { Progress } from '../../src/shared/progress';
 import { parseHostMessage, PROTOCOL_VERSION } from '../../src/shared/protocol';
-import type { AgentInfo } from '../../src/shared/protocol';
+import type { AgentInfo, ConfigSnapshot } from '../../src/shared/protocol';
 import {
+  changeConfiguration,
   FakeLogOutputChannel,
+  FakeMemento,
   FakeWebview,
   FakeWebviewView,
   recorded,
@@ -24,10 +32,25 @@ import { asRecord, readJson } from '../support/repo';
 const EXTENSION_URI = Uri.file('/ext');
 const NONCE_PATTERN = /^[A-Za-z0-9+/]{22,}={0,2}$/;
 const READY = { type: 'ready' } as const;
+const DEFAULT_GAME_CONFIG: ConfigSnapshot = {
+  protocolVersion: PROTOCOL_VERSION,
+  enemiesEnabled: true,
+  killsPerStage: 30,
+  maxEnemies: 6,
+};
 const EXPECTED_ANSWER = [
-  { type: 'config', config: { protocolVersion: PROTOCOL_VERSION } },
+  { type: 'config', config: DEFAULT_GAME_CONFIG },
   { type: 'agentList', agents: [] },
+  { type: 'progress', progress: DEFAULT_PROGRESS },
 ];
+const STORED: Progress = {
+  schemaVersion: 1,
+  stageIndex: 2,
+  killsInStage: 11,
+  totalKills: 71,
+  bossesDefeated: 1,
+  cycle: 0,
+};
 
 const SIM_AGENT: AgentInfo = {
   id: 'sim-1',
@@ -40,13 +63,18 @@ const SIM_AGENT: AgentInfo = {
 interface FakeContext {
   readonly extensionUri: Uri;
   subscriptions: { dispose(): void }[];
+  readonly globalState: FakeMemento;
 }
 
 /** Every context handed out, so afterEach can dispose what activate registered (stops monitor timers). */
 const contexts: FakeContext[] = [];
 
 function fakeContext(): FakeContext {
-  const context: FakeContext = { extensionUri: EXTENSION_URI, subscriptions: [] };
+  const context: FakeContext = {
+    extensionUri: EXTENSION_URI,
+    subscriptions: [],
+    globalState: new FakeMemento(),
+  };
   contexts.push(context);
   return context;
 }
@@ -82,7 +110,10 @@ function standaloneProvider(agents: readonly AgentInfo[] = []): {
   const log = new FakeLogOutputChannel('test');
   const bridge = new WebviewBridge({
     getAgents: () => agents,
-    getConfig: () => ({ protocolVersion: PROTOCOL_VERSION }),
+    getConfig: () => DEFAULT_GAME_CONFIG,
+    getFallbackConfig: () => DEFAULT_GAME_CONFIG,
+    getProgress: () => DEFAULT_PROGRESS,
+    saveProgress: () => undefined,
     revealAgentTerminal: null,
     logger: log,
   });
@@ -150,9 +181,9 @@ void describe('activate', () => {
     assert.deepEqual(recorded.outputChannels[0]?.options, { log: true });
   });
 
-  void it('hands exactly eight disposables to context.subscriptions: channel, terminal port, monitor, three monitor listeners, provider, registration (M3)', () => {
+  void it('hands exactly ten disposables to context.subscriptions: channel, terminal port, monitor, three monitor listeners, progress store, game-settings listener, provider, registration (M3, E1)', () => {
     const { context, provider, log } = activated();
-    assert.equal(context.subscriptions.length, 8);
+    assert.equal(context.subscriptions.length, 10);
     const expected = [log, provider, recorded.registrations[0]?.disposable];
     for (const disposable of expected) {
       assert.ok(context.subscriptions.includes(disposable as { dispose(): void }));
@@ -266,7 +297,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
     assert.deepEqual(view.webview.postedMessages, []);
   });
 
-  void it('answers ready with exactly config then an empty agentList (no sessions, simulator off)', () => {
+  void it('answers ready with exactly config, an empty agentList, then progress (no sessions, simulator off)', () => {
     const view = new FakeWebviewView();
     const { provider, log } = activated();
     resolve(provider, view);
@@ -329,7 +360,7 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
     view.setVisible(false);
     assert.equal(bridge.state, 'loading');
     bridge.postAgentState(SIM_AGENT);
-    assert.equal(view.webview.postedMessages.length, 2, 'no agentState while hidden');
+    assert.equal(view.webview.postedMessages.length, 3, 'no agentState while hidden');
     view.setVisible(true);
     assert.equal(bridge.state, 'loading', 'showing alone does not mark ready; the new ready does');
     view.webview.deliver(READY);
@@ -407,9 +438,238 @@ void describe('PixelAgentsViewProvider.resolveWebviewView: message channel (M2)'
       await new Promise<void>((done) => setImmediate(done));
       await new Promise<void>((done) => setImmediate(done));
       assert.deepEqual(unhandled, []);
-      assert.deepEqual(log.messages('trace'), ['post failed: view gone', 'post failed: view gone']);
+      assert.deepEqual(log.messages('trace'), [
+        'post failed: view gone',
+        'post failed: view gone',
+        'post failed: view gone',
+      ]);
     } finally {
       process.off('unhandledRejection', onUnhandled);
     }
+  });
+});
+
+/** Resolves a view on an activated extension and answers its ready; returns the pieces. */
+function readyView(seed?: unknown): {
+  context: FakeContext;
+  view: FakeWebviewView;
+  log: FakeLogOutputChannel;
+} {
+  const context = fakeContext();
+  if (seed !== undefined) {
+    context.globalState.store.set(PROGRESS_KEY, seed);
+  }
+  activate(context as unknown as vscode.ExtensionContext);
+  const provider = recorded.registrations[0]?.provider;
+  assert.ok(provider instanceof PixelAgentsViewProvider);
+  const log = recorded.outputChannels[0]?.channel;
+  assert.ok(log !== undefined);
+  const view = new FakeWebviewView();
+  resolve(provider, view);
+  return { context, view, log };
+}
+
+function disposeAll(context: FakeContext): void {
+  for (const disposable of [...context.subscriptions].reverse()) {
+    disposable.dispose();
+  }
+}
+
+void describe('extension glue: persisted progress (E1, ADR 0012)', () => {
+  beforeEach(resetWithQuietMonitor);
+
+  void it('a fresh install answers ready with the default progress and writes nothing', () => {
+    const { context, view } = readyView();
+    view.webview.deliver(READY);
+    assert.deepEqual(posted(view.webview)[2], { type: 'progress', progress: DEFAULT_PROGRESS });
+    assert.deepEqual(context.globalState.updates, []);
+    assert.deepEqual(context.globalState.gets, [PROGRESS_KEY]);
+  });
+
+  void it('returns the stored progress on every ready, reading storage only once', () => {
+    const { context, view } = readyView(STORED);
+    view.webview.deliver(READY);
+    view.webview.deliver(READY);
+    const progress = posted(view.webview).filter(
+      (m) => (m as { type: string }).type === 'progress',
+    );
+    assert.deepEqual(progress, [
+      { type: 'progress', progress: STORED },
+      { type: 'progress', progress: STORED },
+    ]);
+    assert.equal(context.globalState.gets.length, 1, 'the store caches its first load');
+  });
+
+  void it('a second ready (hide and show, or Reload Webviews) returns the progress saved since the first', () => {
+    const { view } = readyView(STORED);
+    view.webview.deliver(READY);
+    const later: Progress = { ...STORED, totalKills: 90, killsInStage: 30 };
+    view.webview.deliver({ type: 'saveProgress', progress: later });
+    view.webview.deliver(READY);
+    const progress = posted(view.webview).filter(
+      (m) => (m as { type: string }).type === 'progress',
+    );
+    assert.deepEqual(progress, [
+      { type: 'progress', progress: STORED },
+      { type: 'progress', progress: later },
+    ]);
+  });
+
+  void it('a valid saveProgress is coalesced and flushed to globalState on dispose', () => {
+    const { context, view } = readyView();
+    view.webview.deliver(READY);
+    view.webview.deliver({ type: 'saveProgress', progress: STORED });
+    view.webview.deliver({ type: 'saveProgress', progress: { ...STORED, totalKills: 72 } });
+    const writes = (): readonly { readonly key: string; readonly value: unknown }[] =>
+      context.globalState.updates;
+    assert.deepEqual(writes(), [], 'not written yet: writes are coalesced');
+    disposeAll(context);
+    assert.equal(writes().length, 1, 'one write for two saves');
+    assert.equal(writes()[0]?.key, PROGRESS_KEY);
+    assert.deepEqual(writes()[0]?.value, { ...STORED, totalKills: 72 });
+  });
+
+  void it('an invalid or controlling save writes nothing', () => {
+    const { context, view } = readyView();
+    view.webview.deliver(READY);
+    for (const message of [
+      { type: 'saveProgress', progress: { ...STORED, stageIndex: 0 } },
+      { type: 'saveProgress', progress: { ...STORED, agentId: 'sim-1' } },
+      { type: 'saveProgress', progress: STORED, command: 'kill' },
+      { type: 'saveProgress' },
+    ]) {
+      view.webview.deliver(message);
+    }
+    disposeAll(context);
+    assert.deepEqual(context.globalState.updates, []);
+  });
+
+  void it('a stored value from a newer version is returned as defaults and never overwritten', () => {
+    const future = { ...STORED, schemaVersion: 99 };
+    const { context, view, log } = readyView(future);
+    view.webview.deliver(READY);
+    assert.deepEqual(posted(view.webview)[2], { type: 'progress', progress: DEFAULT_PROGRESS });
+    view.webview.deliver({ type: 'saveProgress', progress: { ...STORED, totalKills: 500 } });
+    disposeAll(context);
+    assert.deepEqual(context.globalState.updates, []);
+    assert.deepEqual(context.globalState.store.get(PROGRESS_KEY), future, 'left untouched');
+    assert.deepEqual(log.messages('error'), [
+      'progress: stored value is from a newer version, read-only',
+    ]);
+  });
+
+  void it('a lower totalKills than stored is ignored (a stale second window cannot rewind)', () => {
+    const { context, view } = readyView(STORED);
+    view.webview.deliver(READY);
+    view.webview.deliver({ type: 'saveProgress', progress: { ...STORED, totalKills: 3 } });
+    disposeAll(context);
+    assert.deepEqual(context.globalState.updates, []);
+  });
+
+  void it('a throwing or rejecting storage never breaks ready, and logs only fixed lines', async () => {
+    const context = fakeContext();
+    context.globalState.getThrows = new Error('SECRET-STORE-TEXT');
+    activate(context as unknown as vscode.ExtensionContext);
+    const provider = recorded.registrations[0]?.provider as PixelAgentsViewProvider;
+    const log = recorded.outputChannels[0]?.channel as FakeLogOutputChannel;
+    const view = new FakeWebviewView();
+    resolve(provider, view);
+    assert.doesNotThrow(() => view.webview.deliver(READY));
+    assert.deepEqual(posted(view.webview), EXPECTED_ANSWER, 'plays on defaults');
+    context.globalState.updateBehavior = 'reject';
+    view.webview.deliver({ type: 'saveProgress', progress: STORED });
+    assert.doesNotThrow(() => disposeAll(context));
+    await new Promise<void>((done) => setImmediate(done));
+    assert.ok(log.messages('error').length >= 1);
+    assert.ok(!log.calls.some((c) => c.message.includes('SECRET-STORE-TEXT')));
+    assert.ok(!log.calls.some((c) => c.message.includes('update rejected')));
+  });
+
+  void it('does not register keys for Settings Sync and touches no other context member', () => {
+    const { context, view } = readyView();
+    view.webview.deliver(READY);
+    view.webview.deliver({ type: 'saveProgress', progress: STORED });
+    disposeAll(context);
+    assert.equal(context.globalState.syncKeyCalls, 0);
+    assert.deepEqual(context.globalState.keys(), [PROGRESS_KEY]);
+  });
+
+  void it('stores nothing but the progress key, and the value has only the six numeric keys', () => {
+    const { context, view } = readyView();
+    view.webview.deliver(READY);
+    view.webview.deliver({
+      type: 'saveProgress',
+      progress: { ...STORED, name: 'SECRET-NAME' } as unknown as Progress,
+    });
+    view.webview.deliver({ type: 'saveProgress', progress: STORED });
+    disposeAll(context);
+    const value = context.globalState.store.get(PROGRESS_KEY) as Record<string, unknown>;
+    assert.deepEqual(Object.keys(value), [
+      'schemaVersion',
+      'stageIndex',
+      'killsInStage',
+      'totalKills',
+      'bossesDefeated',
+      'cycle',
+    ]);
+    assert.ok(Object.values(value).every((v) => typeof v === 'number'));
+    assert.ok(!JSON.stringify(context.globalState.updates).includes('SECRET'));
+  });
+});
+
+void describe('extension glue: game settings (E1)', () => {
+  beforeEach(resetWithQuietMonitor);
+
+  void it('config carries the three settings with their defaults', () => {
+    const { view } = readyView();
+    view.webview.deliver(READY);
+    assert.deepEqual((posted(view.webview)[0] as { config: unknown }).config, DEFAULT_GAME_CONFIG);
+  });
+
+  void it('reads configured values, clamps out-of-range values, and ignores wrong types', () => {
+    recorded.config.enemies = false;
+    recorded.config.killsPerStage = 99_999;
+    recorded.config.maxEnemies = 'lots';
+    const { view } = readyView();
+    view.webview.deliver(READY);
+    assert.deepEqual((posted(view.webview)[0] as { config: unknown }).config, {
+      protocolVersion: PROTOCOL_VERSION,
+      enemiesEnabled: false,
+      killsPerStage: 500,
+      maxEnemies: 6,
+    });
+  });
+
+  void it('a pixelAgents settings change re-posts config to a ready view; another section does not', () => {
+    const { view } = readyView();
+    view.webview.deliver(READY);
+    const before = view.webview.postedMessages.length;
+    changeConfiguration({ enemies: false }, ['editor']);
+    assert.equal(view.webview.postedMessages.length, before);
+    changeConfiguration({ enemies: false, killsPerStage: 12 });
+    assert.equal(view.webview.postedMessages.length, before + 1);
+    assert.deepEqual(posted(view.webview).at(-1), {
+      type: 'config',
+      config: { ...DEFAULT_GAME_CONFIG, enemiesEnabled: false, killsPerStage: 12 },
+    });
+  });
+
+  void it('a settings change before the view says ready posts nothing', () => {
+    const { view } = readyView();
+    changeConfiguration({ enemies: false });
+    assert.deepEqual(view.webview.postedMessages, []);
+  });
+
+  void it('a throwing getConfiguration during a change is contained and logged once', () => {
+    const { view, log } = readyView();
+    view.webview.deliver(READY);
+    recorded.configThrows = new Error('SECRET_SETTINGS_TEXT');
+    assert.doesNotThrow(() => changeConfiguration({ enemies: false }));
+    // Two listeners react to a pixelAgents change and each logs once: the monitor's settings reader
+    // and the bridge's postConfig (E1). Neither throws out of the event handler.
+    const errors = log.messages('error');
+    assert.equal(errors.length, 2, 'one logged error per listener');
+    assert.ok(errors.some((m) => m.startsWith('monitor: configuration update failed')));
+    assert.ok(errors.some((m) => m.startsWith('webview bridge error')));
   });
 });

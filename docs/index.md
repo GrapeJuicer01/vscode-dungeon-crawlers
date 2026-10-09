@@ -20,7 +20,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [security and safety](architecture/security-and-safety.md) | [M2, M3] threat model (T1-T19), trust boundaries B1-B4, CSP, validation, data inventory, read-only and reveal-only guarantees, monitor file access |
 | [agent detection](architecture/agent-detection.md) | [M3] monitor components (core and adapters), transcript, terminal, and simulator sources, session state machine, registry and coalescing, settings, error logging, platform notes, limits |
 | [game engine](architecture/game-engine.md) | [M4 design] components, room layout, fixed-step loop and crash isolation, host events to heroes, hero phase machine, rendering order, lighting, particles, pathfinding, sprite consumption, performance budget |
-| [data model](architecture/data-model.md) | [M4 design] data tables and owners, art data contract (A0), stage table and validator, tuning constants; persisted progress and migrations are planned (E1) |
+| [data model](architecture/data-model.md) | [M4 design] data tables and owners, art data contract (A0), stage table and validator, tuning constants; persisted progress and migrations, and the enemy table and validator (E1, as built) |
 
 ### Plans
 
@@ -33,6 +33,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [h1-classes](architecture/plans/h1-classes.md) | H1 Warrior, Mage, Archer, Rogue (checked against M4 as built; class assignment from the session id, ability phase, effect pool, `docs:tables`, exact art list, decisions H1-1 to H1-10) |
 | [h2-classes](architecture/plans/h2-classes.md) | H2 Cleric, Paladin, Necromancer, Bard (checked against H1 as built; summon convention, cosmetic buffs, eight-class `classFor`, art list, decisions H2-1 to H2-11) |
 | [h3-classes](architecture/plans/h3-classes.md) | H3 Druid (beast), Monk, Artificer (turret), Berserker (checked against H2 as built; twelve-class `classFor` spread, summon capacity, kind-aware pool, Berserker rules, art list, decisions H3-1 to H3-10) |
+| [e1-enemies](architecture/plans/e1-enemies.md) | E1 Stage 1 and 2 enemies, bosses, combat, drops, stage progression, persisted progress (checked against H3 as built, with an as-built drift section 13 added after E1 was implemented; the enemy-side and hero-side seam, enemy table and scaling, `progress` and `saveProgress` messages, migration runner, settings, art list in six steps, decisions E1-1 to E1-19) |
 
 ### ADRs
 
@@ -49,6 +50,8 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [0009](architecture/adr/0009-hero-lifecycle-isolation.md) | hero lifecycle separated from animation phase, one mutator fed by queued host events, quarantine instead of removal on faults |
 | [0010](architecture/adr/0010-split-room-stage-layout.md) | fixed 320x180 split room: static campfire alcove plus scrolling corridor on a 16 px tile grid |
 | [0011](architecture/adr/0011-summons-are-leased-cosmetic-entities.md) | summons are pooled cosmetic entities outside the roster, kept alive by an owner-renewed lease, never targets, with no hero reference |
+| [0012](architecture/adr/0012-host-owned-versioned-progress.md) | game progress is host-owned (`globalState`), numeric-only, versioned, migrated forward only, read-only on a newer version (E1) |
+| [0013](architecture/adr/0013-enemy-health-and-hero-reaction-board.md) | only enemies have health; combat reaches heroes only through numeric buffers and a cosmetic reaction board (E1) |
 
 ## Engineering
 

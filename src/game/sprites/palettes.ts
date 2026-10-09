@@ -4,6 +4,7 @@
 
 import { CLASS_PALETTES_H2 } from './palettesH2';
 import { CLASS_PALETTES_H3 } from './palettesH3';
+import { STAGE_PALETTES } from './palettesE1';
 import type { ClassPaletteId, ClassPaletteIdH1 } from './spriteTypes';
 
 /** One character -> '#rrggbb'. '.' is transparent and is never a key. */
@@ -92,17 +93,23 @@ export const HAIR_COLORS: readonly Palette[] = [
 /** Stage id -> the (at most 8) characters its tiles, props, and backdrop may use. */
 export const STAGE_TILE_CHARS: Readonly<Record<string, string>> = {
   'forgotten-cellar': '12345678',
+  'goblin-mine-shafts': '12345678',
 };
 
 /** Stage id -> the character that fills the background (near-black, luminance under 0.02). */
 export const STAGE_CLEAR_CHAR: Readonly<Record<string, string>> = {
   'forgotten-cellar': 'n',
+  'goblin-mine-shafts': 'n',
 };
 
 /** Stage id -> the darkness tint multiplied over the environment (cool gray-blue, never black). */
 export const STAGE_AMBIENT_CHAR: Readonly<Record<string, string>> = {
   'forgotten-cellar': 'g',
+  'goblin-mine-shafts': 'g',
 };
+
+/** Stage id -> partial palette over the master (characters 1 to 8, g, T). See palettesE1.ts. */
+export { STAGE_PALETTES };
 
 /** Warm light colors added into the light map. */
 export const LIGHT_CHARS: { readonly torch: string; readonly campfire: string } = {
@@ -112,12 +119,14 @@ export const LIGHT_CHARS: { readonly torch: string; readonly campfire: string } 
 
 /** Particle color ramps, bright to dim by age. */
 export const PARTICLE_PALETTE: Readonly<
-  Record<'ember' | 'spark' | 'drip' | 'splash', readonly string[]>
+  Record<'ember' | 'spark' | 'drip' | 'splash' | 'mote', readonly string[]>
 > = {
   ember: ['Y', 'O', 'R', 'D'],
   spark: ['w', 'Y', 'O'],
   drip: ['q', 'Q', '8'],
   splash: ['w', 'q', 'Q'],
+  // warm dust (stage 2 ambient): sand, light wood, dark wood; master characters, no new colors
+  mote: ['a', 'V', 'W'],
 };
 
 /**

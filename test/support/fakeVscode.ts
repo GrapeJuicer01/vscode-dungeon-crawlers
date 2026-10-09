@@ -454,3 +454,46 @@ export class FakeWebviewView {
     );
   }
 }
+
+/**
+ * A recording stand-in for vscode.Memento (context.globalState). `store` is the persisted data;
+ * `gets` and `updates` log every access, `syncKeyCalls` any attempt to register Settings Sync.
+ */
+export class FakeMemento {
+  readonly store = new Map<string, unknown>();
+  readonly gets: string[] = [];
+  readonly updates: { readonly key: string; readonly value: unknown }[] = [];
+  syncKeyCalls = 0;
+  /** 'reject' makes update return a rejected promise; 'throw' throws synchronously. */
+  updateBehavior: 'resolve' | 'reject' | 'throw' = 'resolve';
+  /** When set, get throws it. */
+  getThrows: Error | null = null;
+
+  get<T>(key: string): T | undefined {
+    this.gets.push(key);
+    if (this.getThrows !== null) {
+      throw this.getThrows;
+    }
+    return this.store.get(key) as T | undefined;
+  }
+
+  update(key: string, value: unknown): PromiseLike<void> {
+    this.updates.push({ key, value });
+    if (this.updateBehavior === 'throw') {
+      throw new Error('update threw');
+    }
+    if (this.updateBehavior === 'reject') {
+      return Promise.reject(new Error('update rejected'));
+    }
+    this.store.set(key, value);
+    return Promise.resolve();
+  }
+
+  keys(): readonly string[] {
+    return [...this.store.keys()];
+  }
+
+  setKeysForSync(): void {
+    this.syncKeyCalls += 1;
+  }
+}

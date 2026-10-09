@@ -1,5 +1,5 @@
 // The hero class table (H1 four, H2 four more, H3 four more: 12, final). Classes are purely cosmetic: a look (art),
-// and the effects a hero plays while attacking. A row deliberately holds no combat or resource
+// and the effects a hero plays while attacking. A row deliberately holds no stat or resource
 // number (Core invariant 1). docs/design/classes.md embeds a table generated from this file by
 // `npm run docs:tables`; this module is pure data so the generator can import it without art.
 import type { EffectId } from './effects';

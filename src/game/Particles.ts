@@ -4,14 +4,15 @@ import type { Rng } from './rng';
 import type { Surface } from './ports';
 import { DRIP_GRAVITY_PX_PER_S2 } from './data/tuning';
 
-export type ParticleKind = 'ember' | 'spark' | 'drip' | 'splash';
+export type ParticleKind = 'ember' | 'spark' | 'drip' | 'splash' | 'mote';
 /** Kind -> CSS colour ramp, bright to dim by age. */
 export type ParticleColors = Readonly<Record<ParticleKind, readonly string[]>>;
 
-const KIND_NAMES: readonly ParticleKind[] = ['ember', 'spark', 'drip', 'splash'];
+const KIND_NAMES: readonly ParticleKind[] = ['ember', 'spark', 'drip', 'splash', 'mote'];
 const KIND_EMBER = 0;
 const KIND_DRIP = 2;
 const KIND_SPLASH = 3;
+const KIND_MOTE = 4;
 
 function kindIndex(kind: ParticleKind): number {
   return KIND_NAMES.indexOf(kind);
@@ -110,6 +111,10 @@ export class Particles {
         this.#vy[i] = (this.#vy[i] ?? 0) + DRIP_GRAVITY_PX_PER_S2 * dt;
       } else if (kind === KIND_SPLASH) {
         this.#vy[i] = (this.#vy[i] ?? 0) + DRIP_GRAVITY_PX_PER_S2 * dt;
+      } else if (kind === KIND_MOTE) {
+        // Dust motes wander gently in both axes (Stage 2 ambient).
+        this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 20 * dt;
+        this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 20 * dt;
       } else if (kind === KIND_EMBER) {
         // Slow sideways wander so embers do not rise in straight lines.
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 60 * dt;

@@ -231,6 +231,8 @@ export interface GameRigOptions {
   readonly record?: boolean;
   /** Defaults to SHIPPED_ART; class suites pass a variant (for example without class layers). */
   readonly art?: ArtSet;
+  /** E1: any other GameDeps field (onProgress, awaitProgress, enemies, stages); wins over the defaults. */
+  readonly deps?: Partial<GameDeps>;
 }
 
 /** A Game over SHIPPED_ART and Stage 1 on fake bitmaps and a recording surface. */
@@ -253,6 +255,7 @@ export function gameRig(options: GameRigOptions = {}): GameRig {
     seed: options.seed ?? ENGINE_SEED,
     agentSource: () => rig.mirror,
     ...(options.heroFactory === undefined ? {} : { heroFactory: options.heroFactory }),
+    ...options.deps,
   };
   return Object.assign(rig, { game: new Game(deps) });
 }

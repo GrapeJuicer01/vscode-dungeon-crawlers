@@ -29,7 +29,7 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | webview view, panel | the "Pixel Agents" tab in VS Code's bottom panel that hosts the webview ([ADR 0001](architecture/adr/0001-bottom-panel-webview.md)). |
 | bundle | one esbuild output: the host bundle (Node CJS) or the webview bundle (browser IIFE). They share only `src/shared/` ([ADR 0004](architecture/adr/0004-esbuild-two-bundles.md)). |
 | protocol | the typed, validated messages between host and webview in `src/shared/protocol.ts` ([host-webview protocol](architecture/host-webview-protocol.md)). |
-| handshake | the webview sends `ready`; the host answers with `config` then `agentList` snapshots, and only then pushes `agentState` events ([ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md)). |
+| handshake | the webview sends `ready`; the host answers with `config` then `agentList` snapshots (from E1, then `progress`), and only then pushes `agentState` events ([ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md)). |
 | `focusAgent` | the only webview action that reaches the host: reveal (show) an agent's terminal. It never writes to or controls the terminal. |
 | monitor | the read-only host code in `src/monitor/` that detects agent sessions and emits agent-state events (M3, [agent detection](architecture/agent-detection.md)). |
 | source | one input to the monitor: transcript polling, terminal observation (reveal links only), or the simulator (fake agents for demo and tests). |
@@ -111,11 +111,32 @@ Full design in [game engine](architecture/game-engine.md) and [data model](archi
 | class (H1) | a cosmetic hero identity (Warrior, Mage, Archer, Rogue; 12 by H3): a palette, silhouette, weapon, and effect shots. It has no health, mana, or power; it is chosen by `classFor(id)` and never changes for a session id. See the [H1 plan](architecture/plans/h1-classes.md). |
 | `classFor` | the pure function in `classMap.ts` that hashes a session id (upper 16 bits of `hashId`) over the delivered classes; no state, no storage, no tool names. |
 | ability (H1) | a class hero's 3-frame signature animation, played from the `attack` phase when a hidden seeded timer fires. Cosmetic: it spawns effects and changes nothing about the hero or the host. |
-| effect, `EffectPool` (H1) | a small pooled sprite (arrow, orb, burst, whirl, dagger, smoke) spawned by a class hook and drawn after the entities; it has no collision and no target until E1. |
+| effect, `EffectPool` (H1) | a small pooled sprite (arrow, orb, burst, whirl, dagger, smoke) spawned by a class hook and drawn after the entities; it has no collision and no target, even after E1 (class shots fly down the corridor and do not home on enemies; hits are resolved from the strike counters). |
 | delivered classes | the classes present in `classes.ts` so far; `classFor` hashes over this set. |
 | lease (H2) | the short timer (`SUMMON_LEASE_MS`) a summoning hero renews every update while it fights; when renewals stop the summon sinks and is freed. The summon system's only link to its owner, and it carries no hero data. |
 | `SummonPool` (H2) | the fixed-size pool of `Summon` entities in `World.summons`; keyed by hero slot, updated and drawn under the entity guards, outside the `Roster`. |
 | aura, buff (H2) | not an engine feature: a one-shot cosmetic effect burst (blessing glow, holy burst, notes) centered on the casting hero. Never a persistent icon, bar, or restore. |
+
+## Combat and progress (E1)
+
+Design and as-built drift in the [E1 plan](architecture/plans/e1-enemies.md); rationale in [ADR 0012](architecture/adr/0012-host-owned-versioned-progress.md) and [ADR 0013](architecture/adr/0013-enemy-health-and-hero-reaction-board.md).
+
+| Term | Meaning |
+|---|---|
+| enemy side, hero side | the two halves of the engine. The enemy side (`Combat`, `Enemy`, `Boss`, drops, progression) may use health vocabulary and holds no hero reference; the hero side keeps the strict vocabulary ban. They meet only at the `FighterBuffer` and the `HitReactions` board. |
+| `FighterBuffer` | the preallocated numeric list (slot, x, y, two strike counters) of heroes whose cosmetic phase is `advance`, `attack`, or `ability`; filled by `Roster.collectFighters`, read by `Combat`. Contains no id, name, state, or summon. |
+| `HitReactions` | the cosmetic reaction board: per hero slot, a 100 ms flash and a 1 to 2 px slide that `Combat` writes and `Hero.draw` reads. Changes only how a hero is drawn. |
+| fighter | a hero currently in a fighting phase; the only heroes enemies can target. Resting and exiting heroes are never fighters. |
+| party fights as one | the combat abstraction: any striking hero hits the nearest engaged enemy and all classes hit alike. |
+| wave | a group of regular enemies sized by the number of fighters and capped by `pixelAgents.maxEnemies`. |
+| `Progression` | the enemy-side counters (stage, kills in stage, totals, cycle) behind the persisted progress. |
+| progress | the persisted `Progress` record: five counters and a `schemaVersion`, stored by the host in `globalState`; never agent data. |
+| `ProgressStore`, migration runner | the host module that loads, validates, migrates (forward only), and writes progress; a newer stored version is read-only and never overwritten. |
+| `StageDirector` | swaps the active stage runtime behind a dark fade after a boss falls; never touches the roster. |
+| drop | cosmetic decoration (`coin gem ore chest`) that pops from a defeated enemy; collected by nothing and worth nothing. |
+| first-sight baseline | how `Combat` counts strikes: the first time it sees a hero slot (or a reused one) it only records the strike counters; later increases are strikes. A hero entering the fighter buffer therefore never injects strikes. |
+| boot gate | until the host's `progress` message is applied (or 1.5 s of game time pass) the engine draws only the clear color and `Combat` idles, so the wrong stage never flashes. A `progress` that arrives later is still applied once. |
+| `RenderExtras` | the optional fifth argument of `Renderer.render` (live enemies, the reaction board, the drop pass, the fade alpha); without it the renderer draws as in H3. |
 
 ## Process
 

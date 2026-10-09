@@ -12,6 +12,8 @@ import {
   createAgentListMessage,
   createAgentStateMessage,
   createConfigMessage,
+  createProgressMessage,
+  createSaveProgressMessage,
   HOST_TO_WEBVIEW_TYPES,
   isAgentId,
   isAgentInfo,
@@ -27,7 +29,27 @@ import {
   toAgentInfo,
   WEBVIEW_TO_HOST_TYPES,
 } from '../../src/shared/protocol';
-import type { AgentInfo } from '../../src/shared/protocol';
+import type { AgentInfo, ConfigSnapshot } from '../../src/shared/protocol';
+import { DEFAULT_PROGRESS, MAX_PROGRESS_COUNT, MAX_STAGE_INDEX } from '../../src/shared/progress';
+import type { Progress } from '../../src/shared/progress';
+
+/** A valid config snapshot (E1: protocol version 2 and the three game settings). */
+const CONFIG: ConfigSnapshot = {
+  protocolVersion: PROTOCOL_VERSION,
+  enemiesEnabled: true,
+  killsPerStage: 30,
+  maxEnemies: 6,
+};
+
+/** A valid non-default progress value. */
+const PROGRESS: Progress = {
+  schemaVersion: 1,
+  stageIndex: 2,
+  killsInStage: 7,
+  totalKills: 57,
+  bossesDefeated: 1,
+  cycle: 0,
+};
 
 const AGENT: AgentInfo = {
   id: 'sim-1',
@@ -160,13 +182,69 @@ function shapeAttacks(valid: Record<string, unknown>): [string, unknown][] {
   ];
 }
 
+/** Progress values the parsers must reject, as [label, value] (E1 test note 2 and 3). */
+function progressAttacks(): [string, unknown][] {
+  const withValue = (key: string, value: unknown): unknown => ({ ...PROGRESS, [key]: value });
+  const without = (key: string): unknown => {
+    const copy: Record<string, unknown> = { ...PROGRESS };
+    delete copy[key];
+    return copy;
+  };
+  const counters = ['stageIndex', 'killsInStage', 'totalKills', 'bossesDefeated', 'cycle'];
+  const attacks: [string, unknown][] = [
+    ['an extra key', { ...PROGRESS, agentId: 'a' }],
+    ['a string-named extra key', { ...PROGRESS, name: 'SECRET' }],
+    ['a symbol key', { ...PROGRESS, [Symbol('x')]: 1 }],
+    ['a non-enumerable extra key', withNonEnumerable({ ...PROGRESS }, 'hidden')],
+    ['an array', [1, 1, 0, 0, 0, 0]],
+    ['a string', JSON.stringify(PROGRESS)],
+    ['a number', 1],
+    ['an inherited shape', Object.create(PROGRESS) as unknown],
+    ['a class instance', Object.assign(new (class P {})(), PROGRESS)],
+    ['schemaVersion 0', withValue('schemaVersion', 0)],
+    ['schemaVersion 2', withValue('schemaVersion', 2)],
+    ['schemaVersion "1"', withValue('schemaVersion', '1')],
+    ['stageIndex 0', withValue('stageIndex', 0)],
+    [`stageIndex ${MAX_STAGE_INDEX + 1}`, withValue('stageIndex', MAX_STAGE_INDEX + 1)],
+    [
+      'a throwing getter',
+      Object.assign(throwingGetter('cycle'), {
+        schemaVersion: 1,
+        stageIndex: 1,
+        killsInStage: 0,
+        totalKills: 0,
+        bossesDefeated: 0,
+      }),
+    ],
+  ];
+  for (const key of ['schemaVersion', ...counters]) {
+    attacks.push([`missing ${key}`, without(key)]);
+  }
+  for (const key of counters) {
+    for (const [label, value] of [
+      ['a string', '1'],
+      ['a float', 1.5],
+      ['a negative', -1],
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['null', null],
+      ['a bigint', 1n],
+      ['above the cap', MAX_PROGRESS_COUNT + 1],
+      ['an unsafe integer', 2 ** 53],
+    ] as const) {
+      attacks.push([`${key} ${label}`, withValue(key, value)]);
+    }
+  }
+  return attacks;
+}
+
 void describe('protocol: exhaustive message and state lists (note 1)', () => {
   void it('lists exactly the host-to-webview types', () => {
-    assert.deepEqual([...HOST_TO_WEBVIEW_TYPES], ['config', 'agentList', 'agentState']);
+    assert.deepEqual([...HOST_TO_WEBVIEW_TYPES], ['config', 'agentList', 'agentState', 'progress']);
   });
 
-  void it('lists exactly the webview-to-host types (ready and reveal-only focusAgent)', () => {
-    assert.deepEqual([...WEBVIEW_TO_HOST_TYPES], ['ready', 'focusAgent']);
+  void it('lists exactly the webview-to-host types (ready, reveal-only focusAgent, saveProgress)', () => {
+    assert.deepEqual([...WEBVIEW_TO_HOST_TYPES], ['ready', 'focusAgent', 'saveProgress']);
   });
 
   void it('lists exactly the four agent states', () => {
@@ -182,8 +260,8 @@ void describe('protocol: exhaustive message and state lists (note 1)', () => {
     }
   });
 
-  void it('PROTOCOL_VERSION is 1', () => {
-    assert.equal(PROTOCOL_VERSION, 1);
+  void it('PROTOCOL_VERSION is 2 (E1 added the game settings and the progress messages)', () => {
+    assert.equal(PROTOCOL_VERSION, 2);
   });
 });
 
@@ -282,7 +360,28 @@ void describe('parseWebviewMessage: rejections (note 2)', () => {
     ['sendInput', { type: 'sendInput', agentId: 'a', input: 'y' }],
     ['executeCommand', { type: 'executeCommand', command: 'workbench.action.terminal.kill' }],
     ['a host message type sent the wrong way', { type: 'agentList', agents: [] }],
-    ['config sent the wrong way', { type: 'config', config: { protocolVersion: 1 } }],
+    ['config sent the wrong way', { type: 'config', config: CONFIG }],
+    ['progress sent the wrong way', { type: 'progress', progress: PROGRESS }],
+    ['agentState sent the wrong way', { type: 'agentState', agent: AGENT }],
+    ['saveProgress without progress', { type: 'saveProgress' }],
+    ['saveProgress with a null progress', { type: 'saveProgress', progress: null }],
+    [
+      'saveProgress with an extra top-level key',
+      { type: 'saveProgress', progress: PROGRESS, agentId: 'a' },
+    ],
+    ['saveProgress naming an agent', { type: 'saveProgress', progress: PROGRESS, agent: AGENT }],
+    ['saveProgress with a progress array', { type: 'saveProgress', progress: [PROGRESS] }],
+    [
+      'saveProgress with a class-instance progress',
+      { type: 'saveProgress', progress: Object.assign(new (class P {})(), PROGRESS) },
+    ],
+    ...shapeAttacks({ type: 'saveProgress', progress: PROGRESS }).map(
+      ([label, raw]): [string, unknown] => [`saveProgress: ${label}`, raw],
+    ),
+    ...progressAttacks().map(([label, progress]): [string, unknown] => [
+      `saveProgress with ${label}`,
+      { type: 'saveProgress', progress },
+    ]),
   ];
 
   for (const [label, raw] of cases) {
@@ -326,6 +425,41 @@ void describe('parseWebviewMessage: acceptances (note 2)', () => {
       Object.freeze({ type: 'focusAgent', agentId: 'x.y:z' }),
       { type: 'focusAgent', agentId: 'x.y:z' },
     ],
+    [
+      'saveProgress with the default progress',
+      { type: 'saveProgress', progress: { ...DEFAULT_PROGRESS } },
+      { type: 'saveProgress', progress: { ...DEFAULT_PROGRESS } },
+    ],
+    [
+      'saveProgress with a mid-game progress',
+      { type: 'saveProgress', progress: { ...PROGRESS } },
+      { type: 'saveProgress', progress: { ...PROGRESS } },
+    ],
+    [
+      'saveProgress at the maximum counters',
+      {
+        type: 'saveProgress',
+        progress: {
+          ...PROGRESS,
+          stageIndex: MAX_STAGE_INDEX,
+          killsInStage: MAX_PROGRESS_COUNT,
+          totalKills: MAX_PROGRESS_COUNT,
+          bossesDefeated: MAX_PROGRESS_COUNT,
+          cycle: MAX_PROGRESS_COUNT,
+        },
+      },
+      {
+        type: 'saveProgress',
+        progress: {
+          ...PROGRESS,
+          stageIndex: MAX_STAGE_INDEX,
+          killsInStage: MAX_PROGRESS_COUNT,
+          totalKills: MAX_PROGRESS_COUNT,
+          bossesDefeated: MAX_PROGRESS_COUNT,
+          cycle: MAX_PROGRESS_COUNT,
+        },
+      },
+    ],
   ];
 
   for (const [label, raw, expected] of accepted) {
@@ -342,6 +476,14 @@ void describe('parseWebviewMessage: acceptances (note 2)', () => {
     assert.deepEqual(parseWebviewMessage(structuredClone({ type: 'ready' })), { type: 'ready' });
   });
 
+  void it('returns a new progress object (no aliasing of the nested value)', () => {
+    const raw = { type: 'saveProgress', progress: { ...PROGRESS } };
+    const parsed = parseWebviewMessage(raw);
+    assert.ok(parsed?.type === 'saveProgress');
+    assert.notEqual(parsed.progress, raw.progress);
+    assert.deepEqual(Object.keys(parsed.progress), Object.keys(DEFAULT_PROGRESS));
+  });
+
   void it('does not mutate its input', () => {
     const raw = { type: 'focusAgent', agentId: 'sim-1' };
     const before = JSON.stringify(raw);
@@ -352,9 +494,10 @@ void describe('parseWebviewMessage: acceptances (note 2)', () => {
 
 void describe('parseHostMessage: rejections (note 3)', () => {
   const cases: [string, unknown][] = [
-    ...shapeAttacks({ type: 'config', config: { protocolVersion: 1 } }).map(
-      ([label, raw]): [string, unknown] => [`config: ${label}`, raw],
-    ),
+    ...shapeAttacks({ type: 'config', config: CONFIG }).map(([label, raw]): [string, unknown] => [
+      `config: ${label}`,
+      raw,
+    ]),
     ...shapeAttacks(agentList([])).map(([label, raw]): [string, unknown] => [
       `agentList: ${label}`,
       raw,
@@ -363,6 +506,18 @@ void describe('parseHostMessage: rejections (note 3)', () => {
       `agentState: ${label}`,
       raw,
     ]),
+    ...shapeAttacks({ type: 'progress', progress: PROGRESS }).map(
+      ([label, raw]): [string, unknown] => [`progress: ${label}`, raw],
+    ),
+    ...progressAttacks().map(([label, progress]): [string, unknown] => [
+      `progress with ${label}`,
+      { type: 'progress', progress },
+    ]),
+    ['progress missing', { type: 'progress' }],
+    [
+      'progress with an extra top-level key',
+      { type: 'progress', progress: PROGRESS, agent: AGENT },
+    ],
     // AgentInfo: missing keys
     ...AGENT_INFO_KEYS.map((key): [string, unknown] => [
       `agent missing ${key}`,
@@ -445,20 +600,50 @@ void describe('parseHostMessage: rejections (note 3)', () => {
     ['agents with a hole', agentList(holey([AGENT, agent({ id: 'b' })]))],
     ['agents with a null entry', agentList([null])],
     // config
-    ['config protocolVersion 2', { type: 'config', config: { protocolVersion: 2 } }],
-    ['config protocolVersion "1"', { type: 'config', config: { protocolVersion: '1' } }],
-    ['config with an extra key', { type: 'config', config: { protocolVersion: 1, sound: true } }],
+    [
+      'config protocolVersion 1 (the old version)',
+      { type: 'config', config: { ...CONFIG, protocolVersion: 1 } },
+    ],
+    ['config protocolVersion 3', { type: 'config', config: { ...CONFIG, protocolVersion: 3 } }],
+    ['config protocolVersion "2"', { type: 'config', config: { ...CONFIG, protocolVersion: '2' } }],
+    ['config with only the old key', { type: 'config', config: { protocolVersion: 2 } }],
+    ['config with an extra key', { type: 'config', config: { ...CONFIG, sound: true } }],
+    ...(['protocolVersion', 'enemiesEnabled', 'killsPerStage', 'maxEnemies'] as const).map(
+      (key): [string, unknown] => {
+        const partial: Record<string, unknown> = { ...CONFIG };
+        delete partial[key];
+        return [`config missing ${key}`, { type: 'config', config: partial }];
+      },
+    ),
+    [
+      'config enemiesEnabled a string',
+      { type: 'config', config: { ...CONFIG, enemiesEnabled: 'true' } },
+    ],
+    ['config enemiesEnabled 1', { type: 'config', config: { ...CONFIG, enemiesEnabled: 1 } }],
+    ...[4, 501, 0, -1, 30.5, Number.NaN, Number.POSITIVE_INFINITY, '30', null].map(
+      (killsPerStage): [string, unknown] => [
+        `config killsPerStage ${String(killsPerStage)}`,
+        { type: 'config', config: { ...CONFIG, killsPerStage } },
+      ],
+    ),
+    ...[0, 13, -1, 6.5, Number.NaN, Number.POSITIVE_INFINITY, '6', null].map(
+      (maxEnemies): [string, unknown] => [
+        `config maxEnemies ${String(maxEnemies)}`,
+        { type: 'config', config: { ...CONFIG, maxEnemies } },
+      ],
+    ),
     ['config empty', { type: 'config', config: {} }],
     ['config missing', { type: 'config' }],
     ['config null', { type: 'config', config: null }],
     ['config an array', { type: 'config', config: [1] }],
     [
       'config with an inherited protocolVersion',
-      { type: 'config', config: Object.create({ protocolVersion: 1 }) as unknown },
+      { type: 'config', config: Object.create(CONFIG) as unknown },
     ],
     // wrong direction and unknown types
     ['ready sent the wrong way', { type: 'ready' }],
     ['focusAgent sent the wrong way', { type: 'focusAgent', agentId: 'a' }],
+    ['saveProgress sent the wrong way', { type: 'saveProgress', progress: PROGRESS }],
     ['an unknown type', { type: 'agentHealth', agent: AGENT }],
   ];
 
@@ -487,11 +672,48 @@ void describe('parseHostMessage: rejections (note 3)', () => {
 });
 
 void describe('parseHostMessage: acceptances (note 3)', () => {
-  void it('accepts config { protocolVersion: 1 }', () => {
-    assert.deepEqual(parseHostMessage({ type: 'config', config: { protocolVersion: 1 } }), {
+  void it('accepts a config with protocolVersion 2 and the three game settings', () => {
+    assert.deepEqual(parseHostMessage({ type: 'config', config: { ...CONFIG } }), {
       type: 'config',
-      config: { protocolVersion: 1 },
+      config: CONFIG,
     });
+  });
+
+  void it('accepts the config range boundaries', () => {
+    for (const config of [
+      { ...CONFIG, killsPerStage: 5, maxEnemies: 1, enemiesEnabled: false },
+      { ...CONFIG, killsPerStage: 500, maxEnemies: 12 },
+    ]) {
+      assert.deepEqual(parseHostMessage({ type: 'config', config }), { type: 'config', config });
+    }
+  });
+
+  void it('accepts a progress message (default, mid-game, and the maximum stage)', () => {
+    for (const progress of [
+      DEFAULT_PROGRESS,
+      PROGRESS,
+      { ...PROGRESS, stageIndex: MAX_STAGE_INDEX },
+    ]) {
+      assert.deepEqual(parseHostMessage({ type: 'progress', progress: { ...progress } }), {
+        type: 'progress',
+        progress,
+      });
+    }
+  });
+
+  void it('accepts a null-prototype progress and a frozen one', () => {
+    const nullProto = Object.assign(Object.create(null) as object, PROGRESS);
+    assert.deepEqual(parseHostMessage({ type: 'progress', progress: nullProto }), {
+      type: 'progress',
+      progress: PROGRESS,
+    });
+    assert.deepEqual(
+      parseHostMessage(deepFreeze({ type: 'progress', progress: { ...PROGRESS } })),
+      {
+        type: 'progress',
+        progress: PROGRESS,
+      },
+    );
   });
 
   void it('accepts an empty agentList and one with 64 agents', () => {
@@ -548,7 +770,7 @@ void describe('parseHostMessage: acceptances (note 3)', () => {
     rawAgent.name = 'changed later';
     assert.equal(parsed.agents[0]?.name, AGENT.name, 'later input changes do not leak in');
 
-    const rawConfig = { type: 'config', config: { protocolVersion: 1 } };
+    const rawConfig = { type: 'config', config: { ...CONFIG } };
     const config = parseHostMessage(rawConfig);
     assert.ok(config?.type === 'config');
     assert.notEqual(config.config, rawConfig.config);
@@ -557,6 +779,11 @@ void describe('parseHostMessage: acceptances (note 3)', () => {
     const state = parseHostMessage(rawState);
     assert.ok(state?.type === 'agentState');
     assert.notEqual(state.agent, rawState.agent);
+
+    const rawProgress = { type: 'progress', progress: { ...PROGRESS } };
+    const progress = parseHostMessage(rawProgress);
+    assert.ok(progress?.type === 'progress');
+    assert.notEqual(progress.progress, rawProgress.progress);
   });
 
   void it('strips extra properties on the agents array (only validated entries are copied)', () => {
@@ -586,7 +813,7 @@ void describe('protocol: cross-realm objects (node:vm)', () => {
   void it('rejects a plain object built in another realm (its Object.prototype differs)', () => {
     assert.equal(parseWebviewMessage(foreign(`{ type: 'ready' }`)), undefined);
     assert.equal(
-      parseHostMessage(foreign(`{ type: 'config', config: { protocolVersion: 1 } }`)),
+      parseHostMessage(foreign(`{ type: 'config', config: ${JSON.stringify(CONFIG)} }`)),
       undefined,
     );
     assert.equal(isAgentInfo(foreign(JSON.stringify(AGENT))), false);
@@ -666,11 +893,42 @@ void describe('creators and the privacy allow-list (note 5)', () => {
     assert.ok(!wire.includes('SECRET'), wire);
   });
 
-  void it('createConfigMessage copies only protocolVersion', () => {
-    const message = createConfigMessage({ protocolVersion: 1, sound: true } as unknown as {
-      protocolVersion: 1;
-    });
-    assert.deepEqual(message, { type: 'config', config: { protocolVersion: 1 } });
+  void it('createConfigMessage copies exactly the four config keys', () => {
+    const message = createConfigMessage({ ...CONFIG, sound: true } as unknown as ConfigSnapshot);
+    assert.deepEqual(message, { type: 'config', config: CONFIG });
+    assert.deepEqual(Object.keys(message.config), [
+      'protocolVersion',
+      'enemiesEnabled',
+      'killsPerStage',
+      'maxEnemies',
+    ]);
+  });
+
+  void it('createProgressMessage and createSaveProgressMessage copy exactly the six progress keys', () => {
+    const leakyProgress = { ...PROGRESS, agentId: 'SECRET', name: 'SECRET' } as unknown as Progress;
+    const host = createProgressMessage(leakyProgress);
+    const web = createSaveProgressMessage(leakyProgress);
+    assert.deepEqual(host, { type: 'progress', progress: PROGRESS });
+    assert.deepEqual(web, { type: 'saveProgress', progress: PROGRESS });
+    assert.ok(!JSON.stringify([host, web]).includes('SECRET'));
+    assert.notEqual(host?.progress, leakyProgress);
+  });
+
+  void it('the progress creators return undefined for an invalid value and never throw', () => {
+    const bad = [
+      { ...PROGRESS, stageIndex: 0 },
+      { ...PROGRESS, totalKills: -1 },
+      { ...PROGRESS, killsInStage: 1.5 },
+      { ...PROGRESS, schemaVersion: 2 },
+      null,
+      undefined,
+      throwingGetter('stageIndex'),
+    ];
+    for (const value of bad) {
+      assert.doesNotThrow(() => createProgressMessage(value as unknown as Progress));
+      assert.equal(createProgressMessage(value as unknown as Progress), undefined);
+      assert.equal(createSaveProgressMessage(value as unknown as Progress), undefined);
+    }
   });
 
   void it('createAgentListMessage drops invalid entries and keeps the first of duplicate ids', () => {
@@ -709,7 +967,8 @@ void describe('creators and the privacy allow-list (note 5)', () => {
 
   void it('every creator output survives structuredClone and parses back deep-equal', () => {
     const outputs = [
-      createConfigMessage({ protocolVersion: PROTOCOL_VERSION }),
+      createConfigMessage(CONFIG),
+      createProgressMessage(PROGRESS),
       createAgentListMessage([]),
       createAgentListMessage([leaky, agent({ id: 'x', toolName: null }) as unknown as AgentInfo]),
       createAgentStateMessage(leaky),

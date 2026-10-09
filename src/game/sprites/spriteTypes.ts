@@ -71,3 +71,6 @@ export type ClassPaletteId = ClassPaletteIdH1 | ClassPaletteIdH2 | ClassPaletteI
  * cosmetic ally drawn from a single (non-layered) template with ids `summons/<name>`.
  */
 export type SummonSpriteId = 'skeleton' | 'beast' | 'turret';
+
+/** Drop kinds (ids `drops/<kind>`). Mirrors DROP_KINDS in src/game/data/drops.ts (developer). */
+export type DropSpriteId = 'coin' | 'gem' | 'ore' | 'chest';

@@ -8,6 +8,7 @@ import { EXIT_FAILSAFE_MS, HAIR_COLOR_COUNT, SKIN_TONE_COUNT } from './data/tuni
 import { guarded } from './entities/Entity';
 import type { World } from './entities/Entity';
 import type { Hero, HeroFactory } from './entities/Hero';
+import type { FighterBuffer } from './Fighters';
 import type { ErrorSink } from './ports';
 import { hashId } from './rng';
 import type { HeroLook } from './sprites/spriteFactory';
@@ -140,6 +141,19 @@ export class Roster {
       }
     }
     return n;
+  }
+
+  /**
+   * Copies slot, position, and the two cosmetic counters of every hero in advance, attack, or
+   * ability into `out` (ADR 0013). Reads heroes, writes nothing to any of them.
+   */
+  collectFighters(out: FighterBuffer): void {
+    out.clear();
+    for (const hero of this.#list) {
+      if (hero.phase === 'advance' || hero.phase === 'attack' || hero.phase === 'ability') {
+        out.push(hero.slot, hero.x, hero.y, hero.strikeSerial, hero.abilitySerial);
+      }
+    }
   }
 
   /** Heroes resting at the fire (drives the campfire size). */

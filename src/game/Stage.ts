@@ -127,13 +127,15 @@ function hasTransparency(t: SpriteTemplate): boolean {
 
 class TilePicker {
   readonly #stageIndex: number;
+  readonly #stageId: string;
   readonly #sprites: StageSprites;
   readonly #cache: SpriteCache;
   readonly #solidWalls: readonly SpriteTemplate[];
   readonly #windows: readonly SpriteTemplate[];
 
-  constructor(stageIndex: number, sprites: StageSprites, cache: SpriteCache) {
+  constructor(stageIndex: number, stageId: string, sprites: StageSprites, cache: SpriteCache) {
     this.#stageIndex = stageIndex;
+    this.#stageId = stageId;
     this.#sprites = sprites;
     this.#cache = cache;
     this.#solidWalls = sprites.tiles.wallMid.filter((t) => !hasTransparency(t));
@@ -143,7 +145,10 @@ class TilePicker {
   #pick(list: readonly SpriteTemplate[], zone: StageZone, col: number, row: number): Bitmap {
     const h = hashCell(this.#stageIndex, ZONE_CODE[zone], col, row);
     const t = list[h % Math.max(1, list.length)];
-    const frame = t === undefined ? undefined : this.#cache.sheet(t).frames[0];
+    const frame =
+      t === undefined
+        ? undefined
+        : this.#cache.sheet(t, this.#cache.stagePalette(this.#stageId)).frames[0];
     if (frame === undefined) {
       throw new RangeError('Stage tile set is empty');
     }
@@ -202,8 +207,10 @@ export function buildStage(
   if (sprites === undefined || clearChar === undefined || ambientChar === undefined) {
     throw new RangeError('Stage art is missing');
   }
-  const clearColor = art.palette[clearChar] ?? '#000000';
-  const picker = new TilePicker(def.index, sprites, cache);
+  // Per-stage partial palette over the master (E1-2); the cellar's is empty.
+  const stagePalette = cache.stagePalette(def.id);
+  const clearColor = stagePalette[clearChar] ?? '#000000';
+  const picker = new TilePicker(def.index, def.id, sprites, cache);
 
   const zones: readonly StageZone[] = ['alcove', 'door', 'corridor'];
   const strips = new Map<StageZone, ReturnType<BitmapFactory['createOffscreen']>>();
@@ -230,7 +237,7 @@ export function buildStage(
       if (template === undefined) {
         throw new RangeError('Stage prop is missing');
       }
-      const sheet = cache.sheet(template);
+      const sheet = cache.sheet(template, stagePalette);
       const top = p.y - sheet.anchor.y;
       const strip = strips.get(p.zone);
       if (p.light !== null) {
@@ -257,7 +264,7 @@ export function buildStage(
           x: p.x,
           y: top,
           sheet,
-          frameMs: p.prop === 'torch' ? TORCH_FRAME_MS : PROP_FRAME_MS,
+          frameMs: p.prop === 'torch' || p.prop === 'lantern' ? TORCH_FRAME_MS : PROP_FRAME_MS,
         });
       } else {
         const frame = sheet.frames[0];
@@ -303,7 +310,7 @@ export function buildStage(
     corridorStrip: corridor.bitmap,
     nearForeground: foregroundNear.bitmap,
     corridorForeground: foregroundCorridor.bitmap,
-    backdrop: cache.sheet(sprites.backdrop),
+    backdrop: cache.sheet(sprites.backdrop, stagePalette),
     nav: buildNav(def, sprites),
     lights,
     livePropsBehind: live,

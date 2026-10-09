@@ -45,6 +45,24 @@ export const SUMMON_RISE_TOTAL_MS: number =
 export const SUMMON_SINK_TOTAL_MS: number =
   (SUMMON_FRAME_MS['sink']?.[0] ?? 100) * SUMMON_SINK_FRAMES;
 
+/**
+ * Enemy animation name -> per-frame durations in ms (E1 plan section 3.5). `idle`, `walk`, and
+ * `attack` loop; `telegraph` (a boss's 2-frame wind-up) and `intro` play once.
+ */
+export const ENEMY_FRAME_MS: Readonly<Record<string, readonly number[]>> = {
+  idle: [400],
+  walk: [160],
+  attack: [140, 90, 160],
+  telegraph: [250],
+  intro: [600],
+};
+
+/** Length of one enemy `attack` animation, in ms. */
+export const ENEMY_ATTACK_TOTAL_MS: number = (ENEMY_FRAME_MS['attack'] ?? []).reduce(
+  (a, b) => a + b,
+  0,
+);
+
 const FALLBACK_FRAME_MS: readonly number[] = [500];
 
 /** Frame index for `elapsedMs` into the named hero animation. Allocation-free. */
@@ -55,6 +73,20 @@ export function heroFrameIndex(name: string, elapsedMs: number, frameCount: numb
 /** Looping frame index of a summon animation (`idle`, `walk`, `attack`). Allocation-free. */
 export function summonFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
   return tableFrameIndex(SUMMON_FRAME_MS, name, elapsedMs, frameCount);
+}
+
+/** Looping frame index of an enemy animation (`idle`, `walk`, `attack`). Allocation-free. */
+export function enemyFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
+  return tableFrameIndex(ENEMY_FRAME_MS, name, elapsedMs, frameCount);
+}
+
+/** Frame index of a once-only enemy animation (`telegraph`, `intro`): clamps at the last frame. */
+export function enemyOnceFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
+  if (frameCount <= 1 || !(elapsedMs > 0)) {
+    return 0;
+  }
+  const frameMs = ENEMY_FRAME_MS[name]?.[0] ?? FALLBACK_FRAME_MS[0] ?? 500;
+  return Math.min(frameCount - 1, Math.floor(elapsedMs / frameMs));
 }
 
 /** Frame index of a once-only summon animation: clamps at the last frame. Allocation-free. */

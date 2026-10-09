@@ -12,6 +12,7 @@ const COLORS: ParticleColors = {
   spark: ['#s1', '#s2'],
   drip: ['#d1', '#d2'],
   splash: ['#p1', '#p2'],
+  mote: ['#m1', '#m2'],
 };
 
 void describe('Particles', () => {

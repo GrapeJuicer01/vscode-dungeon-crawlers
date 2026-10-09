@@ -124,6 +124,28 @@
           "maximum": 10000,
           "scope": "window",
           "markdownDescription": "Milliseconds between transcript polls."
+        },
+        "pixelAgents.enemies": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "Show enemies and stage progress. Off: the party marches in an empty corridor. Enemies are scenery: heroes take no damage either way."
+        },
+        "pixelAgents.killsPerStage": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 500,
+          "scope": "window",
+          "markdownDescription": "Enemies the party defeats in a stage before the stage boss appears."
+        },
+        "pixelAgents.maxEnemies": {
+          "type": "integer",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 12,
+          "scope": "window",
+          "markdownDescription": "Most enemies on screen at once. Waves are also sized by the number of fighting heroes."
         }
       }
     }

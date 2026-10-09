@@ -91,6 +91,8 @@ export class Hero extends GuardedEntity {
   #engageMs = 0;
   #attackFrame = -1;
   #abilityReleased = false;
+  #strikeSerial = 0;
+  #abilitySerial = 0;
   #sparkDebt = 0;
 
   constructor(init: HeroInit) {
@@ -163,6 +165,16 @@ export class Hero extends GuardedEntity {
   /** The cosmetic class, or null for the base hero. Set once from the id; never changes. */
   get classId(): string | null {
     return this.look.classId;
+  }
+
+  /** Counts strikes released; read by Roster.collectFighters. Never read for lifecycle or phase. */
+  get strikeSerial(): number {
+    return this.#strikeSerial;
+  }
+
+  /** Counts abilities released; read by Roster.collectFighters. */
+  get abilitySerial(): number {
+    return this.#abilitySerial;
   }
 
   get faceRight(): boolean {
@@ -295,7 +307,14 @@ export class Hero extends GuardedEntity {
   draw(ctx: DrawContext): void {
     const world = ctx.world;
     this.#sprites ??= world.cache.hero(this.look, this.heroLayers(world));
-    const set = this.#sprites[this.#animationName()];
+    // A brief white silhouette after an enemy attack (cosmetic; ADR 0013). Warp phases ignore it.
+    // Only how the hero is drawn changes: x, y, phase, and lifecycle are never written here.
+    const warping = this.#phase === 'warpIn' || this.#phase === 'warpOut';
+    const flashing = !warping && ctx.reactions.flashing(this.slot);
+    const sprites = flashing
+      ? world.cache.heroFlash(this.look, this.heroLayers(world))
+      : this.#sprites;
+    const set = sprites[this.#animationName()];
     if (set === undefined) {
       return;
     }
@@ -330,7 +349,8 @@ export class Hero extends GuardedEntity {
       return;
     }
     const flip = !this.#faceRight;
-    const dx = flip ? x - (set.w - 1 - set.anchor.x) : x - set.anchor.x;
+    const slide = ctx.reactions.offsetPx(this.slot);
+    const dx = (flip ? x - (set.w - 1 - set.anchor.x) : x - set.anchor.x) + slide;
     ctx.surface.drawBitmap(frame, dx, dy, flip);
   }
 
@@ -543,6 +563,7 @@ export class Hero extends GuardedEntity {
     if (frame !== this.#attackFrame) {
       this.#attackFrame = frame;
       if (frame === ATTACK_STRIKE_FRAME) {
+        this.#strikeSerial++;
         this.onAttackStrike(world);
       }
     }
@@ -558,6 +579,7 @@ export class Hero extends GuardedEntity {
       heroFrameIndex('ability', this.#animMs, ABILITY_FRAME_COUNT) >= ABILITY_RELEASE_FRAME
     ) {
       this.#abilityReleased = true;
+      this.#abilitySerial++;
       this.onAbilityRelease(world);
     }
     if (this.#phaseMs >= ABILITY_TOTAL_MS) {

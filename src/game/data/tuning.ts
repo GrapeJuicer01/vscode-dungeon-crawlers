@@ -103,3 +103,75 @@ export const SUMMON_SHADOW_PX: Readonly<Record<SummonId, number>> = {
   beast: 12,
   turret: 10,
 };
+
+// ---- Enemies, combat, and stages (E1, ADR 0013) ----
+// Cosmetic and engine-safety values, constants and not settings (decision H4-5). Enemy numbers
+// (health, speed, attack timing) live in data/enemies.ts, not here.
+/** Pooled regular enemies. The one boss uses a separate pooled instance. */
+export const ENEMY_CAPACITY = 12;
+/** Spawn x, off the right edge of the 320 px view. */
+export const ENEMY_SPAWN_X = 340;
+/** Lanes by foot y: 156 - 5 * lane, so a wave of six does not stack on one pixel row. */
+export const ENEMY_LANE_COUNT = 4;
+export const ENEMY_LANE_FOOT_Y = 156;
+export const ENEMY_LANE_STEP_PX = 5;
+/** Gap between the front of the party and where enemies stand. */
+export const ENEMY_GAP_PX = 14;
+export const ENEMY_STAND_MAX_X = 300;
+/** The boss stands closer than this x at most, so its wide body does not leave the view. */
+export const BOSS_STAND_MAX_X = 288;
+export const BOSS_GAP_PX = 28;
+/** A withdrawing enemy is released once it passes this x. */
+export const ENEMY_RELEASE_X = 340;
+/** Pause after a wave is cleared before the next spawns. */
+export const WAVE_GAP_MS = 1200;
+/** No fighters for this long makes every live enemy walk off. */
+export const WITHDRAW_AFTER_MS = 2000;
+/** Spawn weight of a regular row: minions are three times as common as the elite. */
+export const MINION_WEIGHT = 3;
+export const ELITE_WEIGHT = 1;
+/** An enemy flashes white this long after a strike. */
+export const ENEMY_FLASH_MS = 100;
+/** A bar stays visible this long after the last strike (always visible for an engaged boss). */
+export const ENEMY_BAR_SHOW_MS = 2500;
+export const ENEMY_DISSOLVE_FRAME_MS = 100;
+/** Engine-generated dissolve frames per enemy (spriteFactory builds them). */
+export const ENEMY_DISSOLVE_FRAMES = 4;
+/** Boss telegraph (2 frames) before each attack, and its intro pose. */
+export const ENEMY_TELEGRAPH_MS = 500;
+export const ENEMY_INTRO_MS = 1200;
+/** Attack animation frame on which an enemy's attack lands (the cosmetic reaction fires). */
+export const ENEMY_ATTACK_STRIKE_FRAME = 1;
+/** Boss phase 2 below this fraction of its health: attacks come at this multiple of the interval. */
+export const BOSS_PHASE2_FRACTION = 0.5;
+export const BOSS_PHASE2_INTERVAL_FACTOR = 0.7;
+/** Fighters a boss slam reaches, and a regular attack reaches. */
+export const BOSS_SLAM_TARGETS = 3;
+/** Strikes counted per fighter per step at most (a guard against a runaway serial). */
+export const MAX_SERIAL_DELTA = 2;
+/** Combat faults before combat is disabled for the page load. */
+export const COMBAT_FAULT_LIMIT = 3;
+/** Draw faults before the drop pass or the fade is disabled. */
+export const PASS_FAULT_LIMIT = 3;
+/** After the boss falls: hold, then the stage changes behind a dark fade. */
+export const STAGE_CLEAR_HOLD_MS = 1200;
+export const STAGE_FADE_MS = 400;
+/** The boot gate (waiting for the stored progress) gives up after this much game time. */
+export const PROGRESS_WAIT_MS = 1500;
+/** Impact sparks emitted on every strike that lands. */
+export const HIT_SPARKS = 2;
+
+// ---- Hero hit reactions (cosmetic; ADR 0013) ----
+/** A struck hero shows a white silhouette this long, at most once per gap (photosensitivity). */
+export const HERO_FLASH_MS = 100;
+export const HERO_FLASH_GAP_MS = 500;
+/** Slide in whole pixels (strong = a boss slam), decaying to 0 over HERO_KNOCK_MS. */
+export const HERO_KNOCK_PX = 1;
+export const HERO_KNOCK_STRONG_PX = 2;
+export const HERO_KNOCK_MS = 160;
+
+// ---- Stage 2 ambient (dust motes) ----
+export const MOTE_MIN_Y = 40;
+export const MOTE_MAX_Y = 150;
+export const MOTE_LIFE_MIN_MS = 2500;
+export const MOTE_LIFE_MAX_MS = 4500;

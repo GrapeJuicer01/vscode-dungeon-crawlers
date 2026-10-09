@@ -16,7 +16,7 @@ import type { SpriteTemplate } from '../../src/game/sprites/spriteTypes';
 /** A deep, mutable copy of the shipped art (it is plain data). */
 type MutableArt = Omit<ArtSet, 'skinTones' | 'hairColors' | 'particlePalette'> & {
   -readonly [K in 'skinTones' | 'hairColors']: Palette[];
-} & { particlePalette: Record<'ember' | 'spark' | 'drip' | 'splash', string[]> };
+} & { particlePalette: Record<'ember' | 'spark' | 'drip' | 'splash' | 'mote', string[]> };
 
 function cloneArt(): MutableArt {
   return structuredClone(SHIPPED_ART) as unknown as MutableArt;

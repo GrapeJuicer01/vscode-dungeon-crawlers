@@ -10,13 +10,18 @@ import {
   SKIN_TONES,
   STAGE_AMBIENT_CHAR,
   STAGE_CLEAR_CHAR,
+  STAGE_PALETTES,
   STAGE_TILE_CHARS,
 } from './palettes';
 import {
   BASE_HERO,
   CAMPFIRE,
   CLASS_LAYERS,
+  DROP_SPRITES,
   EFFECT_SPRITES,
+  ENEMY_BAR,
+  ENEMY_PHASE_PALETTES,
+  ENEMY_SPRITES,
   STAGE_SPRITES,
   SUMMON_SPRITES,
 } from './spriteTemplates';
@@ -37,4 +42,9 @@ export const SHIPPED_ART: ArtSet = {
   classPalettes: CLASS_PALETTES,
   effects: EFFECT_SPRITES,
   summons: SUMMON_SPRITES,
+  stagePalettes: STAGE_PALETTES,
+  enemies: ENEMY_SPRITES,
+  enemyPhasePalettes: ENEMY_PHASE_PALETTES,
+  drops: DROP_SPRITES,
+  enemyBar: ENEMY_BAR,
 };

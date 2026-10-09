@@ -12,7 +12,6 @@ import {
   ABILITY_INTERVAL_MIN_MS,
   STEP_MS,
 } from '../../src/game/data/tuning';
-import { Camera } from '../../src/game/Camera';
 import { ClassHero, createHero } from '../../src/game/entities/ClassHero';
 import type { World } from '../../src/game/entities/Entity';
 import { Hero } from '../../src/game/entities/Hero';
@@ -20,6 +19,7 @@ import type { HeroInit } from '../../src/game/entities/Hero';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
 import {
   artWithoutClasses,
+  drawContext,
   idsOfClass,
   info,
   lookFor,
@@ -465,7 +465,7 @@ void describe('what the hooks receive', () => {
 void describe('the look', () => {
   function drawn(hero: Hero, w: ClassWorld): FakeBitmap {
     const surface = new RecordingSurface();
-    hero.draw({ surface, camera: new Camera(), world: w.world });
+    hero.draw(drawContext(surface, w));
     assert.equal(surface.count('drawBitmap'), 1);
     assert.equal(surface.count('fillRect'), 0);
     const bitmap = surface.calls[0]?.args[0];
@@ -554,7 +554,7 @@ void describe('the look', () => {
       const surface = new RecordingSurface();
       for (let i = 0; i < 20_000 / STEP_MS; i++) {
         r.advance(STEP_MS);
-        r.hero.draw({ surface, camera: new Camera(), world: w.world });
+        r.hero.draw(drawContext(surface, w));
       }
       assert.equal(surface.count('fillRect'), 0, cls);
       assert.equal(surface.count('drawBitmapRegion'), 0, cls);

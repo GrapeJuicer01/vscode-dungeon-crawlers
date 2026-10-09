@@ -4,8 +4,18 @@
 // bounds of every layer), then recoloured through the skin and hair swaps, then rasterized.
 import type { Bitmap, BitmapFactory } from '../ports';
 import type { ParticleKind } from '../Particles';
+import { ENEMIES } from '../data/enemies';
+import { STAGES } from '../data/stages';
+import { ENEMY_DISSOLVE_FRAMES } from '../data/tuning';
+import { hashCell, hashId } from '../rng';
 import type { Palette } from './palettes';
-import type { CampfireSprites, HeroLayerSet, SpriteTemplate, StageSprites } from './spriteTypes';
+import type {
+  CampfireSprites,
+  DropSpriteId,
+  HeroLayerSet,
+  SpriteTemplate,
+  StageSprites,
+} from './spriteTypes';
 
 /**
  * Skin and hair are indexes into the swap lists. `accent` is a CSS colour ('#rrggbb') that
@@ -51,6 +61,47 @@ export interface ArtSet {
   readonly effects: Readonly<Record<string, SpriteTemplate>>;
   /** Summon id -> single non-layered template with idle, walk, attack, rise, sink (H2). */
   readonly summons: Readonly<Record<string, SpriteTemplate>>;
+  /** Stage id -> partial overrides of the stage characters over the master palette (E1-2). */
+  readonly stagePalettes: Readonly<Record<string, Palette>>;
+  /** Enemy id -> single template `enemies/<id>`, left-facing, foot anchor (E1). */
+  readonly enemies: Readonly<Record<string, SpriteTemplate>>;
+  /** Boss id -> palettes for phases 2..n, partial overrides over the master palette (E1). */
+  readonly enemyPhasePalettes: Readonly<Record<string, readonly Palette[]>>;
+  /** Drop kind -> template `drops/<kind>` (E1). */
+  readonly drops: Readonly<Record<DropSpriteId, SpriteTemplate>>;
+  /** Enemy bar frames (outline, transparent interior) and the fill and back characters. */
+  readonly enemyBar: {
+    readonly frame: SpriteTemplate;
+    readonly bossFrame: SpriteTemplate;
+    readonly fillChar: string;
+    readonly backChar: string;
+  };
+}
+
+/** The character used for every white silhouette (hit flashes). It is a master character. */
+const FLASH_CHAR = 'w';
+
+/** Pure: every opaque character becomes the flash character; '.' stays transparent. */
+export function silhouetteRows(rows: readonly string[]): string[] {
+  return rows.map((row) => row.replace(/[^.]/g, FLASH_CHAR));
+}
+
+/**
+ * Pure: the dissolve frame `step` (0-based, of ENEMY_DISSOLVE_FRAMES) of one frame. Each opaque
+ * pixel gets a seeded rank; the frame keeps the pixels whose rank is at least
+ * (step + 1) / (ENEMY_DISSOLVE_FRAMES + 1), so frames are nested and strictly lose pixels.
+ */
+export function dissolveRows(rows: readonly string[], seed: number, step: number): string[] {
+  const threshold = (step + 1) / (ENEMY_DISSOLVE_FRAMES + 1);
+  return rows.map((row, y) => {
+    let out = '';
+    for (let x = 0; x < row.length; x++) {
+      const ch = row.charAt(x);
+      const rank = (hashCell(x, y, seed & 0xffff, seed >>> 16) % 1000) / 1000;
+      out += ch === '.' || rank < threshold ? '.' : ch;
+    }
+    return out;
+  });
 }
 
 /** Extents in pixels left of, right of, above, and below the anchor. */
@@ -194,12 +245,30 @@ export function heroFrameNames(layers: HeroLayerSet): readonly string[] {
   return Object.keys(layers.body.animations);
 }
 
+function heroKey(look: HeroLook, layers: HeroLayerSet): string {
+  return [
+    look.classId ?? '-',
+    look.skin,
+    look.hair,
+    look.accent ?? '-',
+    layers.body.id,
+    layers.head.id,
+    layers.gear?.id ?? '-',
+    layers.weapon.id,
+  ].join('|');
+}
+
 export class SpriteCache {
   readonly #bitmaps: BitmapFactory;
   readonly #art: ArtSet;
   readonly #heroes = new Map<string, HeroSprites>();
   readonly #sheets = new Map<string, FrameSet>();
   readonly #summons = new Map<string, HeroSprites>();
+  readonly #heroFlashes = new Map<string, HeroSprites>();
+  readonly #enemies = new Map<string, HeroSprites | null>();
+  readonly #enemyFlashes = new Map<string, HeroSprites | null>();
+  readonly #enemyDissolves = new Map<string, FrameSet | null>();
+  readonly #stagePalettes = new Map<string, Palette>();
 
   constructor(bitmaps: BitmapFactory, art: ArtSet) {
     this.#bitmaps = bitmaps;
@@ -253,20 +322,32 @@ export class SpriteCache {
 
   /** Built lazily per look and layer set, then cached. */
   hero(look: HeroLook, layers: HeroLayerSet): HeroSprites {
-    const key = [
-      look.classId ?? '-',
-      look.skin,
-      look.hair,
-      look.accent ?? '-',
-      layers.body.id,
-      layers.head.id,
-      layers.gear?.id ?? '-',
-      layers.weapon.id,
-    ].join('|');
+    const key = heroKey(look, layers);
     const hit = this.#heroes.get(key);
     if (hit !== undefined) {
       return hit;
     }
+    const out = this.#buildHero(look, layers, false);
+    this.#heroes.set(key, out);
+    return out;
+  }
+
+  /**
+   * White silhouettes of the composited hero rows (the cosmetic hit flash, E1), same sizes and
+   * anchor as `hero(look, layers)`. Built lazily per look on the first flash.
+   */
+  heroFlash(look: HeroLook, layers: HeroLayerSet): HeroSprites {
+    const key = heroKey(look, layers);
+    const hit = this.#heroFlashes.get(key);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const out = this.#buildHero(look, layers, true);
+    this.#heroFlashes.set(key, out);
+    return out;
+  }
+
+  #buildHero(look: HeroLook, layers: HeroLayerSet, silhouette: boolean): HeroSprites {
     const palette: Palette = {
       ...this.#art.palette,
       ...(look.classId === null ? {} : (this.#art.classPalettes[look.classId] ?? {})),
@@ -284,17 +365,163 @@ export class SpriteCache {
       const count = layers.body.animations[name]?.length ?? 0;
       const frames: Bitmap[] = [];
       for (let i = 0; i < count; i++) {
-        const rows = heroFrameRows(layers, name, i);
+        const composed = heroFrameRows(layers, name, i);
+        const rows = silhouette ? silhouetteRows(composed) : composed;
         frames.push(this.#bitmaps.fromRgba(w, h, rasterizeFrame(rows, w, h, palette)));
       }
       out[name] = { w, h, anchor: { x: bounds.left, y: bounds.up }, frames };
     }
-    this.#heroes.set(key, out);
     return out;
   }
 
-  /** Any non-hero template: its `idle` frames, cached by template id. */
-  sheet(template: SpriteTemplate): FrameSet {
+  /**
+   * The master palette plus a stage's partial overrides (E1-2), cached by stage id. A stage with
+   * no entry gets the master palette itself.
+   */
+  stagePalette(stageId: string): Palette {
+    const hit = this.#stagePalettes.get(stageId);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const overrides = Object.hasOwn(this.#art.stagePalettes, stageId)
+      ? this.#art.stagePalettes[stageId]
+      : undefined;
+    const merged: Palette =
+      overrides === undefined ? this.#art.palette : { ...this.#art.palette, ...overrides };
+    this.#stagePalettes.set(stageId, merged);
+    return merged;
+  }
+
+  /** A CSS colour for a palette character (the bar fill); white for an unknown one. */
+  css(char: string): string {
+    return this.#art.palette[char] ?? '#ffffff';
+  }
+
+  /**
+   * Every animation of an enemy, rasterized over its stage's merged palette (master plus the
+   * stage overrides, so Stage 2 characters 1-8 take the mine colors); phase 2 and later apply the
+   * boss's phase palette on top of that. Null when the art set lacks the enemy (the draw is skipped).
+   */
+  enemy(id: string, phase: number): HeroSprites | null {
+    const template = Object.hasOwn(this.#art.enemies, id) ? this.#art.enemies[id] : undefined;
+    if (template === undefined) {
+      return null;
+    }
+    const key = `${id}|${phase}`;
+    const hit = this.#enemies.get(key);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const out = this.#buildAnimations(template, this.#enemyPalette(id, phase), false);
+    this.#enemies.set(key, out);
+    return out;
+  }
+
+  /** White silhouettes of every enemy animation frame (the hit flash), or null when no art. */
+  enemyFlash(id: string): HeroSprites | null {
+    const template = Object.hasOwn(this.#art.enemies, id) ? this.#art.enemies[id] : undefined;
+    if (template === undefined) {
+      return null;
+    }
+    const hit = this.#enemyFlashes.get(id);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const out = this.#buildAnimations(template, this.#enemyPalette(id, 1), true);
+    this.#enemyFlashes.set(id, out);
+    return out;
+  }
+
+  /** ENEMY_DISSOLVE_FRAMES frames of idle frame 0, pixels removed in a seeded order; null if no art. */
+  enemyDissolve(id: string): FrameSet | null {
+    const template = Object.hasOwn(this.#art.enemies, id) ? this.#art.enemies[id] : undefined;
+    const base = template?.animations['idle']?.[0];
+    if (template === undefined || base === undefined) {
+      return null;
+    }
+    const hit = this.#enemyDissolves.get(id);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const seed = hashId(id);
+    const frames: Bitmap[] = [];
+    for (let step = 0; step < ENEMY_DISSOLVE_FRAMES; step++) {
+      frames.push(
+        this.#bitmaps.fromRgba(
+          template.w,
+          template.h,
+          rasterizeFrame(
+            dissolveRows(base, seed, step),
+            template.w,
+            template.h,
+            this.#enemyPalette(id, 1),
+          ),
+        ),
+      );
+    }
+    const set: FrameSet = { w: template.w, h: template.h, anchor: template.anchor, frames };
+    this.#enemyDissolves.set(id, set);
+    return set;
+  }
+
+  /** A drop's `idle` frames, or null when the art set lacks the kind. */
+  drop(kind: string): FrameSet | null {
+    const template = Object.hasOwn(this.#art.drops, kind)
+      ? this.#art.drops[kind as DropSpriteId]
+      : undefined;
+    return template === undefined ? null : this.sheet(template);
+  }
+
+  /** The enemy bar frame (outline) or the boss bar frame. */
+  barFrame(boss: boolean): FrameSet {
+    return this.sheet(boss ? this.#art.enemyBar.bossFrame : this.#art.enemyBar.frame);
+  }
+
+  /** The fill and back characters of the bar. */
+  get barChars(): { readonly fillChar: string; readonly backChar: string } {
+    return this.#art.enemyBar;
+  }
+
+  /**
+   * The enemy's stage palette (its ENEMIES row carries the stage index) with the boss phase palette
+   * laid over it from phase 2. An unknown id or stage falls back to the master palette. The cache
+   * keys stay `id|phase` because an enemy belongs to exactly one stage.
+   */
+  #enemyPalette(id: string, phase: number): Palette {
+    const row = ENEMIES.find((r) => r.id === id);
+    const stage = row === undefined ? undefined : STAGES.find((d) => d.index === row.stage);
+    const base = stage === undefined ? this.#art.palette : this.stagePalette(stage.id);
+    if (phase < 2) {
+      return base;
+    }
+    const list = Object.hasOwn(this.#art.enemyPhasePalettes, id)
+      ? this.#art.enemyPhasePalettes[id]
+      : undefined;
+    const override = list?.[Math.min(phase - 2, (list?.length ?? 1) - 1)];
+    return override === undefined ? base : { ...base, ...override };
+  }
+
+  #buildAnimations(template: SpriteTemplate, palette: Palette, silhouette: boolean): HeroSprites {
+    const out: Record<string, FrameSet> = {};
+    for (const [name, animation] of Object.entries(template.animations)) {
+      const frames = animation.map((rows) =>
+        this.#bitmaps.fromRgba(
+          template.w,
+          template.h,
+          rasterizeFrame(silhouette ? silhouetteRows(rows) : rows, template.w, template.h, palette),
+        ),
+      );
+      out[name] = { w: template.w, h: template.h, anchor: template.anchor, frames };
+    }
+    return out;
+  }
+
+  /**
+   * Any non-hero template: its `idle` frames, cached by template id. `palette` defaults to the
+   * master palette; stage templates pass `stagePalette(stageId)`. Template ids are unique, so the
+   * cache needs no palette key as long as a template is always built with the same palette.
+   */
+  sheet(template: SpriteTemplate, palette: Palette = this.#art.palette): FrameSet {
     const hit = this.#sheets.get(template.id);
     if (hit !== undefined) {
       return hit;
@@ -307,7 +534,7 @@ export class SpriteCache {
       this.#bitmaps.fromRgba(
         template.w,
         template.h,
-        rasterizeFrame(rows, template.w, template.h, this.#art.palette),
+        rasterizeFrame(rows, template.w, template.h, palette),
       ),
     );
     const set: FrameSet = { w: template.w, h: template.h, anchor: template.anchor, frames };

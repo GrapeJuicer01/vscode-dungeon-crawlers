@@ -3,6 +3,7 @@
 import type { Camera } from '../Camera';
 import type { EffectPool } from '../Effects';
 import type { Engagement } from '../Engagement';
+import type { HitReactions } from '../HitReactions';
 import type { ErrorSink, Surface } from '../ports';
 import type { Particles } from '../Particles';
 import type { SummonPool } from '../Summons';
@@ -11,6 +12,10 @@ import type { SpriteCache } from '../sprites/spriteFactory';
 import type { StageRuntime } from '../Stage';
 import type { Campfire } from './Campfire';
 import { FAULT_LIMIT } from '../data/tuning';
+
+// Re-exported so enemy-side files can use the shared guard without importing src/shared directly
+// (combatStructure.test.ts limits the enemy side to Entity and a few support modules).
+export { assertNever } from '../../shared/assertNever';
 
 export interface World {
   readonly stage: StageRuntime;
@@ -27,6 +32,8 @@ export interface DrawContext {
   readonly surface: Surface;
   readonly camera: Camera;
   readonly world: World;
+  /** The cosmetic reaction board; only Hero.draw reads it (ADR 0013). World is unchanged. */
+  readonly reactions: HitReactions;
 }
 
 /** Fault bookkeeping the guard reads and writes. */

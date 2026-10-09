@@ -38,7 +38,7 @@ export type Palette = Record<string, string>; // palette char -> color
 
 - **Heroes:** the required set is eleven animations: `idle` 2, `walk` 4, `attack` 3, `ability` 3, `sit` 2, `eat` 2, `sleep` 2, `polish` 2, `read` 2, `warmHands` 2, `victory` 2 = 26 frames per layer. `ability` (the class signature move, added in A1-1) is a generic raise, thrust, recover pose on the base hero that the base hero never plays; the renderer times it 120/140/200 ms. There are no hurt, downed, dying, or dead animations for heroes, and the validator rejects those names.
 - **Effects** (`EFFECT_SPRITES`, A1-1) use `idle` only, with the anchor at the sprite centre (`floor(w/2)`, `floor(h/2)`), drawn with master characters (assumption: no class palette is applied to effects), at most 8 colors, no outline on the 24-wide ones.
-- **Everything that is not a hero** (campfire, tiles, props, backdrop; later enemies and bosses) uses the single animation name **`idle`**. A static sprite has one frame; a loop (flame, torch, ripple) has several. Enemy-only extras (`attack`, `hit`, `death`, `telegraph`) arrive with E1 and are listed in the style guide when added.
+- **Everything that is not a hero** (campfire, tiles, props, backdrop; later enemies and bosses) uses the single animation name **`idle`**. A static sprite has one frame; a loop (flame, torch, ripple) has several. Enemies add `walk`, `attack`, and for bosses `telegraph` and `intro` (section 10); there is no `hit` or `death` art, the engine makes the flash and the dissolve.
 - **Class layer sets** (`CLASS_LAYERS`, A1-2 and A1-3): the `body` is the shared base template object (id `hero/body`, recolored by the class palette); `head` (16x20), `gear` (16x20, never `null` for a class) and `weapon` (24x20) are class-specific, ids `<class>/head`, `<class>/gear`, `<class>/weapon`, anchor `(8, 19)` like the base hero. They are rendered from the same poses as the base hero, so hand and torso positions match the body in every frame. `attack` is exactly 3 frames. A class head may sit 1 px lower or forward (Mage 1 px down so the hat cone fits, Rogue 1 px down and 1 px forward for the crouch and lean). The weapon layer is empty except in `idle`, `walk`, `attack`, `ability`, `victory`, and `polish`; head and gear stay visible in every rest pose. Layer outlines are added per piece with `Grid.outline`; gear and weapon outlines never cover skin or the eye pixel.
 - Heroes are layered: `body`, `head`, `gear`, `weapon`, composited in that order. All layers share the animation names and frame counts; a layer may hold all-transparent frames (the weapon layer is empty while resting, except `polish`). `gear` is `null` in the classless base hero.
 
@@ -106,6 +106,8 @@ A template is valid when every row length equals `w`, every frame has `h` rows, 
 | `CLASS_LAYERS` | `classTemplates.ts`, re-exported from `spriteTemplates.ts` (A1-2, A1-3) | `Readonly<Record<string, HeroLayerSet>>`, keys `warrior`, `mage`, `archer`, `rogue`; all eleven animations, 26 frames per layer |
 | `HERO_POSES`, `HERO_HEAD`, `HeroPose` | `heroTemplates.ts` | base pose data the class layers are derived from (art-internal; the engine does not import them) |
 
+Stage 2 (`stage2Templates.ts`, `GOBLIN_MINE_SHAFTS`, registered in `STAGE_SPRITES`) props are keyed `support`, `pickaxe`, `oreVein`, `lantern` (4 frames), `minecart`, `rubble`, `doorFrame`, ids `goblin-mine-shafts/<name>`; it has no `barrel`, `crate`, `bonePile`, `puddle`, `cobweb`, `chains`, or `torch`, so the per-stage required-prop list in `spriteValidator.ts` must become per stage.
+
 Stage props are keyed by their short name (`barrel`, `crate`, `bonePile`, `puddle`, `cobweb`, `chains`, `torch`, `doorFrame`), while template ids are `forgotten-cellar/<name>` so the sprite cache never collides across stages.
 
 H2 exports (batch A2, new files so the H1 art files stay clean):
@@ -139,3 +141,26 @@ A summon is a cosmetic ally a class may call (the Necromancer's skeleton, the Dr
 
 - **Floor frames**: `rise` and `sink` are the finished idle figure shifted down by N rows and clipped at the ground line (the inner row above the bottom outline), with a closing outline row, so the figure stays upright and never collapses. The shared helper is `floorFrame` in each summon file.
 - **Exports**: `SUMMON_SPRITES: Readonly<Record<SummonSpriteId, SpriteTemplate>>`, `SummonSpriteId = 'skeleton' | 'beast' | 'turret'`; `ArtSet.summons` and `validateSummonArt` (sizes, names, colors, the five animations) are developer-owned and already in place.
+
+## 10. Enemy-side shared art (batch E1)
+
+Delivered in steps A-E1-1 to A-E1-6 ([E1 plan section 10](../architecture/plans/e1-enemies.md)).
+
+| Export | File | Content |
+|---|---|---|
+| `STAGE_PALETTES` | `palettesE1.ts`, re-exported from `palettes.ts` and `spriteTemplates.ts` | `Record<stageId, Palette>`: partial overrides of `1`-`8` (and `g`, `T`) over the master. `forgotten-cellar` is `{}`; `goblin-mine-shafts` recolors all eight. `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR` also have `goblin-mine-shafts` entries (`12345678`, `n`, `g`) |
+| `PARTICLE_PALETTE.mote` | `palettes.ts` | `['a', 'V', 'W']`, bright to dim warm dust (master characters) |
+| `ENEMY_BAR` | `enemyTemplates.ts` | `{ frame, bossFrame, fillChar: 'R', backChar: 'P' }`; frames are templates `ui/enemyBar` 18x4 and `ui/bossBar` 34x5, outline `o` with transparent interior, `idle` 1 frame, anchor `(0, 0)`. The engine draws back, then fill, inside the inset interior, then the frame |
+| `ENEMY_SPRITES`, `ENEMY_PHASE_PALETTES` | `enemyTemplates.ts` (data in `enemiesStage1.ts`, `ratKingTemplate.ts`, `enemiesStage2.ts`, `goblinForemanTemplate.ts`; phase palettes in `palettesE1.ts` as `BOSS_PHASE_PALETTES`) | ten `enemies/<id>` templates and `rat-king` / `goblin-foreman` -> `[phase 2 palette]` (see below) |
+| `DROP_SPRITES`, `DropSpriteId` | `dropTemplates.ts`, type in `spriteTypes.ts` | `coin`, `gem`, `ore` 6x6 anchor `(3, 5)`, `chest` 12x10 anchor `(6, 9)`; ids `drops/<kind>`, `idle` 2 frames, at most 8 colors, master characters |
+
+Stage palette mechanism: a stage sprite is validated against the merged palette `{ ...MASTER_PALETTE, ...STAGE_PALETTES[stageId] }`, and rendered with it, so a character means the same role in every stage but a different color. Enemy rules (left-facing, `idle 2 / walk 2 / attack 3`, no `hit` or `death` frames, size by tier, at most 12 colors) are in the [art style guide section 7](art-style-guide.md#7-enemy-rules).
+
+### Enemy templates in detail
+
+- Id `enemies/<id>` equal to the key of `ENEMY_SPRITES` and the id in `src/game/data/enemies.ts`; one non-layered template per enemy, facing **left**, 1 px outline in `1` (the stage's deepest shadow), foot anchor on the bottom outline row (minion `(8, 15)`, elite `(12, 23)`, boss `(24, 47)`). A flying enemy (bat) keeps its claws on the bottom row; the engine's gait offset lifts it.
+- Animations exactly `idle 2, walk 2, attack 3`; bosses add `telegraph 2` and `intro 2`. No `hit`, `death`, or `hurt` animation: the engine builds the flash and dissolve from `idle` frame 0 and the `attack` frames.
+- Characters: master characters plus the stage's `1`-`8` (the engine resolves enemies of stage N with `{ ...MASTER_PALETTE, ...STAGE_PALETTES[stage id] }`); at most 12 colors over all frames; no frame draws opaque pixels on the top row or side columns other than the outline (so the outline is never clipped; the spider's thread starts at row 0 on purpose).
+- Authoring: `enemyBuilder.ts` (`draft`, `put`, `dots`, `poly`, `ellipse`, `stroke`, `looseLine`, `finish`) draws the fill, `finish` adds the outline, and thin parts (spider and beetle legs) are "loose" pixels added after the outline.
+- Phase palettes: `ENEMY_PHASE_PALETTES[bossId]` is an array of partial palettes for phases 2..n (here one each), overriding at most four characters over master plus stage.
+- Preview tool: `tools/sprite-preview.mjs` (excluded from the package by `tools/**` in `.vscodeignore`).

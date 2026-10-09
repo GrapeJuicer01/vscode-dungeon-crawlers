@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { listFiles } from '../support/repo';
+import { ENEMY_SIDE } from '../support/sides';
 import { blockAt, code, filesMatching, importSpecifiers } from '../support/source';
 
 const gameFiles = listFiles('src/game').filter((f) => f.endsWith('.ts'));
@@ -15,8 +16,10 @@ const CLASS_FILES = [
   'src/game/data/classMap.ts',
   'src/game/data/effects.ts',
 ];
+// E1: Enemy.ts and Boss.ts live in entities/ but are enemy side (they may say health; see
+// test/support/sides.ts and combatStructure.test.ts). Every other entity file is scanned.
 const SCANNED = [
-  ...gameFiles.filter((f) => f.startsWith('src/game/entities/')),
+  ...gameFiles.filter((f) => f.startsWith('src/game/entities/') && !ENEMY_SIDE.includes(f)),
   'src/game/Roster.ts',
   ...CLASS_FILES,
 ];
@@ -157,6 +160,28 @@ void describe('ClassHero cannot reach the lifecycle (invariant 2)', () => {
     }
   });
 
+  void it('E1 widening: ClassHero, the class tables, effects, summons, and Roster name no combat, enemy, boss, reaction, fighter, or progress word (case-insensitive)', () => {
+    const pattern = /\b(combat|enemy|enemies|boss|reaction|reactions|fighter|fighters|progress)\b/i;
+    for (const f of [
+      'src/game/entities/ClassHero.ts',
+      'src/game/data/classes.ts',
+      'src/game/data/classMap.ts',
+      'src/game/data/effects.ts',
+      'src/game/data/summons.ts',
+      'src/game/Summons.ts',
+      'src/game/entities/Summon.ts',
+      'src/game/Effects.ts',
+    ]) {
+      assert.doesNotMatch(code(f), pattern, f);
+    }
+    // Roster is allowed exactly one thing: the import of the FighterBuffer type, and collectFighters.
+    const roster = code('src/game/Roster.ts');
+    const hits = [...roster.matchAll(new RegExp(pattern.source, 'gi'))].map((m) => m[0]);
+    assert.deepEqual(hits, ['Fighters'], 'only the ./Fighters import path matches');
+    assert.match(roster, /import type \{ FighterBuffer \} from '\.\/Fighters';/);
+    assert.match(roster, /\bcollectFighters\(out: FighterBuffer\): void\b/);
+  });
+
   void it('never mentions applyAgentState, lifecycle, AgentInfo, or AgentState', () => {
     assert.doesNotMatch(
       src,
@@ -283,11 +308,33 @@ void describe('every phase switch knows ability (invariant 2, cosmetic phase)', 
   });
 
   void it('no other file switches on a hero phase', () => {
-    // Summon.ts switches on its own SummonPhase (rise, active, sink), which is not a hero phase.
+    // Summon.ts switches on its own SummonPhase (rise, active, sink) and Enemy.ts on its own
+    // EnemyPhase (approach, engaged, withdraw, dissolve); neither is a hero phase.
     const offenders = gameFiles
-      .filter((f) => f !== 'src/game/entities/Hero.ts' && f !== 'src/game/entities/Summon.ts')
+      .filter(
+        (f) =>
+          f !== 'src/game/entities/Hero.ts' &&
+          f !== 'src/game/entities/Summon.ts' &&
+          f !== 'src/game/entities/Enemy.ts',
+      )
       .filter((f) => /\bswitch\s*\([^)]*\bphase\b[^)]*\)/.test(code(f)));
     assert.deepEqual(offenders, []);
+  });
+
+  void it("Enemy.ts's phase switch handles only approach, engaged, withdraw, and dissolve", () => {
+    const src = code('src/game/entities/Enemy.ts');
+    const matches = [...src.matchAll(/\bswitch\s*\(([^)]*phase[^)]*)\)\s*\{/g)];
+    assert.ok(matches.length >= 1);
+    for (const m of matches) {
+      const body = blockAt(src, (m.index ?? 0) + m[0].length - 1);
+      const cases = [...body.matchAll(/case '(\w+)':/g)].map((c) => c[1]);
+      for (const c of cases) {
+        assert.ok(['approach', 'engaged', 'withdraw', 'dissolve'].includes(c ?? ''), String(c));
+      }
+      assert.ok(
+        !cases.some((c) => ['advance', 'attack', 'ability', 'rest', 'warpIn'].includes(c ?? '')),
+      );
+    }
   });
 
   void it("Summon.ts's phase switch handles only rise, active, and sink, and ends in assertNever", () => {

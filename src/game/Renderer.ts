@@ -8,9 +8,11 @@ import {
   BACKDROP_PARALLAX,
   BACKDROP_WIDTH_PX,
   EFFECT_FAULT_LIMIT,
+  PASS_FAULT_LIMIT,
   TORCH_FLICKER_MS,
 } from './data/tuning';
 import { Hero } from './entities/Hero';
+import { HitReactions } from './HitReactions';
 import { guarded } from './entities/Entity';
 import type { Entity, World } from './entities/Entity';
 import {
@@ -27,7 +29,7 @@ import type { LightSource } from './Lighting';
 import type { ParticleColors } from './Particles';
 import type { BitmapFactory, ErrorSink, Surface } from './ports';
 import { hashCell } from './rng';
-import type { ArtSet, FrameSet } from './sprites/spriteFactory';
+import type { ArtSet, FrameSet, SpriteCache } from './sprites/spriteFactory';
 import type { Bitmap } from './ports';
 import type { PlacedProp, StageRuntime } from './Stage';
 
@@ -36,6 +38,19 @@ interface MutableDrawContext {
   surface: Surface;
   camera: Camera;
   world: World;
+  reactions: HitReactions;
+}
+
+/**
+ * What Game hands the renderer besides the heroes (E1): the live enemies to y-sort, the cosmetic
+ * reaction board Hero.draw reads, the drop pass, and the stage fade. One reused object.
+ */
+export interface RenderExtras {
+  foes: readonly Entity[];
+  reactions: HitReactions;
+  drops: (surface: Surface, cache: World['cache']) => void;
+  /** 0..1: a dark full-screen rect in the stage clear colour, drawn last. */
+  fadeAlpha: number;
 }
 
 const SHADOW_ALPHA = 0.35;
@@ -102,6 +117,11 @@ export class Renderer {
   #lightFaultReported = false;
   #effectFaults = 0;
   #effectFaultReported = false;
+  #dropFaults = 0;
+  #dropFaultReported = false;
+  #fadeFaults = 0;
+  #fadeFaultReported = false;
+  readonly #noReactions = new HitReactions(1);
   readonly #drawCurrent = (): void => {
     if (this.#current !== null && this.#ctx !== null) {
       this.#current.draw(this.#ctx);
@@ -119,6 +139,7 @@ export class Renderer {
       spark: css(art.particlePalette.spark),
       drip: css(art.particlePalette.drip),
       splash: css(art.particlePalette.splash),
+      mote: css(art.particlePalette.mote),
     };
     this.#white = art.palette['w'] ?? '#ffffff';
   }
@@ -128,7 +149,13 @@ export class Renderer {
     this.#clockMs += dtMs;
   }
 
-  render(surface: Surface, world: World, heroes: readonly Entity[], camera: Camera): void {
+  render(
+    surface: Surface,
+    world: World,
+    heroes: readonly Entity[],
+    camera: Camera,
+    extras?: RenderExtras,
+  ): void {
     const stage = world.stage;
     surface.setComposite('source-over');
     surface.setAlpha(1);
@@ -143,14 +170,16 @@ export class Renderer {
 
     this.#guardedLightPass(surface, world, corridorOffset);
 
-    this.#sortEntities(world, heroes);
+    this.#sortEntities(world, heroes, extras?.foes);
     this.#drawShadows(surface, stage.clearColor);
+    const reactions = extras?.reactions ?? this.#noReactions;
     if (this.#ctx === null) {
-      this.#ctx = { surface, camera, world };
+      this.#ctx = { surface, camera, world, reactions };
     } else {
       this.#ctx.surface = surface;
       this.#ctx.camera = camera;
       this.#ctx.world = world;
+      this.#ctx.reactions = reactions;
     }
     for (const entity of this.#sortBuf) {
       this.#current = entity;
@@ -162,12 +191,18 @@ export class Renderer {
     this.#current = null;
 
     this.#guardedEffectPass(surface, world);
+    if (extras !== undefined) {
+      this.#guardedDropPass(surface, world, extras);
+    }
 
     const fgH = INTERNAL_HEIGHT - FOREGROUND_Y;
     surface.drawBitmap(stage.nearForeground, 0, FOREGROUND_Y, false);
     blitCorridor(surface, stage.corridorForeground, corridorOffset, 0, fgH, FOREGROUND_Y);
 
     world.particles.draw(surface, this.#particleColors);
+    if (extras !== undefined && extras.fadeAlpha > 0) {
+      this.#guardedFade(surface, stage, extras.fadeAlpha);
+    }
 
     surface.setComposite('source-over');
     surface.setAlpha(1);
@@ -243,10 +278,10 @@ export class Renderer {
     }
   }
 
-  #lighting(stage: StageRuntime): Lighting {
+  #lighting(stage: StageRuntime, cache: SpriteCache): Lighting {
     let lighting = this.#lightings.get(stage.def.id);
     if (lighting === undefined) {
-      lighting = new Lighting(this.#bitmaps, this.#art.palette, stage.ambientChar, [
+      lighting = new Lighting(this.#bitmaps, cache.stagePalette(stage.def.id), stage.ambientChar, [
         this.#art.lightChars.torch,
         this.#art.lightChars.campfire,
       ]);
@@ -292,9 +327,47 @@ export class Renderer {
     }
   }
 
+  /** Drops draw after the effects, before the foreground; own guard, disabled after a few faults. */
+  #guardedDropPass(surface: Surface, world: World, extras: RenderExtras): void {
+    if (this.#dropFaults >= PASS_FAULT_LIMIT) {
+      return;
+    }
+    try {
+      extras.drops(surface, world.cache);
+    } catch (error) {
+      this.#dropFaults++;
+      if (!this.#dropFaultReported) {
+        this.#dropFaultReported = true;
+        this.#onError(error, 'render');
+      }
+      surface.setComposite('source-over');
+      surface.setAlpha(1);
+    }
+  }
+
+  /** The stage fade: dark, never white. Own guard so a fault here cannot blank the frame. */
+  #guardedFade(surface: Surface, stage: StageRuntime, alpha: number): void {
+    if (this.#fadeFaults >= PASS_FAULT_LIMIT) {
+      return;
+    }
+    try {
+      surface.setComposite('source-over');
+      surface.setAlpha(Math.min(1, alpha));
+      surface.fillRect(stage.clearColor, 0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+      surface.setAlpha(1);
+    } catch (error) {
+      this.#fadeFaults++;
+      if (!this.#fadeFaultReported) {
+        this.#fadeFaultReported = true;
+        this.#onError(error, 'render');
+      }
+      surface.setAlpha(1);
+    }
+  }
+
   #lightPass(surface: Surface, world: World, corridorOffset: number): void {
     const stage = world.stage;
-    const lighting = this.#lighting(stage);
+    const lighting = this.#lighting(stage, world.cache);
     const light = this.#scratchLight;
     lighting.begin();
     const tick = Math.floor(this.#clockMs / TORCH_FLICKER_MS);
@@ -331,11 +404,16 @@ export class Renderer {
     lighting.compose(surface);
   }
 
-  #sortEntities(world: World, heroes: readonly Entity[]): void {
+  #sortEntities(world: World, heroes: readonly Entity[], foes?: readonly Entity[]): void {
     const buf = this.#sortBuf;
     buf.length = 0;
     for (const hero of heroes) {
       buf.push(hero);
+    }
+    if (foes !== undefined) {
+      for (const foe of foes) {
+        buf.push(foe);
+      }
     }
     for (const summon of world.summons.entities()) {
       buf.push(summon);

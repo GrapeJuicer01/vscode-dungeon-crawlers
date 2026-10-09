@@ -17,7 +17,7 @@ Every hero is one of the delivered classes (Warrior, Mage, Archer, Rogue, Cleric
 
 ## Effects
 
-While the party fights, class heroes release small effects: an orb bolt, an arrow, a whirl, a burst, a thrown dagger. They are short pictures that fly right and fade, kept calm and small (at most 24 live at once, never a full-screen flash). They do not hit or mark a hero. In H1 there are no enemies, so they play into the empty corridor.
+While the party fights, class heroes release small effects: an orb bolt, an arrow, a whirl, a burst, a thrown dagger. They are short pictures that fly right and fade, kept calm and small (at most 24 live at once, never a full-screen flash). They do not hit or mark a hero. Enemies stand in the corridor from E1 on; the shots still fly into the corridor and fade, and each strike is paired with an engine impact spark on the targeted enemy (see [enemies and stages](enemies-and-stages.md)).
 
 ## Summons and aura effects
 
@@ -25,4 +25,4 @@ A class may raise a summon: the Necromancer's Bone Call lifts a small skeleton b
 
 ## Rhythm
 
-Fights come in cycles: the party advances, engages for a few seconds, and advances again, so the corridor scrolls and the scene always looks alive. The campfire grows with the number of resting heroes. Stages, enemies, achievements, and sound arrive in later milestones; see the [roadmap](../engineering/roadmap.md).
+Fights come in cycles: the party advances until an enemy stands in front of it, fights, and advances again, so the corridor scrolls and the scene always looks alive. With enemies turned off (or if combat is disabled after a fault) the party keeps the older timed rhythm: advance for five seconds, engage for a few, repeat. The campfire grows with the number of resting heroes. Enemies and bosses arrive with Stage 1 and Stage 2 (see [enemies and stages](enemies-and-stages.md)): the party fights as one, any striking hero hits the nearest enemy for the same amount, enemies alone have health and a health bar, and an enemy attack only makes a fighting hero flash white and slide a pixel or two. Defeating each stage's boss after the kill threshold moves the party to the next stage, and progress is saved (five stage counters, nothing about agents). Achievements and sound arrive in later milestones; see the [roadmap](../engineering/roadmap.md).

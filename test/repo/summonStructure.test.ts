@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { listFiles } from '../support/repo';
+import { ENEMY_SIDE, ENEMY_SIDE_BANNED } from '../support/sides';
 import { blockAt, code, filesMatching, importSpecifiers } from '../support/source';
 
 const SUMMON_FILES = [
@@ -35,9 +36,16 @@ void describe('summon vocabulary (invariant 1)', () => {
 
   void it('the widened ban holds across every file under src/game except the validator and the Surface port note', () => {
     // ports.ts says callers "restore" the canvas composite; that is canvas state, not health.
+    // E1: the eight enemy-side files may say hp, health, and damage (only enemies have health);
+    // they keep the rest of the ban (ENEMY_SIDE_BANNED), checked in engineStructure.test.ts.
     const allowed = new Set(['src/game/sprites/spriteValidator.ts', 'src/game/ports.ts']);
-    const offenders = gameFiles.filter((f) => !allowed.has(f)).filter((f) => BANNED.test(code(f)));
+    const offenders = gameFiles
+      .filter((f) => !allowed.has(f) && !ENEMY_SIDE.includes(f))
+      .filter((f) => BANNED.test(code(f)));
     assert.deepEqual(offenders, []);
+    for (const f of ENEMY_SIDE) {
+      assert.doesNotMatch(code(f), ENEMY_SIDE_BANNED, f);
+    }
   });
 
   void it('no gauge vocabulary or hit semantics: no bar, meter, target, hit, or flash in the summon files', () => {
@@ -150,11 +158,34 @@ void describe('summons cannot reach a hero (invariant 2)', () => {
     assert.match(tend, /this\.slot/);
   });
 
-  void it('Combat.ts (E1) must not import Summons.ts', () => {
-    for (const f of gameFiles.filter((x) => /\/Combat\.ts$/.test(x))) {
+  void it('no enemy-side file (Combat included) imports or names a Summon (summons are never targets, ADR 0013)', () => {
+    for (const f of ENEMY_SIDE) {
       for (const spec of importSpecifiers(code(f))) {
         assert.doesNotMatch(spec, /Summons?$/, `${f}: ${spec}`);
       }
+      assert.doesNotMatch(code(f), /\bSummon\w*|\bsummons?\b/i, f);
+    }
+  });
+
+  void it('Summons.ts and Summon.ts import and name nothing from the enemy side (E1 widening)', () => {
+    for (const f of [
+      'src/game/Summons.ts',
+      'src/game/entities/Summon.ts',
+      'src/game/data/summons.ts',
+    ]) {
+      const text = code(f);
+      for (const spec of importSpecifiers(text)) {
+        assert.doesNotMatch(
+          spec,
+          /Combat|Enemy|Enemies|Boss|Drops|Progression|StageDirector|Fighters|HitReactions/,
+          `${f}: ${spec}`,
+        );
+      }
+      assert.doesNotMatch(
+        text,
+        /\b(Combat|Enemy|Boss|Fighters|FighterBuffer|HitReactions|combat|enemies)\b/,
+        f,
+      );
     }
   });
 });

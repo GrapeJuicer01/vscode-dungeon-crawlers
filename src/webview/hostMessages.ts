@@ -3,6 +3,7 @@
 // dropped and the target is left untouched (host-webview-protocol.md section 6.6).
 import { assertNever } from '../shared/assertNever';
 import { parseHostMessage } from '../shared/protocol';
+import type { Progress } from '../shared/progress';
 import type { AgentInfo, ConfigSnapshot } from '../shared/protocol';
 
 /** Anything that consumes host state. HostStateMirror now; the M4 Game reads the mirror. */
@@ -10,6 +11,8 @@ export interface HostMessageTarget {
   replaceAgents(agents: readonly AgentInfo[]): void;
   applyAgent(agent: AgentInfo): void;
   applyConfig(config: ConfigSnapshot): void;
+  /** The stored progress (E1); arrives after `config` and `agentList` on every `ready`. */
+  applyProgress(progress: Progress): void;
 }
 
 /**
@@ -30,6 +33,9 @@ export function handleHostMessage(raw: unknown, target: HostMessageTarget): bool
       return true;
     case 'agentState':
       target.applyAgent(message.agent);
+      return true;
+    case 'progress':
+      target.applyProgress(message.progress);
       return true;
     default:
       return assertNever(message);

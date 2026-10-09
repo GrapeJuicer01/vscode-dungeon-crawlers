@@ -9,6 +9,8 @@ import './view.itest';
 import './protocol.itest';
 // After protocol.itest: it asserts that no terminal exists, and this suite creates some.
 import './monitor.itest';
+// Last: it re-resolves the provider with its own fake view and checks persisted progress (E1).
+import './progress.itest';
 
 export async function run(): Promise<void> {
   installProviderSpy();

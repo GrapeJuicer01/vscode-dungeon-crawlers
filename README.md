@@ -27,7 +27,7 @@ The full list of invariants is in [CLAUDE.md](CLAUDE.md#core-invariants-never-vi
 
 The monitor reads Claude Code's transcript files (`~/.claude/projects/<project>/<session>.jsonl`) read-only and keeps exactly five facts per session: the session id, a display name, the state (spawned, working, idle, ended), the current tool name (for example `Bash`), and the time of the last change. The display name is your workspace folder name (or a label from the project directory name) plus the first four characters of the session id; it never comes from transcript or terminal text. Nothing else from a transcript is kept: lines are parsed and dropped in the same step, and errors are logged as codes such as `EACCES`, never with their text or a file path.
 
-By default (`pixelAgents.projectScope: "workspace"`) only the sessions of the folders open in the current window are read. With `"all"`, the transcripts of every project on this machine are read and their sessions appear in every VS Code window (still five fields only). Nothing is persisted, and nothing is sent anywhere: the five fields go only to the panel in your own VS Code window. The monitor never writes, creates, locks, or deletes a file, never follows symbolic links below the transcript directory, never reads `~/.claude/settings.json` or hooks, and never types into, stops, or closes a terminal.
+By default (`pixelAgents.projectScope: "workspace"`) only the sessions of the folders open in the current window are read. With `"all"`, the transcripts of every project on this machine are read and their sessions appear in every VS Code window (still five fields only). The only thing the extension stores is your game progress (the current stage and four counters: kills in the stage, total kills, bosses defeated, and cycles), as numbers in VS Code's own extension storage; no agent, session, tool, or transcript data is stored. Nothing is sent anywhere: the five fields go only to the panel in your own VS Code window. The monitor never writes, creates, locks, or deletes a file, never follows symbolic links below the transcript directory, never reads `~/.claude/settings.json` or hooks, and never types into, stops, or closes a terminal.
 
 ## Configuration
 
@@ -44,6 +44,9 @@ All settings live under `pixelAgents.*` and apply immediately.
 | `pixelAgents.sessionEndTimeoutMinutes` | `30` | 1 to 1440 | silence before a session counts as ended and its hero leaves; at least the tool timeout |
 | `pixelAgents.debounceMs` | `750` | 0 to 10000 | smoothing: delay from spawn to the first state, quiet time after a turn ends, and the per-agent update window |
 | `pixelAgents.pollIntervalMs` | `1000` | 250 to 10000 | time between transcript polls |
+| `pixelAgents.enemies` | on | on or off | show enemies and stage progress; off keeps the party marching in an empty corridor |
+| `pixelAgents.killsPerStage` | `30` | 5 to 500 | regular kills before the stage boss appears |
+| `pixelAgents.maxEnemies` | `6` | 1 to 12 | most enemies on screen at once |
 
 A session ends (its hero leaves) when its transcript file is removed, when it leaves the configured scope, or after `sessionEndTimeoutMinutes` of silence. Closing a terminal never ends a session.
 

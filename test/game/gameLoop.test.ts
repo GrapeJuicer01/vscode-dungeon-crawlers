@@ -291,7 +291,7 @@ void describe('snapshot rebuild equals the running scene (reload, invariant 4)',
     const logA = heroLog();
     const a = gameRig({ heroFactory: logA.factory });
     const mirror = new HostStateMirror();
-    const feedA = new SceneFeed(mirror, a.game);
+    const feedA = new SceneFeed(mirror, a.game, () => undefined);
     const states = ['spawned', 'working', 'idle', 'working', 'idle', 'spawned'] as const;
     states.forEach((state, i) => {
       feedA.applyAgent(agent(`h${i}`, state));
@@ -377,7 +377,11 @@ void describe('Game never reaches the host', () => {
       names.filter((n) => /send|post|message|channel|focus|terminal/i.test(n)),
       [],
     );
+    // E1: applyProgress and applyConfig are the two numeric inputs of the GameSink; neither names a
+    // channel, a message, or a hero.
     assert.deepEqual(names.sort(), [
+      'applyConfig',
+      'applyProgress',
       'constructor',
       'dispose',
       'enqueueAgent',

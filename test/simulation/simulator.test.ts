@@ -328,16 +328,17 @@ void describe('simulation integration: hero lifecycle follows host events only',
     assert.ok(checks > 50, `${checks} checks`);
   });
 
-  void it('a second ready at any point posts config then an agentList equal to getAgents()', async () => {
+  void it('a second ready at any point posts config, an agentList equal to getAgents(), then progress', async () => {
     const rig = simRig(3);
     for (let i = 0; i < 8; i += 1) {
       await rig.time.advance(37 * SECOND);
       const mark = rig.posts.length;
       rig.ready();
       const answer = rig.posts.slice(mark);
-      assert.equal(answer.length, 2);
+      assert.equal(answer.length, 3);
       assert.equal(answer[0]?.type, 'config');
       assert.deepEqual(answer[1], createAgentListMessage(rig.monitor.getAgents()));
+      assert.equal(answer[2]?.type, 'progress');
     }
   });
 

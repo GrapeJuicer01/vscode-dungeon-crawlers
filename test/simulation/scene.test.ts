@@ -33,7 +33,7 @@ function connect(count: number): {
   const log = heroLog();
   const game = gameRig({ heroFactory: log.factory });
   const mirror = new HostStateMirror();
-  const feed = new SceneFeed(mirror, game.game);
+  const feed = new SceneFeed(mirror, game.game, () => undefined);
   let delivered = 0;
   const deliver = (): void => {
     while (delivered < host.posts.length) {
@@ -157,7 +157,7 @@ void describe('scene follows the simulated host (8 agents, 10 simulated minutes)
     });
     broken.surface.failOn('clear', 'dead', Infinity);
     const mirror = new HostStateMirror();
-    const feed = new SceneFeed(mirror, broken.game);
+    const feed = new SceneFeed(mirror, broken.game, () => undefined);
     let delivered = 0;
     for (let second = 0; second < 60; second++) {
       await host.time.advance(SECOND);

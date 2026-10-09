@@ -1,5 +1,5 @@
 // Stage rows (docs/architecture/data-model.md section 4). A stage references art by id and prop
-// key; it never embeds pixels. M4 ships Stage 1 only; E1-E5 append rows.
+// key; it never embeds pixels. M4 shipped Stage 1; E1 appends Stage 2; E2-E5 append the rest.
 
 export interface LightDef {
   readonly radius: number;
@@ -35,7 +35,10 @@ export interface PropPlacement {
   readonly light: LightDef | null;
 }
 
-export type AmbientEffect = { readonly kind: 'drip'; readonly perSecond: number };
+export type AmbientEffect =
+  | { readonly kind: 'drip'; readonly perSecond: number }
+  /** Drifting motes (E1, Stage 2). */
+  | { readonly kind: 'dust'; readonly perSecond: number };
 
 export interface StageDef {
   /** Kebab-case; matches the StageSprites key. */
@@ -48,6 +51,8 @@ export interface StageDef {
 }
 
 const TORCH_LIGHT: LightDef = { radius: 56, intensity: 0.85, colorChar: 'T', flicker: true };
+/** Lanterns light Stage 2 like torches do Stage 1 (same light character; the stage palette recolors `T`). */
+const LANTERN_LIGHT: LightDef = { radius: 52, intensity: 0.85, colorChar: 'T', flicker: true };
 
 function wall(
   prop: string,
@@ -99,5 +104,36 @@ export const STAGES: readonly StageDef[] = [
       floor('bonePile', 'corridor', 200, 154),
     ],
     ambient: { kind: 'drip', perSecond: 1.5 },
+  },
+  /**
+   * Stage 2, "Goblin Mine Shafts". Same room geometry as Stage 1 (heroes keep their seats and
+   * formation), so only the dressing differs. The minecart stands against the back wall like the
+   * cellar's barrels (foot y 134, never on a seat or slot). Assumption: prop positions are chosen
+   * before the art (A-E1-4) lands, from the plan's sizes (wall props about 16 px, lantern about
+   * 8 x 16, minecart 16 x 16); `validateStages` re-checks them against the real sizes.
+   */
+  {
+    id: 'goblin-mine-shafts',
+    index: 2,
+    name: 'Goblin Mine Shafts',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('support', 'alcove', 0, 16),
+      wall('pickaxe', 'alcove', 52, 44),
+      wall('lantern', 'alcove', 28, 40, LANTERN_LIGHT),
+      wall('lantern', 'alcove', 92, 40, LANTERN_LIGHT),
+      wall('oreVein', 'alcove', 108, 72),
+      floor('minecart', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('rubble', 'alcove', 88, 150),
+      wall('lantern', 'corridor', 60, 40, LANTERN_LIGHT),
+      wall('lantern', 'corridor', 252, 40, LANTERN_LIGHT),
+      wall('support', 'corridor', 150, 16),
+      wall('support', 'corridor', 330, 16),
+      wall('oreVein', 'corridor', 190, 72),
+      wall('pickaxe', 'corridor', 120, 44),
+      floor('rubble', 'corridor', 100, 152),
+      floor('rubble', 'corridor', 300, 148),
+    ],
+    ambient: { kind: 'dust', perSecond: 6 },
   },
 ];

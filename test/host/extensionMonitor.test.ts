@@ -18,9 +18,12 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import type * as vscode from 'vscode';
 import { activate, PixelAgentsViewProvider } from '../../src/extension';
-import { parseHostMessage } from '../../src/shared/protocol';
+import { parseHostMessage, PROTOCOL_VERSION } from '../../src/shared/protocol';
+import { readGameSettings } from '../../src/host/gameConfig';
 import type { AgentInfo, HostToWebviewMessage } from '../../src/shared/protocol';
+import { PROGRESS_KEY } from '../../src/host/progressStore';
 import {
+  FakeMemento,
   FakeWebviewView,
   Uri,
   changeConfiguration,
@@ -36,7 +39,9 @@ import { MARKER, SESSION_A, SESSION_B, toolUseLine, userLine } from '../support/
 interface TrackedContext {
   readonly extensionUri: Uri;
   subscriptions: { dispose(): void }[];
-  /** Every other member access is recorded (M3 persists nothing). */
+  /** The only storage the extension may touch: the progress store (E1, ADR 0012). */
+  readonly globalState: FakeMemento;
+  /** Every other member access is recorded (nothing but globalState may be used). */
   readonly touched: string[];
 }
 
@@ -45,20 +50,21 @@ function trackedContext(): vscode.ExtensionContext & TrackedContext {
   const base = {
     extensionUri: Uri.file('/ext'),
     subscriptions: [] as { dispose(): void }[],
+    globalState: new FakeMemento(),
     touched,
   };
   return new Proxy(base, {
     get(target, property, receiver): unknown {
       if (!(property in target)) {
         touched.push(String(property));
-        // A recording stand-in for globalState, workspaceState, secrets, and friends.
+        // A recording stand-in for workspaceState, secrets, storage URIs, and friends.
         return new Proxy(
           {},
           {
             get(_t, member): unknown {
               touched.push(`${String(property)}.${String(member)}`);
               return () => {
-                throw new Error(`${String(property)}.${String(member)} must not be used in M3`);
+                throw new Error(`${String(property)}.${String(member)} must not be used`);
               };
             },
           },
@@ -178,6 +184,7 @@ void describe('extension glue: monitor wiring', () => {
     view.webview.deliver({ type: 'ready' });
     const answer = posts(view);
     assert.equal(answer[0]?.type, 'config');
+    assert.equal(answer[2]?.type, 'progress');
     const list = answer[1];
     assert.equal(list?.type, 'agentList');
     assert.ok(list?.type === 'agentList' && list.agents.some((a) => a.id === 'sim-0-0'));
@@ -275,20 +282,41 @@ void describe('extension glue: monitor wiring', () => {
     assert.equal(terminal.shows, 1);
   });
 
-  void it('if getConfiguration throws: the view is still registered, ready answers an empty list, focusAgent is dropped, one coded error is logged', () => {
+  void it('if getConfiguration throws: the view is still registered, ready answers an empty list, focusAgent is dropped, a coded error is logged then one bridge error, config falls back to defaults', () => {
     recorded.configThrows = new TypeError('settings broke SECRET_SETTINGS_TEXT');
     const { view, log } = boot();
     assert.equal(recorded.registrations.length, 1);
     view.webview.deliver({ type: 'ready' });
-    assert.deepEqual(posts(view)[1], { type: 'agentList', agents: [] });
+    const answer = posts(view);
+    const first = answer[0];
+    assert.equal(first?.type, 'config');
+    // The fallback is defaults-only: it is built without reading any setting.
+    assert.deepEqual(first, {
+      type: 'config',
+      config: { protocolVersion: PROTOCOL_VERSION, ...readGameSettings(() => undefined) },
+    });
+    assert.deepEqual(answer[1], { type: 'agentList', agents: [] });
+    assert.equal(answer[2]?.type, 'progress');
     view.webview.deliver({ type: 'focusAgent', agentId: SESSION_A });
-    assert.equal(posts(view).length, 2);
-    assert.deepEqual(log.messages('error'), ['monitor failed to start (TypeError)']);
+    assert.equal(posts(view).length, 3, 'config, agentList, progress');
+    // One coded monitor error, then one bridge error for the throwing getConfig on ready.
+    assert.deepEqual(log.messages('error'), [
+      'monitor failed to start (TypeError)',
+      'webview bridge error: TypeError',
+    ]);
     assert.ok(log.messages('trace').includes('dropped focusAgent: reveal unavailable'));
-    assert.ok(!log.calls.some((c) => c.message.includes('SECRET_SETTINGS_TEXT')));
+    assert.ok(
+      !log.messages('error')[0]?.includes('SECRET_SETTINGS_TEXT'),
+      'the coded monitor error carries no message text',
+    );
+    for (const level of ['error', 'trace'] as const) {
+      for (const line of log.messages(level)) {
+        assert.ok(!line.includes('SECRET_SETTINGS_TEXT'), `no secret in ${level} line: ${line}`);
+      }
+    }
   });
 
-  void it('M3 persists nothing: no globalState, workspaceState, secrets, or storage access', async () => {
+  void it('the monitor persists nothing: only the progress key is read, never written, and no other storage is touched', async () => {
     const env = makeEnv();
     baseConfig(env, { simulator: 'on' });
     const { context, view } = boot();
@@ -296,7 +324,10 @@ void describe('extension glue: monitor wiring', () => {
     await sleep(500);
     changeConfiguration({ simulator: 'off' });
     await sleep(200);
-    assert.deepEqual(context.touched, []);
+    assert.deepEqual(context.touched, [], 'no workspaceState, secrets, or storage URI');
+    assert.deepEqual(context.globalState.gets, [PROGRESS_KEY]);
+    assert.deepEqual(context.globalState.updates, [], 'agent activity never writes storage');
+    assert.equal(context.globalState.syncKeyCalls, 0);
   });
 });
 
@@ -366,6 +397,8 @@ void describe('extension glue: transcript privacy end to end (note 9)', () => {
       );
       assert.ok(!log.calls.some((c) => c.message.includes(base)), 'no temp path text in the log');
       assert.deepEqual(context.touched, [], 'no storage access');
+      assert.deepEqual(context.globalState.updates, [], 'no write at all');
+      assert.ok(!JSON.stringify(context.globalState.gets).includes(MARKER));
     } finally {
       chmodSync(unreadable, 0o600);
     }

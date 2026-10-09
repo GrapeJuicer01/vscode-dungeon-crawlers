@@ -3,9 +3,12 @@
 // adapters, and wires it into the vscode-free WebviewBridge (src/host/webviewBridge.ts):
 // getAgents is the monitor's list, every monitor change is posted with postAgentState, and
 // focusAgent reveals the agent's linked terminal (Terminal.show() only). No commands or status
-// bar yet (M7). Thin glue only (coding-standards.md section 3).
+// bar yet (M7). E1 adds the progress store over globalState (ADR 0012) and the game settings.
+// Thin glue only (coding-standards.md section 3).
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
+import { GAME_SETTINGS_SECTION, readGameSettings } from './host/gameConfig';
+import { ProgressStore } from './host/progressStore';
 import { WebviewBridge } from './host/webviewBridge';
 import { createNodeFileSystem } from './monitor/adapters/nodeFileSystem';
 import {
@@ -34,14 +37,46 @@ export function activate(context: vscode.ExtensionContext): void {
   const log = vscode.window.createOutputChannel('Pixel Agents', { log: true });
   context.subscriptions.push(log);
   const monitor = createMonitor(context, log);
+  // The only persisted data: five stage counters in the extension's own globalState. Not
+  // registered for Settings Sync (ADR 0012). Dispose flushes a pending write.
+  const progressStore = new ProgressStore({
+    store: {
+      get: (key) => context.globalState.get<unknown>(key),
+      update: (key, value) => context.globalState.update(key, value),
+    },
+    timers: {
+      set: (run, ms) => setTimeout(run, ms),
+      clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+    },
+    logger: log,
+  });
+  context.subscriptions.push({ dispose: () => progressStore.dispose() });
   const bridge = new WebviewBridge({
     getAgents: monitor === null ? () => NO_AGENTS : () => monitor.getAgents(),
-    getConfig: () => ({ protocolVersion: PROTOCOL_VERSION }),
+    getConfig: () => ({ protocolVersion: PROTOCOL_VERSION, ...readGameConfig() }),
+    // A settings failure must not suppress the agent list on `ready` (Core invariant 4).
+    getFallbackConfig: () => ({
+      protocolVersion: PROTOCOL_VERSION,
+      ...readGameSettings(() => undefined),
+    }),
+    getProgress: () => progressStore.load(),
+    saveProgress: (progress) => progressStore.save(progress),
     // Reveal only: bridge -> AgentMonitor -> TerminalSource -> TerminalPort -> Terminal.show().
     revealAgentTerminal:
       monitor === null ? null : (agentId) => monitor.revealAgentTerminal(agentId),
     logger: log,
   });
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      try {
+        if (event.affectsConfiguration(GAME_SETTINGS_SECTION)) {
+          bridge.postConfig();
+        }
+      } catch (error: unknown) {
+        logMonitorError(log, 'game: configuration update failed', error);
+      }
+    }),
+  );
   if (monitor !== null) {
     context.subscriptions.push(
       monitor.onDidChangeAgent((agent) => bridge.postAgentState(agent)),
@@ -114,6 +149,11 @@ function createMonitor(
 function readConfig(): MonitorConfig {
   const section = vscode.workspace.getConfiguration(SETTINGS_SECTION);
   return readMonitorConfig((key) => section.get<unknown>(key));
+}
+
+function readGameConfig(): ReturnType<typeof readGameSettings> {
+  const section = vscode.workspace.getConfiguration(GAME_SETTINGS_SECTION);
+  return readGameSettings((key) => section.get<unknown>(key));
 }
 
 /** Local `file:` workspace folders only; other schemes have no transcript directory. */

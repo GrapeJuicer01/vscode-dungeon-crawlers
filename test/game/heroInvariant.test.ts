@@ -15,6 +15,7 @@ import {
   WARP_OUT_MS,
 } from '../../src/game/data/tuning';
 import { classFor } from '../../src/game/data/classMap';
+import { ENEMIES } from '../../src/game/data/enemies';
 import { Game } from '../../src/game/Game';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
 import { FakeBitmaps, RecordingSurface } from '../support/engineFakes';
@@ -299,6 +300,8 @@ function gameRigWithStages(stages: readonly StageDef[]): GameRig {
       },
       seed: ENGINE_SEED,
       agentSource: () => rig.mirror,
+      // A one-stage test table needs the matching one-stage enemy rows (the validator is exact).
+      enemies: ENEMIES.filter((row) => row.stage === 1),
     }),
   });
 }
@@ -309,7 +312,7 @@ void describe('the engine never talks to the host', () => {
     createHostChannel({ postMessage: (m: unknown) => void posted.push(m) });
     const rig = scene(8);
     const mirror = new HostStateMirror();
-    const sceneFeed = new SceneFeed(mirror, rig.game);
+    const sceneFeed = new SceneFeed(mirror, rig.game, () => undefined);
     handleHostMessage({ type: 'agentList', agents: list(8) }, sceneFeed);
     handleHostMessage({ type: 'agentState', agent: agent('h0', 'despawned', null, 3) }, sceneFeed);
     run(rig, 5000);

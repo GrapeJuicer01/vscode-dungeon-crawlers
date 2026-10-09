@@ -1,6 +1,6 @@
 // Webview-to-host sending side of the protocol (ADR 0007). DOM-free so tests can import it;
 // main.ts passes in the object returned by acquireVsCodeApi().
-// The only messages it can send are WebviewToHostMessage: `ready` and reveal-only `focusAgent`.
+// The only messages it can send are WebviewToHostMessage: `ready`, reveal-only `focusAgent`, and `saveProgress` (ADR 0012).
 import type { WebviewToHostMessage } from '../shared/protocol';
 
 /**

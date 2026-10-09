@@ -154,6 +154,29 @@ export class FakeWindow {
     return now;
   }
 
+  /** Manually fired timers (setTimeout/clearTimeout), by handle, with their delay. */
+  readonly timers = new Map<number, { readonly run: () => void; readonly ms: number }>();
+  #nextTimerHandle = 1;
+
+  setTimeout(run: () => void, ms: number): number {
+    const handle = this.#nextTimerHandle++;
+    this.timers.set(handle, { run, ms });
+    return handle;
+  }
+
+  clearTimeout(handle: number): void {
+    this.timers.delete(handle);
+  }
+
+  /** Runs every timer pending right now, in creation order (timers set meanwhile wait). */
+  fireTimers(): void {
+    const due = [...this.timers.entries()];
+    for (const [handle, timer] of due) {
+      this.timers.delete(handle);
+      timer.run();
+    }
+  }
+
   /** Dispatches a `message` event, as the host's webview.postMessage would. */
   dispatchMessage(event: unknown): void {
     this.dispatch('message', event);

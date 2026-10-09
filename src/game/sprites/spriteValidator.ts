@@ -5,6 +5,10 @@
 import { hexToRgb, heroBounds, heroFrameNames, heroFrameRows } from './spriteFactory';
 import type { ArtSet } from './spriteFactory';
 import type { Palette } from './palettes';
+import { ENEMIES } from '../data/enemies';
+import { STAGES } from '../data/stages';
+import { DROP_KINDS } from '../data/drops';
+import type { EnemyRow, EnemyTier } from '../data/enemies';
 import type { HeroLayerSet, SpriteTemplate, StageSprites } from './spriteTypes';
 
 /** Required hero animation name -> frame count (docs/design/sprite-spec.md section 3). */
@@ -44,16 +48,37 @@ const MAX_HERO_COLORS = 12;
 const MAX_STAGE_COLORS = 8;
 const TILE_SIZE = 16;
 const BACKDROP_SIZE = 128;
-const REQUIRED_PROPS = [
-  'barrel',
-  'crate',
-  'bonePile',
-  'puddle',
-  'cobweb',
-  'chains',
-  'torch',
-  'doorFrame',
-] as const;
+/** Required props per stage id (sprite-spec section 5 and 10). A stage not listed has none. */
+const REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
+  'forgotten-cellar': [
+    'barrel',
+    'crate',
+    'bonePile',
+    'puddle',
+    'cobweb',
+    'chains',
+    'torch',
+    'doorFrame',
+  ],
+  'goblin-mine-shafts': [
+    'support',
+    'pickaxe',
+    'oreVein',
+    'lantern',
+    'minecart',
+    'rubble',
+    'doorFrame',
+  ],
+};
+/** Animated light props: prop name -> minimum idle frames of the flame loop. */
+const FLAME_PROPS: Readonly<Record<string, number>> = { torch: 2, lantern: 4 };
+const ENEMY_MAX_SIZE: Readonly<Record<EnemyTier, number>> = { minion: 16, elite: 24, boss: 48 };
+const ENEMY_ANIMATIONS: Readonly<Record<string, number>> = { idle: 2, walk: 2, attack: 3 };
+const BOSS_EXTRA_ANIMATIONS: Readonly<Record<string, number>> = { telegraph: 2, intro: 2 };
+const FORBIDDEN_ENEMY_ANIMATION = /hit|death|dead|die|dying|hurt|downed/i;
+const MAX_ENEMY_COLORS = 12;
+const MAX_PHASE_OVERRIDES = 4;
+const MAX_DROP_COLORS = 8;
 const MIN_TILE_VARIANTS: Readonly<Record<keyof StageSprites['tiles'], number>> = {
   wallTop: 2,
   wallMid: 4,
@@ -461,7 +486,7 @@ function validateStageSprites(
   if (sprites.backdrop.w !== BACKDROP_SIZE || sprites.backdrop.h !== BACKDROP_SIZE) {
     errors.push(`${sprites.backdrop.id}: backdrop must be ${BACKDROP_SIZE}x${BACKDROP_SIZE}`);
   }
-  for (const key of REQUIRED_PROPS) {
+  for (const key of REQUIRED_PROPS[stageId] ?? []) {
     if (sprites.props[key] === undefined) {
       errors.push(`${stageId}: missing required prop ${key}`);
     }
@@ -472,9 +497,126 @@ function validateStageSprites(
       errors.push(`${t.id}: stage templates use only the idle animation`);
     }
   }
-  const torch = sprites.props['torch'];
-  if (torch !== undefined && (torch.animations['idle']?.length ?? 0) < 2) {
-    errors.push(`${torch.id}: torch needs a flame loop`);
+  for (const [name, min] of Object.entries(FLAME_PROPS)) {
+    const flame = sprites.props[name];
+    if (flame !== undefined && (flame.animations['idle']?.length ?? 0) < min) {
+      errors.push(`${flame.id}: ${name} needs a flame loop of at least ${min} frames`);
+    }
+  }
+  return errors;
+}
+
+function validateEnemyTemplate(row: EnemyRow, t: SpriteTemplate, palette: Palette): string[] {
+  const errors = [...validateTemplate(t, palette, null, MAX_ENEMY_COLORS)];
+  if (t.id !== `enemies/${row.id}`) {
+    errors.push(`${t.id}: enemy id does not match its key ${row.id}`);
+  }
+  const limit = ENEMY_MAX_SIZE[row.tier];
+  if (t.w > limit || t.h > limit) {
+    errors.push(`${t.id}: ${row.tier} is larger than ${limit}x${limit}`);
+  }
+  const expected: Record<string, number> =
+    row.tier === 'boss'
+      ? { ...ENEMY_ANIMATIONS, ...BOSS_EXTRA_ANIMATIONS }
+      : { ...ENEMY_ANIMATIONS };
+  for (const name of Object.keys(t.animations)) {
+    if (FORBIDDEN_ENEMY_ANIMATION.test(name)) {
+      errors.push(`${t.id}: forbidden enemy animation name ${name}`);
+    } else if (expected[name] === undefined) {
+      errors.push(`${t.id}: unexpected animation ${name}`);
+    }
+  }
+  for (const [name, count] of Object.entries(expected)) {
+    const frames = t.animations[name];
+    if (frames === undefined) {
+      errors.push(`${t.id}: missing required animation ${name}`);
+    } else if (frames.length !== count) {
+      errors.push(`${t.id}: animation ${name} has ${frames.length} frames, expected ${count}`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * Enemies: every ENEMIES row has a well-formed template (exact animation set, tier size limit, at
+ * most 12 colors, no forbidden names), nothing is extra, and boss phase palettes override at most
+ * four single characters that exist in the master palette.
+ */
+export function validateEnemyArt(art: ArtSet): readonly string[] {
+  const errors: string[] = [];
+  const rows = new Map<string, EnemyRow>(ENEMIES.map((row) => [row.id, row]));
+  for (const row of rows.values()) {
+    const t = Object.hasOwn(art.enemies, row.id) ? art.enemies[row.id] : undefined;
+    if (t === undefined) {
+      errors.push(`${row.id}: no enemy template`);
+      continue;
+    }
+    // Enemies are drawn over their stage's merged palette (phase palettes are checked below).
+    const stageId = STAGES.find((d) => d.index === row.stage)?.id;
+    const palette: Palette =
+      stageId !== undefined && Object.hasOwn(art.stagePalettes, stageId)
+        ? { ...art.palette, ...art.stagePalettes[stageId] }
+        : art.palette;
+    errors.push(...validateEnemyTemplate(row, t, palette));
+  }
+  for (const key of Object.keys(art.enemies)) {
+    if (!rows.has(key)) {
+      errors.push(`${key}: enemy template for an unknown enemy`);
+    }
+  }
+  for (const [id, list] of Object.entries(art.enemyPhasePalettes)) {
+    if (rows.get(id)?.tier !== 'boss') {
+      errors.push(`${id}: phase palettes belong to bosses only`);
+    }
+    for (const override of list) {
+      const keys = Object.keys(override);
+      if (keys.length > MAX_PHASE_OVERRIDES) {
+        errors.push(`${id}: phase palette overrides ${keys.length} characters, limit 4`);
+      }
+      for (const [key, value] of Object.entries(override)) {
+        if (key.length !== 1 || art.palette[key] === undefined) {
+          errors.push(`${id}: phase palette overrides an unknown character`);
+          break;
+        }
+        if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+          errors.push(`${id}: phase palette value is not #rrggbb`);
+          break;
+        }
+      }
+    }
+  }
+  for (const frame of [art.enemyBar.frame, art.enemyBar.bossFrame]) {
+    errors.push(...validateTemplate(frame, art.palette, null, MAX_ENEMY_COLORS));
+  }
+  for (const ch of [art.enemyBar.fillChar, art.enemyBar.backChar]) {
+    if (art.palette[ch] === undefined) {
+      errors.push('enemy bar: a fill or back character is not in the palette');
+    }
+  }
+  return errors;
+}
+
+/** Drops: one `drops/<kind>` template per DROP_KINDS entry, idle only, at most 8 colors. */
+export function validateDropArt(art: ArtSet): readonly string[] {
+  const errors: string[] = [];
+  for (const kind of DROP_KINDS) {
+    const t = Object.hasOwn(art.drops, kind) ? art.drops[kind] : undefined;
+    if (t === undefined) {
+      errors.push(`${kind}: no drop template`);
+      continue;
+    }
+    errors.push(...validateTemplate(t, art.palette, null, MAX_DROP_COLORS));
+    if (t.id !== `drops/${kind}`) {
+      errors.push(`${t.id}: drop id does not match its key ${kind}`);
+    }
+    if (Object.keys(t.animations).join() !== 'idle') {
+      errors.push(`${t.id}: drop templates use only the idle animation`);
+    }
+  }
+  for (const key of Object.keys(art.drops)) {
+    if (!(DROP_KINDS as readonly string[]).includes(key)) {
+      errors.push(`${key}: drop template for an unknown kind`);
+    }
   }
   return errors;
 }
@@ -551,29 +693,32 @@ export function validateArtSet(art: ArtSet): readonly string[] {
       errors.push('palette: a light character is not defined');
     }
   }
+  errors.push(...validateEnemyArt(art), ...validateDropArt(art));
   for (const [stageId, sprites] of Object.entries(art.stageSprites)) {
+    // A stage sprite is checked against master plus the stage's overrides (sprite-spec section 10).
+    const stagePalette: Palette = { ...palette, ...(art.stagePalettes[stageId] ?? {}) };
     const chars = art.stageTileChars[stageId];
     if (chars === undefined || chars.length > MAX_STAGE_COLORS) {
       errors.push(`${stageId}: tile characters missing or more than ${MAX_STAGE_COLORS}`);
       continue;
     }
     for (const ch of chars) {
-      if (palette[ch] === undefined) {
-        errors.push(`${stageId}: tile character ${ch} is not in the master palette`);
+      if (stagePalette[ch] === undefined) {
+        errors.push(`${stageId}: tile character ${ch} is not in the stage palette`);
       }
     }
     const clear = art.stageClearChar[stageId];
     const ambient = art.stageAmbientChar[stageId];
-    const clearHex = clear === undefined ? undefined : palette[clear];
+    const clearHex = clear === undefined ? undefined : stagePalette[clear];
     if (clearHex === undefined) {
       errors.push(`${stageId}: clear character missing`);
     } else if (luminance(clearHex) >= 0.02) {
       errors.push(`${stageId}: clear color is not near-black`);
     }
-    if (ambient === undefined || palette[ambient] === undefined) {
+    if (ambient === undefined || stagePalette[ambient] === undefined) {
       errors.push(`${stageId}: ambient character missing`);
     }
-    errors.push(...validateStageSprites(stageId, sprites, palette, chars));
+    errors.push(...validateStageSprites(stageId, sprites, stagePalette, chars));
   }
   return errors;
 }

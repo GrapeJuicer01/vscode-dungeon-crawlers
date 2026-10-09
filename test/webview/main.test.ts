@@ -231,6 +231,7 @@ void describe('webview main: the engine loop (M4)', () => {
 
   void it('draws the lit room each frame with one multiply blit and restores the composite', () => {
     const run = engineRun();
+    sendProgress(run); // the boot gate draws only the clear colour until the host's progress arrives
     run.window.runFrame(1000);
     const context = run.canvas?.context;
     const draws = context?.draws ?? [];
@@ -315,6 +316,7 @@ void describe('webview main: the engine loop (M4)', () => {
 
   void it('a drawing failure is reported once and the loop keeps running (invariant 4)', () => {
     const run = engineRun();
+    sendProgress(run);
     const context = run.canvas?.context;
     assert.ok(context);
     context.drawImage = (): never => {
@@ -394,6 +396,16 @@ void describe('webview main: crash containment (invariant 4)', () => {
   });
 });
 
+const PROGRESS_LITERAL =
+  '{ schemaVersion: 1, stageIndex: 1, killsInStage: 0, totalKills: 0, bossesDefeated: 0, cycle: 0 }';
+
+/** Delivers the host's stored progress (what the extension posts after config and agentList). */
+function sendProgress(run: WebviewRun, literal = PROGRESS_LITERAL): void {
+  run.window.dispatchMessage({
+    data: runInBundleRealm(run, `{ type: 'progress', progress: ${literal} }`),
+  });
+}
+
 function bootWith(mode: VsCodeApiMode): WebviewRun {
   return runWebviewBundle(new FakeWindow(640, 360, 1), new FakeCanvas(), mode);
 }
@@ -444,7 +456,8 @@ void describe('webview main: host channel and ready handshake (M2)', () => {
   void it('accepts valid same-realm host messages without any error output', () => {
     const run = bootWith('present');
     const messages = [
-      `{ type: 'config', config: { protocolVersion: 1 } }`,
+      `{ type: 'config', config: { protocolVersion: 2, enemiesEnabled: true, killsPerStage: 30, maxEnemies: 6 } }`,
+      `{ type: 'progress', progress: ${PROGRESS_LITERAL} }`,
       `{ type: 'agentList', agents: [{ id: 'sim-1', name: 'Sim', state: 'working', toolName: 'Bash', timestamp: 1 }] }`,
       `{ type: 'agentState', agent: { id: 'sim-1', name: 'Sim', state: 'idle', toolName: null, timestamp: 2 } }`,
       `{ type: 'agentState', agent: { id: 'sim-1', name: 'Sim', state: 'despawned', toolName: null, timestamp: 3 } }`,
@@ -466,7 +479,9 @@ void describe('webview main: host channel and ready handshake (M2)', () => {
       undefined,
       `${secret}${'x'.repeat(1_000_000)}`,
       runInBundleRealm(run, `{ type: 'agentList', agents: [{ id: 'a', text: '${secret}' }] }`),
+      runInBundleRealm(run, `{ type: 'config', config: { protocolVersion: 1 } }`),
       runInBundleRealm(run, `{ type: 'config', config: { protocolVersion: 2 } }`),
+      runInBundleRealm(run, `{ type: 'progress', progress: { stageIndex: 0 } }`),
       // Built in the test realm: a cross-realm object is not a plain object to the bundle.
       { type: 'agentList', agents: [] },
     ];
@@ -555,5 +570,135 @@ void describe('webview main: the single crash reporter (M2)', () => {
     assert.equal(run.window.listenerCount('message'), 1);
     run.window.dispatchMessage(throwingEvent(new Error('second')));
     assert.equal(run.errors.length, 2);
+  });
+});
+
+function sendWorking(run: WebviewRun, id: string): void {
+  run.window.dispatchMessage({
+    data: runInBundleRealm(
+      run,
+      `{ type: 'agentState', agent: { id: '${id}', name: 'Sim ${id}', state: 'working', toolName: 'Bash', timestamp: 1 } }`,
+    ),
+  });
+}
+
+function sendConfig(run: WebviewRun, enemiesEnabled: boolean, killsPerStage = 30): void {
+  run.window.dispatchMessage({
+    data: runInBundleRealm(
+      run,
+      `{ type: 'config', config: { protocolVersion: 2, enemiesEnabled: ${String(enemiesEnabled)}, killsPerStage: ${killsPerStage}, maxEnemies: 6 } }`,
+    ),
+  });
+}
+
+/** Everything posted after `ready`, structured-cloned into this realm as the host would see it. */
+function savesOf(run: WebviewRun): unknown[] {
+  return run.api.posted.slice(1).map((message) => structuredClone(message));
+}
+
+void describe('webview main: stored progress and saving (E1, ADR 0012)', () => {
+  void it('draws only the clear colour until the host progress arrives, then the room', () => {
+    const run = engineRun();
+    run.window.runFrames(20);
+    assert.equal(run.canvas?.context?.draws.length, 0, 'no stage flash while the stage is unknown');
+    sendProgress(run);
+    run.window.runFrames(2);
+    assert.ok(
+      (run.canvas?.context?.draws.length ?? 0) > 3,
+      'the room draws once progress is applied',
+    );
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('stops waiting after 1.5 s of game time and runs on the defaults', () => {
+    const run = engineRun();
+    run.window.runFrames(60); // about 1.0 s
+    assert.equal(run.canvas?.context?.draws.length, 0);
+    run.window.runFrames(60); // past 1.5 s
+    assert.ok((run.canvas?.context?.draws.length ?? 0) > 3);
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('a document that never receives progress never sends saveProgress', () => {
+    const run = engineRun();
+    sendConfig(run, true, 5);
+    sendWorking(run, 'sim-a');
+    sendWorking(run, 'sim-b');
+    run.window.runFrames(2400);
+    run.window.fireTimers();
+    run.window.dispatch('pagehide');
+    assert.equal(run.api.posted.length, 1, 'only `ready` was posted');
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('once progress is loaded, kills are saved as valid, monotonic saveProgress messages', () => {
+    const run = engineRun();
+    sendConfig(run, true, 5);
+    sendProgress(run);
+    sendWorking(run, 'sim-a');
+    sendWorking(run, 'sim-b');
+    for (let i = 0; i < 6; i += 1) {
+      run.window.runFrames(600);
+      run.window.fireTimers(); // the 15 s throttle timer
+    }
+    run.window.dispatch('pagehide');
+    const saves = savesOf(run);
+    assert.ok(saves.length >= 1, 'at least one save after real fighting');
+    let lastTotal = 0;
+    for (const raw of saves) {
+      const parsed = parseWebviewMessage(raw);
+      assert.ok(parsed?.type === 'saveProgress', `unexpected message ${JSON.stringify(raw)}`);
+      assert.ok(parsed.progress.totalKills >= lastTotal, 'totalKills never goes down');
+      lastTotal = parsed.progress.totalKills;
+    }
+    assert.ok(lastTotal > 0, 'kills were counted');
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('stored progress is restored: a stored kill count continues from where it was', () => {
+    const run = engineRun();
+    sendConfig(run, true, 5);
+    sendProgress(
+      run,
+      '{ schemaVersion: 1, stageIndex: 1, killsInStage: 1, totalKills: 100, bossesDefeated: 3, cycle: 1 }',
+    );
+    sendWorking(run, 'sim-a');
+    sendWorking(run, 'sim-b');
+    for (let i = 0; i < 6; i += 1) {
+      run.window.runFrames(600);
+      run.window.fireTimers();
+    }
+    run.window.dispatch('pagehide');
+    const saves = savesOf(run).map((raw) => parseWebviewMessage(raw));
+    assert.ok(saves.length >= 1);
+    for (const save of saves) {
+      assert.ok(save?.type === 'saveProgress');
+      assert.ok(save.progress.totalKills > 100, 'continues above the stored 100');
+      assert.ok(save.progress.bossesDefeated >= 3 && save.progress.cycle >= 1);
+    }
+  });
+
+  void it('with enemies switched off by the host nothing is ever saved', () => {
+    const run = engineRun();
+    sendConfig(run, false);
+    sendProgress(run);
+    sendWorking(run, 'sim-a');
+    run.window.runFrames(1800);
+    run.window.fireTimers();
+    run.window.dispatch('pagehide');
+    assert.equal(run.api.posted.length, 1);
+    assert.deepEqual(run.errors, []);
+  });
+
+  void it('a second progress message in the same document does not reset the engine', () => {
+    const run = engineRun();
+    sendProgress(run);
+    run.window.runFrames(5);
+    sendProgress(
+      run,
+      '{ schemaVersion: 1, stageIndex: 2, killsInStage: 0, totalKills: 9, bossesDefeated: 1, cycle: 0 }',
+    );
+    assert.doesNotThrow(() => run.window.runFrames(5));
+    assert.deepEqual(run.errors, []);
   });
 });

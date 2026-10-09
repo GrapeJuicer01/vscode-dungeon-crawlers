@@ -81,6 +81,23 @@ function measure(rig: GameRig, frames: number): Worst {
 }
 
 void describe('draw-call ceiling with class heroes and effects', () => {
+  void it('8 heroes of classes 4..11 (all summoners and the H3 classes) with a full effect pool: still at most 152 bitmap draws and 450 fills', (t) => {
+    tracker = trackBitmaps();
+    floodEffects();
+    const rig = gameRig();
+    mixedIds(12)
+      .slice(4)
+      .forEach((id) => feed(rig, agent(id, 'working')));
+    run(rig, 12_000);
+    const worst = measure(rig, 900);
+    t.diagnostic(`8 H2/H3 class heroes, 24 live effects: ${JSON.stringify(worst)}`);
+    assert.equal(worst.effectDraws, EFFECT_CAPACITY, 'the pool really was full in some frame');
+    assert.ok(worst.bitmaps <= MAX_BITMAPS, `${worst.bitmaps} bitmap draws`);
+    assert.ok(worst.fills <= MAX_FILLS, `${worst.fills} fills`);
+    assert.equal(worst.multiplies, 1);
+    assert.deepEqual(rig.errors, []);
+  });
+
   void it('8 class heroes with the effect pool kept full: at most 152 bitmap draws, 450 fills, 1 multiply', (t) => {
     tracker = trackBitmaps();
     floodEffects();

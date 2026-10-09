@@ -32,6 +32,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [m4-engine](architecture/plans/m4-engine.md) | M4 Engine (checked against M3 as built; includes the exact A0 art list and decisions for the human) |
 | [h1-classes](architecture/plans/h1-classes.md) | H1 Warrior, Mage, Archer, Rogue (checked against M4 as built; class assignment from the session id, ability phase, effect pool, `docs:tables`, exact art list, decisions H1-1 to H1-10) |
 | [h2-classes](architecture/plans/h2-classes.md) | H2 Cleric, Paladin, Necromancer, Bard (checked against H1 as built; summon convention, cosmetic buffs, eight-class `classFor`, art list, decisions H2-1 to H2-11) |
+| [h3-classes](architecture/plans/h3-classes.md) | H3 Druid (beast), Monk, Artificer (turret), Berserker (checked against H2 as built; twelve-class `classFor` spread, summon capacity, kind-aware pool, Berserker rules, art list, decisions H3-1 to H3-10) |
 
 ### ADRs
 

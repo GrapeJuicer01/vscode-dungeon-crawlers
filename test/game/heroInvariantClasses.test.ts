@@ -14,17 +14,22 @@ import { EffectPool } from '../../src/game/Effects';
 import { ClassHero, createHero } from '../../src/game/entities/ClassHero';
 import type { World } from '../../src/game/entities/Entity';
 import type { HeroInit } from '../../src/game/entities/Hero';
-import type { AgentInfo, AgentState } from '../../src/shared/protocol';
-import { artWithoutClasses, artWithoutEffects, idsOfClass, mixedIds } from '../support/classRig';
+import type { AgentInfo } from '../../src/shared/protocol';
+import {
+  artWithoutClasses,
+  artWithoutEffects,
+  idsOfClass,
+  mixedIds,
+  partyState,
+} from '../support/classRig';
 import { agent, feed, gameRig, heroLog, run, steps } from '../support/engineFakes';
 import type { GameRig } from '../support/engineFakes';
 
 const SCALES = [1, 8, 32, 64];
 const TEN_MINUTES = 10 * 60 * 1000;
-const STATES: readonly AgentState[] = ['working', 'spawned', 'idle'];
 
 function party(n: number): AgentInfo[] {
-  return mixedIds(n).map((id, i) => agent(id, STATES[i % 3] ?? 'idle', null, 1));
+  return mixedIds(n).map((id, i) => agent(id, partyState(i), null, 1));
 }
 
 function scene(n: number, options: Parameters<typeof gameRig>[0] = {}): GameRig {
@@ -83,11 +88,11 @@ function unchanged(
   }
 }
 
-void describe('the scene itself covers all eight classes and all three live states', () => {
+void describe('the scene itself covers all twelve classes and all three live states', () => {
   void it('64 heroes: every class and every state appears', () => {
     const rig = scene(64);
     const snap = rig.game.heroSnapshot();
-    assert.equal(new Set(snap.map((h) => h.classId)).size, 8);
+    assert.equal(new Set(snap.map((h) => h.classId)).size, 12);
     assert.equal(new Set(snap.map((h) => h.lifecycle)).size, 3);
     for (const h of snap) {
       assert.equal(h.classId, classFor(h.id));

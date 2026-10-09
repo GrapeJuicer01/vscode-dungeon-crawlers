@@ -1,4 +1,4 @@
-// The hero class table (H1 four, H2 four more; H3 grows it to 12). Classes are purely cosmetic: a look (art),
+// The hero class table (H1 four, H2 four more, H3 four more: 12, final). Classes are purely cosmetic: a look (art),
 // and the effects a hero plays while attacking. A row deliberately holds no combat or resource
 // number (Core invariant 1). docs/design/classes.md embeds a table generated from this file by
 // `npm run docs:tables`; this module is pure data so the generator can import it without art.
@@ -17,6 +17,10 @@ export const CLASS_IDS = [
   'paladin',
   'necromancer',
   'bard',
+  'druid',
+  'monk',
+  'artificer',
+  'berserker',
 ] as const;
 export type ClassId = (typeof CLASS_IDS)[number];
 export type ClassRole = 'melee' | 'ranged' | 'caster';
@@ -65,7 +69,7 @@ export interface ClassDef {
   /** Spawned on the attack strike frame; empty for a pure melee swing. */
   readonly strike: readonly EffectShot[];
   readonly ability: ClassAbility;
-  /** The ally raised with the ability, or null (all classes but the Necromancer in H2). */
+  /** The ally raised with the ability, or null (Necromancer skeleton, Druid beast, Artificer turret). */
   readonly summon: SummonDef | null;
 }
 
@@ -202,6 +206,80 @@ export const CLASSES = [
         { effect: 'note', dx: 6, dy: -16, vx: 24, vy: -26, lifeMs: 760 },
         { effect: 'note', dx: 8, dy: -14, vx: 36, vy: -18, lifeMs: 760 },
         { effect: 'note', dx: 10, dy: -12, vx: 48, vy: -10, lifeMs: 760 },
+      ],
+    },
+    summon: null,
+  },
+  {
+    id: 'druid',
+    name: 'Druid',
+    role: 'caster',
+    colors: 'earth brown + leaf green',
+    silhouette: 'antler or leaf crown, gnarled wooden staff, beast beside it',
+    strike: [{ effect: 'leaf', dx: 10, dy: -12, vx: 110, vy: -6, lifeMs: 600 }],
+    ability: {
+      id: 'wildCall',
+      name: 'Wild Call',
+      shots: [
+        { effect: 'leaf', dx: 12, dy: -8, vx: 20, vy: -22, lifeMs: 640 },
+        { effect: 'leaf', dx: 16, dy: -6, vx: 34, vy: -14, lifeMs: 640 },
+      ],
+    },
+    // Decoration: no health, no target, no effect on any hero (ADR 0011).
+    summon: { kind: 'beast', dx: 16, dy: 1 },
+  },
+  {
+    id: 'monk',
+    name: 'Monk',
+    role: 'melee',
+    colors: 'orange + cream',
+    silhouette: 'headband, bare forearms, glowing fists, no weapon',
+    // A static glow at the fist on the strike frame (the glowing fists are weapon-layer art).
+    strike: [{ effect: 'chiOrb', dx: 11, dy: -9, vx: 0, vy: 0, lifeMs: 200 }],
+    ability: {
+      id: 'chiBurst',
+      name: 'Chi Burst',
+      shots: [
+        { effect: 'chiBurst', dx: 18, dy: -10, vx: 0, vy: 0, lifeMs: 440 },
+        { effect: 'chiOrb', dx: 10, dy: -9, vx: 0, vy: 0, lifeMs: 300 },
+      ],
+    },
+    summon: null,
+  },
+  {
+    id: 'artificer',
+    name: 'Artificer',
+    role: 'ranged',
+    colors: 'copper + teal',
+    silhouette: 'goggles on forehead, gear backpack, wrench, turret beside it',
+    strike: [{ effect: 'wrench', dx: 10, dy: -12, vx: 140, vy: -4, lifeMs: 520 }],
+    ability: {
+      id: 'deployTurret',
+      name: 'Deploy Turret',
+      shots: [
+        { effect: 'smokePuff', dx: 14, dy: -3, vx: 0, vy: 0, lifeMs: 360 },
+        { effect: 'wrench', dx: 8, dy: -14, vx: 0, vy: -18, lifeMs: 500 },
+      ],
+    },
+    // Decoration: no health, no target, no effect on any hero (ADR 0011).
+    summon: { kind: 'turret', dx: 14, dy: 1 },
+  },
+  {
+    id: 'berserker',
+    name: 'Berserker',
+    role: 'melee',
+    colors: 'fur brown + war-paint red',
+    silhouette: 'wild spiky hair, bare chest, oversized axe',
+    // No strike effect: the axe swing is in the weapon layer.
+    strike: [],
+    // A timer-driven one-shot flourish, identical on every cast (H3 plan section 2.1).
+    ability: {
+      id: 'battleRoar',
+      name: 'Battle Roar',
+      shots: [
+        { effect: 'warCry', dx: 0, dy: -3, vx: 0, vy: 0, lifeMs: 480 },
+        { effect: 'smokePuff', dx: -6, dy: -1, vx: 0, vy: 0, lifeMs: 360 },
+        { effect: 'smokePuff', dx: 8, dy: -1, vx: 0, vy: 0, lifeMs: 360 },
       ],
     },
     summon: null,

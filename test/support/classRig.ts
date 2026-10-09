@@ -135,13 +135,28 @@ export function idsOfClass(classId: ClassId, count: number, prefix = 'c-'): stri
   return out;
 }
 
-/** `n` ids whose classes cycle through all eight classes, so every class appears once n >= 8. */
+/** `n` ids whose classes cycle through all twelve classes, so every class appears once n >= 8. */
 export function mixedIds(n: number, prefix = 'm-'): string[] {
   const perClass = CLASS_IDS.map((c) => idsOfClass(c, Math.ceil(n / CLASS_IDS.length), prefix));
   return Array.from(
     { length: n },
     (_, i) => perClass[i % CLASS_IDS.length]?.[Math.floor(i / CLASS_IDS.length)] ?? '',
   );
+}
+
+/**
+ * Agent state for the i-th hero of a mixed party. The class cycle has period 12, a multiple of 3,
+ * so a plain `i % 3` would tie every class to one state and only four classes would ever fight.
+ * Round 0 uses `p % 3`, round 1 makes all but every third class work, round 2 shifts by one; so
+ * with 32 or more heroes every class has at least one working hero and all three states appear.
+ */
+export function partyState(i: number): AgentState {
+  const states: readonly AgentState[] = ['working', 'spawned', 'idle'];
+  const p = i % CLASS_IDS.length;
+  const round = Math.floor(i / CLASS_IDS.length) % 3;
+  if (round === 0) return states[p % 3] ?? 'idle';
+  if (round === 1) return p % 3 === 0 ? 'idle' : 'working';
+  return states[(p + 1) % 3] ?? 'idle';
 }
 
 export { lookFor };

@@ -45,7 +45,8 @@ export class SummonPool {
 
   /**
    * The owner raises its summon. A bad number, an unknown kind, or a full pool is a silent no-op.
-   * A summon already rising or active for the slot is left alone; a sinking one restarts.
+   * A summon of the same kind already rising or active for the slot is left alone; a sinking
+   * one, or one of a different kind, restarts as the requested kind.
    */
   raise(slot: number, kind: SummonId, x: number, y: number, faceRight: boolean): void {
     if (
@@ -56,11 +57,11 @@ export class SummonPool {
     ) {
       return;
     }
-    // Summons are keyed by slot only: a new hero reusing a slot within the lease inherits the old
-    // summon (cosmetic only, no state effect).
+    // One summon per slot. A slot reused by a hero of another class never keeps the old kind
+    // (H3-7): a sinking summon or one of a different kind restarts as the requested kind.
     const existing = this.#find(slot);
     if (existing !== null) {
-      if (existing.phase === 'sink') {
+      if (existing.phase === 'sink' || existing.kind !== kind) {
         existing.begin(slot, kind, x, y, faceRight, SUMMON_LEASE_MS);
       }
       return;
@@ -74,13 +75,23 @@ export class SummonPool {
     }
   }
 
-  /** Extends the lease and places the summon. Does nothing for a missing or sinking summon. */
-  renew(slot: number, x: number, y: number, faceRight: boolean, pose: SummonPose): void {
+  /**
+   * Extends the lease and places the summon. Does nothing for a missing or sinking summon, or one
+   * of a different kind (it then sinks when its lease runs out).
+   */
+  renew(
+    slot: number,
+    kind: SummonId,
+    x: number,
+    y: number,
+    faceRight: boolean,
+    pose: SummonPose,
+  ): void {
     if (!Number.isFinite(slot) || !Number.isFinite(x) || !Number.isFinite(y)) {
       return;
     }
     const summon = this.#find(slot);
-    if (summon === null || summon.phase === 'sink') {
+    if (summon === null || summon.phase === 'sink' || summon.kind !== kind) {
       return;
     }
     summon.place(x, y, faceRight, pose, SUMMON_LEASE_MS);

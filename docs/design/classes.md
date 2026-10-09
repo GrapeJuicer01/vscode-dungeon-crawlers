@@ -5,12 +5,12 @@ Related: [game design](game-design.md), [art style guide](art-style-guide.md), [
 
 ## Assignment
 
-A hero's class is `classFor(sessionId)` in `src/game/data/classMap.ts`: a pure hash of the session id over the delivered classes. It uses no state, no storage, no tool names, and no transcript content. The same id always gives the same class, so a class survives hiding and re-showing the tab, "Developer: Reload Webviews", and a replaced or rebuilt hero. When a later batch delivers more classes the count changes and an id may get a different class once, after the extension updates (H2 did this: the eight-class mapping reads a different slice of the id hash).
+A hero's class is `classFor(sessionId)` in `src/game/data/classMap.ts`: a pure hash of the session id over the delivered classes. It uses no state, no storage, no tool names, and no transcript content. The same id always gives the same class, so a class survives hiding and re-showing the tab, "Developer: Reload Webviews", and a replaced or rebuilt hero. The set is now complete at twelve classes, so this mapping is final. H3 changed it once more, after the extension updates: with twelve classes about two thirds of all session ids get a different class than under the eight-class mapping (about one third keep it). Within a running extension a class never changes.
 
 ## Class table
 
 <!-- BEGIN GENERATED: classes -->
-Delivered classes: 8 of 12.
+Delivered classes: 12 of 12.
 
 | Class | Role | Colors | Silhouette | Strike effect | Ability (effects) |
 |---|---|---|---|---|---|
@@ -22,6 +22,10 @@ Delivered classes: 8 of 12.
 | Paladin | melee | gold + white | winged helm, tall kite shield, glowing sword | none | Radiant Smite (`holyBurst`, `buffSparkle`) |
 | Necromancer | caster | dark purple + sickly green | hood, hunched, skull staff, skeleton beside it | `soulWisp` | Bone Call (`soulWisp` x2; summons a skeleton) |
 | Bard | caster | teal + magenta | big feathered hat, lute | `note` | Chorus (`note` x3) |
+| Druid | caster | earth brown + leaf green | antler or leaf crown, gnarled wooden staff, beast beside it | `leaf` | Wild Call (`leaf` x2; summons a beast) |
+| Monk | melee | orange + cream | headband, bare forearms, glowing fists, no weapon | `chiOrb` | Chi Burst (`chiBurst`, `chiOrb`) |
+| Artificer | ranged | copper + teal | goggles on forehead, gear backpack, wrench, turret beside it | `wrench` | Deploy Turret (`smokePuff`, `wrench`; summons a turret) |
+| Berserker | melee | fur brown + war-paint red | wild spiky hair, bare chest, oversized axe | none | Battle Roar (`warCry`, `smokePuff` x2) |
 <!-- END GENERATED: classes -->
 
 ## What each class plays
@@ -36,6 +40,10 @@ Every class uses the same three-frame `attack` cycle. A strike effect, where the
 - **Paladin**: cuts with a glowing sword (the glow is part of the sword art), behind a tall kite shield. Radiant Smite: a gold-white burst in front of the paladin and one rising sparkle.
 - **Necromancer**: thrusts a skull staff and sends a green `soulWisp` drifting right. Bone Call: two wisps rise, and a small skeleton climbs out of the floor beside the necromancer. The skeleton is decoration with no health and no effect on anything or anyone: it walks in place while the hero advances, swings at nothing while the hero fights, and sinks into the floor about half a second after the hero stops fighting (goes to the campfire, or leaves). See [ADR 0011](../architecture/adr/0011-summons-are-leased-cosmetic-entities.md).
 - **Bard**: strums a lute and sends a musical `note` drifting up and forward. Chorus: three notes fan out.
+- **Druid**: spins a `leaf` forward from a gnarled wooden staff. Wild Call: two drifting leaves, and a small friendly wolf (the beast) sprouts out of the floor beside the druid. The beast is decoration with no health and no effect on anything or anyone: it walks in place while the hero advances, snaps at nothing while the hero fights, and sinks into the floor shortly after the hero stops fighting.
+- **Monk**: fights barehanded; the fists glow (part of the weapon art) and a small `chiOrb` glows at the fist on the strike frame. Chi Burst: a short warm burst in front of the monk plus the fist glow.
+- **Artificer**: spins a `wrench` forward. Deploy Turret: a small dust puff, a wrench lobbed up, and a clockwork turret (a little walker) unfolds out of the floor beside the artificer. The turret is decoration with no health and no effect on anything or anyone: it walks in place while the hero advances, aims at nothing (no projectile) while the hero fights, and folds back into the floor shortly after the hero stops fighting.
+- **Berserker**: swings an oversized axe (the swing is in the weapon art, so there is no strike effect). Battle Roar: a one-shot expanding ring at the feet and two dust puffs. It is a timer-driven flourish on the same hidden 4 to 8 second timer as every class, identical on the first and the hundredth cast. It is not a meter: nothing builds up, nothing stays on the hero, and it never reacts to anything that happens to the hero. The red war paint is a fixed pattern on the face and chest, the same in every frame.
 
 ## No health, no damage
 

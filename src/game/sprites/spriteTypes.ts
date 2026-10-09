@@ -45,11 +45,14 @@ export type EffectSpriteIdH1 =
 /** Effect sprite ids delivered by H2 (ids `effects/<name>`). `blessGlow` is the Cleric blessing (H2-7). */
 export type EffectSpriteIdH2 = 'buffSparkle' | 'note' | 'blessGlow' | 'holyBurst' | 'soulWisp';
 
+/** Effect sprite ids delivered by H3 (ids `effects/<name>`). */
+export type EffectSpriteIdH3 = 'leaf' | 'chiOrb' | 'chiBurst' | 'warCry' | 'wrench';
+
 /**
  * All effect sprite ids. Mirrors `EFFECT_IDS` in src/game/data/effects.ts (developer); the sprite
  * files cannot import data, so the list is repeated and the validator checks the keys.
  */
-export type EffectSpriteId = EffectSpriteIdH1 | EffectSpriteIdH2;
+export type EffectSpriteId = EffectSpriteIdH1 | EffectSpriteIdH2 | EffectSpriteIdH3;
 
 /** The classes delivered by H1. */
 export type ClassPaletteIdH1 = 'warrior' | 'mage' | 'archer' | 'rogue';
@@ -57,11 +60,14 @@ export type ClassPaletteIdH1 = 'warrior' | 'mage' | 'archer' | 'rogue';
 /** The classes delivered by H2. */
 export type ClassPaletteIdH2 = 'cleric' | 'paladin' | 'necromancer' | 'bard';
 
-/** All classes with a palette; H3 widens this to 12. */
-export type ClassPaletteId = ClassPaletteIdH1 | ClassPaletteIdH2;
+/** The classes delivered by H3. */
+export type ClassPaletteIdH3 = 'druid' | 'monk' | 'artificer' | 'berserker';
+
+/** All classes with a palette (twelve). */
+export type ClassPaletteId = ClassPaletteIdH1 | ClassPaletteIdH2 | ClassPaletteIdH3;
 
 /**
  * Summon sprite ids (convention ratified in docs/architecture/plans/h2-classes.md section 3.5; see docs/design/sprite-spec.md section 9). A summon is a
  * cosmetic ally drawn from a single (non-layered) template with ids `summons/<name>`.
  */
-export type SummonSpriteId = 'skeleton';
+export type SummonSpriteId = 'skeleton' | 'beast' | 'turret';

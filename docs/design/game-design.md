@@ -13,7 +13,7 @@ A hero is exactly as alive as its agent. Its state changes only when the host re
 
 ## Classes
 
-Every hero is one of the delivered classes (Warrior, Mage, Archer, Rogue, Cleric, Paladin, Necromancer, and Bard so far; twelve are planned). The class is chosen from the session id alone, so it never changes for a session. A class is a look (palette, silhouette, weapon) plus a small effect it plays while fighting, and nothing more: no stats, no roles that matter to your agents. See [classes](classes.md).
+Every hero is one of the delivered classes (Warrior, Mage, Archer, Rogue, Cleric, Paladin, Necromancer, Bard, Druid, Monk, Artificer, and Berserker: the set is complete at twelve). The class is chosen from the session id alone, so it never changes for a session. A class is a look (palette, silhouette, weapon) plus a small effect it plays while fighting, and nothing more: no stats, no roles that matter to your agents. See [classes](classes.md).
 
 ## Effects
 
@@ -21,7 +21,7 @@ While the party fights, class heroes release small effects: an orb bolt, an arro
 
 ## Summons and aura effects
 
-A class may raise a summon: the Necromancer's Bone Call lifts a small skeleton beside it. A summon is decoration. It has no health, is never a target, and has no effect on any hero; it walks in place while the hero advances, swings at nothing while the hero fights, and sinks into the floor shortly after the hero stops fighting. Blessings and music (Cleric, Paladin, Bard) are one-shot aura effects of at most a second, centered on the caster: calm gold sparkles, a glow at the feet, drifting notes. They restore, buff, and mark nothing, and no icon or bar stays on a hero.
+A class may raise a summon: the Necromancer's Bone Call lifts a small skeleton beside it, the Druid's Wild Call a small wolf (the beast), and the Artificer's Deploy Turret a small clockwork turret. A summon is decoration. It has no health, is never a target, and has no effect on any hero; it walks in place while the hero advances, swings at nothing while the hero fights, and sinks into the floor shortly after the hero stops fighting. Blessings and music (Cleric, Paladin, Bard) are one-shot aura effects of at most a second, centered on the caster: calm gold sparkles, a glow at the feet, drifting notes. The Monk's Chi Burst and the Berserker's Battle Roar are likewise one-shot flourishes on the hidden ability timer; the roar is not a rage meter and nothing about it builds or reacts to the fight. They restore, buff, and mark nothing, and no icon or bar stays on a hero.
 
 ## Rhythm
 

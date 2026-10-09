@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import {
-  SUMMON_SHADOW_WIDTH_PX,
+  SUMMON_SHADOW_PX,
   EFFECT_CAPACITY,
   PARTICLE_CAPACITY,
   STEP_MS,
@@ -162,7 +162,7 @@ void describe('summon drawing', () => {
     const calls = s.frame();
     assert.equal(calls.filter((c) => c.method === 'fillRect').length, base + 2);
     const bars = calls.filter(
-      (c) => c.method === 'fillRect' && c.args[3] === SUMMON_SHADOW_WIDTH_PX && c.args[4] === 2,
+      (c) => c.method === 'fillRect' && c.args[3] === SUMMON_SHADOW_PX.skeleton && c.args[4] === 2,
     );
     const positions = bars.map((c) => [c.args[1], c.args[2]]);
     assert.ok(
@@ -224,7 +224,8 @@ void describe('summon drawing', () => {
     const calls = s.frame();
     assert.deepEqual(s.errors, []);
     assert.equal(
-      calls.filter((c) => c.method === 'fillRect' && c.args[3] === SUMMON_SHADOW_WIDTH_PX).length,
+      calls.filter((c) => c.method === 'fillRect' && c.args[3] === SUMMON_SHADOW_PX.skeleton)
+        .length,
       1,
     );
   });
@@ -247,18 +248,56 @@ void describe('summon drawing', () => {
   });
 });
 
+void describe('the shadow bar follows the summon kind (H3-8)', () => {
+  void it('SUMMON_SHADOW_PX is skeleton 8, beast 12, turret 10, one entry per kind', () => {
+    assert.deepEqual(SUMMON_SHADOW_PX, { skeleton: 8, beast: 12, turret: 10 });
+    assert.deepEqual(Object.keys(SUMMON_SHADOW_PX).sort(), [...SUMMON_IDS].sort());
+  });
+
+  for (const kind of SUMMON_IDS) {
+    void it(`a ${kind} draws a ${SUMMON_SHADOW_PX[kind]} x 2 shadow centered on its foot pixel`, () => {
+      const s = scene();
+      s.w.summons.raise(0, kind, 100, 120, true);
+      const bars = s.frame().filter((c) => c.method === 'fillRect' && c.args[4] === 2);
+      const width = SUMMON_SHADOW_PX[kind];
+      const mine = bars.filter((c) => c.args[3] === width);
+      assert.equal(mine.length >= 1, true, JSON.stringify(bars.map((c) => c.args)));
+      assert.ok(
+        mine.some((c) => c.args[1] === 100 - width / 2 && c.args[2] === 119),
+        JSON.stringify(mine.map((c) => c.args)),
+      );
+    });
+  }
+
+  void it('a mixed row of three kinds draws three bars of three widths', () => {
+    const s = scene();
+    s.w.summons.raise(0, 'skeleton', 60, 120, true);
+    s.w.summons.raise(1, 'beast', 120, 120, true);
+    s.w.summons.raise(2, 'turret', 180, 120, true);
+    const widths = s
+      .frame()
+      .filter((c) => c.method === 'fillRect' && c.args[4] === 2 && c.args[2] === 119)
+      .map((c) => Number(c.args[3]))
+      .sort((a, b) => a - b);
+    assert.deepEqual(widths, [8, 10, 12]);
+  });
+});
+
 void describe('draw-call ceiling with summons', () => {
-  void it('8 heroes, 8 summons, a full effect pool, and a full particle pool: at most 152 bitmap draws and 450 fills', (t) => {
+  void it('8 heroes, 8 summons of all three kinds, a full effect pool, and a full particle pool: at most 152 bitmap draws and 450 fills', (t) => {
     const w = makeWorld();
     const renderer = new Renderer(w.bitmaps, SHIPPED_ART, () => undefined);
-    const heroes = mixedIds(8).map((id, slot) =>
-      createHero({
-        info: info(id, 'working'),
-        slot,
-        instant: true,
-        look: lookFor(id),
-      }),
-    );
+    // Classes 4..11 (Cleric to Berserker): the H2 and H3 casters, so all new art is in the count.
+    const heroes = mixedIds(12)
+      .slice(4)
+      .map((id, slot) =>
+        createHero({
+          info: info(id, 'working'),
+          slot,
+          instant: true,
+          look: lookFor(id),
+        }),
+      );
     w.engagement.engaged = true;
     const surface = new RecordingSurface();
     surface.record = true;
@@ -267,7 +306,19 @@ void describe('draw-call ceiling with summons', () => {
     let worstFills = 0;
     let worstEffects = 0;
     const effectFrames = new Set<unknown>();
-    for (const id of ['whirl', 'arrow', 'note', 'soulWisp', 'holyBurst', 'blessGlow']) {
+    for (const id of [
+      'whirl',
+      'arrow',
+      'note',
+      'soulWisp',
+      'holyBurst',
+      'blessGlow',
+      'leaf',
+      'chiOrb',
+      'chiBurst',
+      'warCry',
+      'wrench',
+    ]) {
       for (const f of w.world.cache.effect(id)?.frames ?? []) {
         effectFrames.add(f);
       }
@@ -277,8 +328,16 @@ void describe('draw-call ceiling with summons', () => {
         h.update(STEP_MS, w.world);
       }
       for (let slot = 0; slot < 8; slot++) {
-        w.summons.raise(slot, 'skeleton', 40 + slot * 30, 110 + (slot % 3) * 10, slot % 2 === 0);
-        w.summons.renew(slot, 40 + slot * 30, 110 + (slot % 3) * 10, slot % 2 === 0, 'attack');
+        const kind = SUMMON_IDS[slot % SUMMON_IDS.length] ?? 'skeleton';
+        w.summons.raise(slot, kind, 40 + slot * 30, 110 + (slot % 3) * 10, slot % 2 === 0);
+        w.summons.renew(
+          slot,
+          kind,
+          40 + slot * 30,
+          110 + (slot % 3) * 10,
+          slot % 2 === 0,
+          'attack',
+        );
       }
       for (let k = 0; k < 40; k++) {
         w.effects.spawn('buffSparkle', 60 + k * 5, 90 + (k % 10) * 6, 0, 0, 600, false);
@@ -394,6 +453,66 @@ void describe('validateSummonArt', () => {
       assert.ok(ch in SHIPPED_ART.palette, `${ch} is a master palette character`);
     }
     assert.ok(Object.keys(SHIPPED_ART.palette).length <= 48, 'master palette at most 48 colors');
+  });
+
+  void it('the shipped beast and turret: idle 2, walk 4, attack 3, rise 4, sink 3; at most 24 x 24; at most 8 colors; anchor inside', () => {
+    for (const kind of ['beast', 'turret'] as const) {
+      const t = SHIPPED_ART.summons[kind] as SpriteTemplate;
+      assert.equal(t.id, `summons/${kind}`);
+      assert.deepEqual(
+        Object.fromEntries(Object.entries(t.animations).map(([k, v]) => [k, v.length])),
+        { idle: 2, walk: 4, attack: 3, rise: 4, sink: 3 },
+        kind,
+      );
+      assert.ok(t.w <= 24 && t.h <= 24, kind);
+      assert.ok(t.anchor.x >= 0 && t.anchor.x < t.w && t.anchor.y >= 0 && t.anchor.y < t.h, kind);
+      const used = new Set<string>();
+      for (const frames of Object.values(t.animations)) {
+        for (const rows of frames) {
+          for (const row of rows) {
+            for (const ch of row) {
+              if (ch !== '.') used.add(ch);
+            }
+          }
+        }
+      }
+      assert.ok(used.size <= 8, `${kind}: ${[...used].join()}`);
+      for (const ch of used) {
+        assert.ok(ch in SHIPPED_ART.palette, `${kind}: ${ch} is a master palette character`);
+      }
+      for (const name of ['hurt', 'death', 'dying', 'downed']) {
+        assert.ok(!(name in t.animations), `${kind} has no ${name}`);
+      }
+    }
+    assert.deepEqual(Object.keys(SHIPPED_ART.summons).sort(), [...SUMMON_IDS].sort());
+  });
+
+  void it('a missing template for a kind is one error naming it (beast, turret, skeleton)', () => {
+    for (const kind of SUMMON_IDS) {
+      const art = clone();
+      delete art.summons[kind];
+      const errors = validateSummonArt(art, ids);
+      assert.ok(
+        errors.some((e) => e.includes(kind)),
+        `${kind}: ${errors.join('\n')}`,
+      );
+    }
+  });
+
+  void it('a beast or turret with a missing animation or a wrong frame count is rejected', () => {
+    for (const kind of ['beast', 'turret']) {
+      const art = clone();
+      delete art.summons[kind]?.animations['sink'];
+      assert.deepEqual(validateSummonArt(art, ids), [
+        `summons/${kind}: missing required animation sink`,
+      ]);
+      const art2 = clone();
+      art2.summons[kind]?.animations['attack']?.pop();
+      assert.match(
+        validateSummonArt(art2, ids).join('\n'),
+        new RegExp(`^summons/${kind}: animation attack has 2 frames, expected 3`),
+      );
+    }
   });
 
   void it('a missing required animation is one error naming the id', () => {

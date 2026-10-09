@@ -66,6 +66,27 @@ void describe('class code in the bundles (H1)', () => {
     assert.doesNotMatch(host, /\b(SUMMON_IDS|SUMMON_CAPACITY|summonFrameIndex)\b/);
   });
 
+  void it('dist/webview.js contains the H3 summon templates, effects, and ability names; dist/extension.js has none (H3)', () => {
+    for (const needle of [
+      'summons/beast',
+      'summons/turret',
+      'effects/leaf',
+      'effects/chiOrb',
+      'effects/chiBurst',
+      'effects/warCry',
+      'effects/wrench',
+      'Wild Call',
+      'Chi Burst',
+      'Deploy Turret',
+      'Battle Roar',
+    ]) {
+      assert.ok(webview.includes(needle), `webview lacks ${needle}`);
+      assert.ok(!host.includes(needle), `host has ${needle}`);
+    }
+    assert.ok(webview.includes('SUMMON_SHADOW_PX'));
+    assert.doesNotMatch(host, /\bSUMMON_SHADOW_PX\b/);
+  });
+
   void it('package.json has no runtime dependencies', () => {
     const pkg = readJson('package.json') as { dependencies?: Record<string, string> };
     assert.deepEqual(pkg.dependencies ?? {}, {});

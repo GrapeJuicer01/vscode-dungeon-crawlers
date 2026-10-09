@@ -56,19 +56,21 @@ src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, 
 src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero + createHero (H1, data-driven: the
                             12 classes are rows, subclass files only where code is needed), Summon.ts (H2, not a
                             hero, never in the roster), Enemy, Boss (E1)
-src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1), summons.ts (H2, SUMMON_IDS);
-                            enemies, drops (E1); achievements (M7)
+src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1),
+                            summons.ts (H2, SUMMON_IDS); enemies, drops (E1); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,
                             campfireTemplates, stage1Templates, classTemplates (H1, CLASS_LAYERS), effectTemplates
                             (H1, EFFECT_SPRITES), classTemplatesH2, effectTemplatesH2, summon templates (H2,
-                            SUMMON_SPRITES); engine (developer): spriteFactory, spriteValidator, artSet
-                            (SHIPPED_ART glue)
+                            SUMMON_SPRITES), palettesH2/H3, classTemplatesH3, effectTemplatesH3, summonTemplatesH3
+                            (H3: Druid, Monk, Artificer, Berserker; beast and turret); engine (developer):
+                            spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
 scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
                             the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
 test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); game/ engine suites
                             incl. the hero-invariant test (M4);
-                            support/ helpers and fakes (fakeVscode, fakeDom; monitor fakes from M3; engine fakes M4);
+                            support/ helpers and fakes (fakeVscode, fakeDom, color; monitor fakes from M3; engine fakes
+                            M4);
                             fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3)
 test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
                             --disable-extensions); support/ in-host harness and providerSpy

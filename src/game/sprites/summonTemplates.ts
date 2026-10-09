@@ -11,6 +11,7 @@
 // green puff. It never collapses, falls apart, flashes, or shows red.
 
 import { Grid } from './spriteBuilder';
+import { SUMMON_SPRITES_H3 } from './summonTemplatesH3';
 import type { SpriteTemplate, SummonSpriteId } from './spriteTypes';
 
 const W = 16;
@@ -195,7 +196,8 @@ function build(): SpriteTemplate {
   };
 }
 
-/** Summon id -> sprite. Only the Necromancer's skeleton exists (H2). */
+/** Summon id -> sprite: the Necromancer's skeleton (H2) plus the Druid's beast and the Artificer's turret (H3). */
 export const SUMMON_SPRITES: Readonly<Record<SummonSpriteId, SpriteTemplate>> = {
   skeleton: build(),
+  ...SUMMON_SPRITES_H3,
 };

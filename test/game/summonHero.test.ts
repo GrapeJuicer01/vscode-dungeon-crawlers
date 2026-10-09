@@ -292,7 +292,7 @@ void describe('the summon disappears within 0.7 s once the hero stops fighting',
 });
 
 void describe('summon: null never touches the pool', () => {
-  for (const classId of CLASS_IDS.filter((c) => c !== 'necromancer')) {
+  for (const classId of CLASS_IDS.filter((c) => classDef(c).summon === null)) {
     void it(`${classId} fights and casts for 60 s without a raise or renew call`, () => {
       spy = spyOnPools();
       const r = rig(classId);

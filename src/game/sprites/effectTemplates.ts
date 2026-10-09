@@ -5,6 +5,7 @@
 
 import { Grid, loopTemplate } from './spriteBuilder';
 import { EFFECT_SPRITES_H2 } from './effectTemplatesH2';
+import { EFFECT_SPRITES_H3 } from './effectTemplatesH3';
 import type { EffectSpriteId, EffectSpriteIdH1, SpriteTemplate } from './spriteTypes';
 
 /** Plots a connected 1px ellipse outline; `pick` chooses the character from the angle (radians). */
@@ -175,8 +176,9 @@ export const EFFECT_SPRITES_H1: Readonly<Record<EffectSpriteIdH1, SpriteTemplate
   ),
 };
 
-/** All effect sprites (H1 + H2). */
+/** All effect sprites (H1 + H2 + H3). */
 export const EFFECT_SPRITES: Readonly<Record<EffectSpriteId, SpriteTemplate>> = {
   ...EFFECT_SPRITES_H1,
   ...EFFECT_SPRITES_H2,
+  ...EFFECT_SPRITES_H3,
 };

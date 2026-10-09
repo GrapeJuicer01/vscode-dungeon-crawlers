@@ -91,6 +91,7 @@ export class ClassHero extends Hero {
     const sign = this.faceRight ? 1 : -1;
     world.summons.renew(
       this.slot,
+      summon.kind,
       Math.floor(this.x) + summon.dx * sign,
       Math.floor(this.y) + summon.dy,
       this.faceRight,

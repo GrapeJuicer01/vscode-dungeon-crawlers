@@ -76,50 +76,84 @@ void describe('classFor is pure and total', () => {
       assert.equal(classFor(id), reference(id), id.slice(0, 20));
     }
     // Pinned: a change here reshuffles every user's heroes and must be a deliberate decision.
-    // H2 moved the slice from >>> 16 to >>> 20 (developer deviation, see classMap.ts).
+    // H2 moved the slice from >>> 16 to >>> 20; H3 keeps >>> 20 (CLASS_SHIFT 20) and goes to twelve
+    // classes, the last reshuffle (re-pinned from a measured run).
     assert.deepEqual(['', 'a', 'alpha', 'sim-0-0', 'sim-1-0', 'sim-3-0', 'sim-6-0'].map(classFor), [
       'mage',
       'warrior',
-      'warrior',
+      'druid',
       'necromancer',
       'rogue',
       'mage',
-      'warrior',
+      'cleric',
     ]);
   });
 
-  void it('DELIVERED_CLASSES equals CLASS_IDS (eight in H2), and CLASSES has one row per id in the same order', () => {
+  void it('DELIVERED_CLASSES equals CLASS_IDS (twelve in H3), and CLASSES has one row per id in the same order', () => {
     assert.deepEqual([...DELIVERED_CLASSES], [...CLASS_IDS]);
     assert.deepEqual(
       CLASSES.map((c) => c.id),
       [...CLASS_IDS],
     );
-    assert.equal(CLASS_IDS.length, 8);
-    assert.equal(DELIVERED_CLASSES.length, 8);
+    assert.equal(CLASS_IDS.length, 12);
+    assert.equal(DELIVERED_CLASSES.length, 12);
+    assert.equal(new Set(CLASS_IDS).size, 12);
+    assert.deepEqual(
+      [...CLASS_IDS].slice(8),
+      ['druid', 'monk', 'artificer', 'berserker'],
+      'H3 appends after the H1 four and the H2 four',
+    );
+    // The `?? 'warrior'` fallback in classFor is unreachable: every index is defined.
+    for (let i = 0; i < DELIVERED_CLASSES.length; i++) {
+      assert.ok(DELIVERED_CLASSES[i] !== undefined, String(i));
+    }
   });
 });
 
 void describe('classFor distribution', () => {
-  void it('1,000 UUID-like ids use all eight classes and none is under 8 percent', () => {
+  void it('1,000 UUID-like ids use all twelve classes, each between 50 and 130 (5 to 13 percent)', () => {
     const counts = tally(uuids(1000));
-    assert.equal(counts.size, 8);
+    assert.equal(counts.size, 12);
     for (const [cls, n] of counts) {
-      assert.ok(n >= 80, `${cls} has only ${n} of 1000`);
+      assert.ok(n >= 50 && n <= 130, `${cls} has ${n} of 1000`);
     }
   });
 
-  void it('sim-0-0 to sim-7-0 (the default simulator party) use at least five classes, including an H2 class', () => {
+  void it('20,000 random strings always map into the twelve classes, with no fallback skew', () => {
+    const rng = mulberry32(77);
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 20_000; i++) {
+      let id = '';
+      const len = 1 + Math.floor(rng() * 24);
+      for (let j = 0; j < len; j++) id += String.fromCharCode(32 + Math.floor(rng() * 4000));
+      const c = classFor(id);
+      assert.ok((CLASS_IDS as readonly string[]).includes(c));
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    assert.equal(counts.size, 12);
+    // A silent 'warrior' fallback would inflate warrior far above the others.
+    for (const [cls, n] of counts) {
+      assert.ok(n > 1200 && n < 2200, `${cls} ${n}`);
+    }
+  });
+
+  void it('sim-0-0 to sim-7-0 (the default simulator party) use at least five classes, including an H3 class and a summoner', () => {
     const ids = Array.from({ length: 8 }, (_, i) => `sim-${i}-0`);
     const used = new Set(ids.map(classFor));
     assert.ok(used.size >= 5, [...used].join());
-    const h2 = ['cleric', 'paladin', 'necromancer', 'bard'];
+    const h3 = ['druid', 'monk', 'artificer', 'berserker'];
     assert.ok(
-      [...used].some((c) => h2.includes(c)),
+      [...used].some((c) => h3.includes(c)),
+      [...used].join(),
+    );
+    const summoners = ['necromancer', 'druid', 'artificer'];
+    assert.ok(
+      [...used].some((c) => summoners.includes(c)),
       [...used].join(),
     );
   });
 
-  void it('is independent of skin tone and hair: all 32 skin and class pairs occur over 1,000 ids', () => {
+  void it('is independent of skin tone and hair: all 48 skin and class pairs occur over 1,000 ids', () => {
     const pairs = new Set<string>();
     for (const id of uuids(1000, 3)) {
       pairs.add(`${lookFor(id).skin}|${classFor(id)}`);
@@ -151,9 +185,9 @@ void describe('classFor distribution', () => {
   });
 });
 
-void describe('the documented reshuffle property (H1 to H2)', () => {
-  void it('an id whose class slice modulo 8 is below 4 has the same class under four and eight classes', () => {
-    // Documents accepted behavior, not a requirement: the H1 classes keep indexes 0..3.
+void describe('the documented reshuffle property (H2 to H3)', () => {
+  void it('an id whose class slice modulo 24 is below 8 has the same class under eight and twelve classes', () => {
+    // Documents accepted behavior, not a requirement: s % 24 < 8 gives s % 8 === s % 12.
     const slice = (id: string): number => {
       let h = 0x811c9dc5;
       for (let i = 0; i < id.length; i++) {
@@ -165,16 +199,14 @@ void describe('the documented reshuffle property (H1 to H2)', () => {
     let checked = 0;
     for (const id of uuids(500, 9)) {
       const s = slice(id);
-      if (s % 8 < 4) {
-        assert.equal(classFor(id), CLASS_IDS[s % 4]);
+      if (s % 24 < 8) {
+        assert.equal(classFor(id), CLASS_IDS[s % 8]);
         checked++;
       } else {
-        assert.ok(
-          (['cleric', 'paladin', 'necromancer', 'bard'] as string[]).includes(classFor(id)),
-        );
+        assert.equal(classFor(id), CLASS_IDS[s % 12]);
       }
     }
-    assert.ok(checked > 100);
+    assert.ok(checked > 100, String(checked));
   });
 });
 

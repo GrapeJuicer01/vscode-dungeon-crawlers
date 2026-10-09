@@ -30,7 +30,7 @@ const phasesOf = (pool: SummonPool): (SummonPhase | 'none')[] =>
 function advance(pool: SummonPool, ms: number, renewSlot: number | null = null): void {
   for (let t = 0; t < ms; t += STEP_MS) {
     if (renewSlot !== null) {
-      pool.renew(renewSlot, 50, 100, true, 'attack');
+      pool.renew(renewSlot, 'skeleton', 50, 100, true, 'attack');
     }
     pool.update(STEP_MS, world);
   }
@@ -136,25 +136,25 @@ void describe('renew and the lease', () => {
   void it('renew places the summon and sets its pose; a pose change restarts the clock only', () => {
     const pool = new SummonPool(SUMMON_CAPACITY);
     pool.raise(0, 'skeleton', 10, 100, true);
-    pool.renew(0, 22.5, 133.7, false, 'walk');
+    pool.renew(0, 'skeleton', 22.5, 133.7, false, 'walk');
     const s = only(pool);
     assert.equal(s.x, 22.5);
     assert.equal(s.sortY, 133);
     assert.equal(s.pose, 'walk');
-    pool.renew(0, 22.5, 133.7, false, 'attack');
+    pool.renew(0, 'skeleton', 22.5, 133.7, false, 'attack');
     assert.equal(s.pose, 'attack');
     assert.equal(pool.count, 1);
   });
 
   void it('renew on a missing slot or a sinking summon does nothing', () => {
     const pool = new SummonPool(SUMMON_CAPACITY);
-    pool.renew(5, 1, 1, true, 'walk');
+    pool.renew(5, 'skeleton', 1, 1, true, 'walk');
     assert.equal(pool.count, 0, 'renew never creates a summon');
     pool.raise(0, 'skeleton', 10, 100, true);
     advance(pool, SUMMON_LEASE_MS + STEP_MS * 3);
     const s = only(pool);
     assert.equal(s.phase, 'sink');
-    pool.renew(0, 99, 99, false, 'walk');
+    pool.renew(0, 'skeleton', 99, 99, false, 'walk');
     assert.equal(s.phase, 'sink', 'a sinking summon is not revived by a renewal');
     assert.equal(s.x, 10);
     assert.equal(s.pose, 'attack');
@@ -163,9 +163,9 @@ void describe('renew and the lease', () => {
   void it('renew ignores NaN and infinite input', () => {
     const pool = new SummonPool(SUMMON_CAPACITY);
     pool.raise(0, 'skeleton', 10, 100, true);
-    pool.renew(NaN, 5, 5, true, 'walk');
-    pool.renew(0, NaN, 5, true, 'walk');
-    pool.renew(0, 5, Infinity, true, 'walk');
+    pool.renew(NaN, 'skeleton', 5, 5, true, 'walk');
+    pool.renew(0, 'skeleton', NaN, 5, true, 'walk');
+    pool.renew(0, 'skeleton', 5, Infinity, true, 'walk');
     assert.equal(only(pool).x, 10);
     assert.equal(only(pool).pose, 'attack');
   });
@@ -243,8 +243,8 @@ void describe('update', () => {
     pool.raise(1, 'skeleton', 30, 100, true);
     const objects = [...pool.entities()];
     for (let i = 0; i < 5000; i++) {
-      pool.renew(0, 10, 100, true, i % 2 === 0 ? 'walk' : 'attack');
-      pool.renew(1, 30, 100, true, 'attack');
+      pool.renew(0, 'skeleton', 10, 100, true, i % 2 === 0 ? 'walk' : 'attack');
+      pool.renew(1, 'skeleton', 30, 100, true, 'attack');
       pool.update(STEP_MS, world);
     }
     assert.equal(pool.entities(), list, 'the same array every time');
@@ -259,7 +259,7 @@ void describe('update', () => {
     const run = (n: number): void => {
       for (let i = 0; i < n; i++) {
         for (let slot = 0; slot < SUMMON_CAPACITY; slot++) {
-          pool.renew(slot, slot * 8, 100, true, 'attack');
+          pool.renew(slot, 'skeleton', slot * 8, 100, true, 'attack');
         }
         pool.update(STEP_MS, world);
       }
@@ -296,7 +296,7 @@ void describe('update', () => {
           p.raise((i / 400) % 3, 'skeleton', i % 97, 100 + (i % 13), i % 2 === 0);
         }
         if (i % 7 !== 0) {
-          p.renew((i / 400) | 0, i % 89, 100, true, i % 3 === 0 ? 'walk' : 'attack');
+          p.renew((i / 400) | 0, 'skeleton', i % 89, 100, true, i % 3 === 0 ? 'walk' : 'attack');
         }
         p.update(STEP_MS, world);
       }
@@ -319,14 +319,14 @@ void describe('a faulting summon', () => {
     );
     for (let i = 0; i < FAULT_LIMIT - 1; i++) {
       assert.doesNotThrow(() => {
-        pool.renew(0, 10, 100, true, 'attack');
-        pool.renew(1, 30, 100, true, 'attack');
+        pool.renew(0, 'skeleton', 10, 100, true, 'attack');
+        pool.renew(1, 'skeleton', 30, 100, true, 'attack');
         pool.update(STEP_MS, world);
       });
       assert.equal(pool.count, 2, `still live after ${i + 1} faults`);
     }
-    pool.renew(0, 10, 100, true, 'attack');
-    pool.renew(1, 30, 100, true, 'attack');
+    pool.renew(0, 'skeleton', 10, 100, true, 'attack');
+    pool.renew(1, 'skeleton', 30, 100, true, 'attack');
     pool.update(STEP_MS, world);
     assert.equal(FAULT_LIMIT, 3);
     assert.equal(pool.count, 1, 'the third fault frees the summon');
@@ -347,7 +347,7 @@ void describe('a faulting summon', () => {
       }),
     );
     for (let i = 0; i < 3; i++) {
-      pool.renew(0, 10, 100, true, 'attack');
+      pool.renew(0, 'skeleton', 10, 100, true, 'attack');
       pool.update(STEP_MS, world);
     }
     assert.equal(pool.count, 0);

@@ -5,7 +5,7 @@
 // drawn with bitmaps only, and missing art is skipped, never thrown.
 import { onceFrameIndex, summonFrameIndex } from '../data/animations';
 import type { SummonId } from '../data/summons';
-import { SUMMON_SHADOW_WIDTH_PX } from '../data/tuning';
+import { SUMMON_SHADOW_PX } from '../data/tuning';
 import { assertNever } from '../../shared/assertNever';
 import { GuardedEntity } from './Entity';
 import type { DrawContext, World } from './Entity';
@@ -14,8 +14,6 @@ export type SummonPhase = 'rise' | 'active' | 'sink';
 export type SummonPose = 'walk' | 'attack';
 
 export class Summon extends GuardedEntity {
-  readonly shadowWidth = SUMMON_SHADOW_WIDTH_PX;
-
   #inUse = false;
   #done = false;
   #slot = -1;
@@ -28,6 +26,11 @@ export class Summon extends GuardedEntity {
   #leaseMs = 0;
   #phaseMs = 0;
   #animMs = 0;
+
+  /** Shadow bar width for the current kind (the skeleton's while idle). */
+  get shadowWidth(): number {
+    return SUMMON_SHADOW_PX[this.#kind ?? 'skeleton'];
+  }
 
   get x(): number {
     return this.#x;

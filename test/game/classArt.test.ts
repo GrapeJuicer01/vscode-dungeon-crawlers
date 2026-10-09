@@ -6,6 +6,7 @@ import { CLASS_IDS } from '../../src/game/data/classes';
 import { EFFECT_IDS } from '../../src/game/data/effects';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
 import type { Palette } from '../../src/game/sprites/palettes';
+import { isRedHex } from '../support/color';
 import { heroFrameRows } from '../../src/game/sprites/spriteFactory';
 import type { ArtSet } from '../../src/game/sprites/spriteFactory';
 import {
@@ -117,12 +118,8 @@ void describe('the shipped art', () => {
     for (const [id, palette] of Object.entries(SHIPPED_ART.classPalettes)) {
       for (const key of ['c', 'd'] as const) {
         const hex = palette[key] ?? '#000000';
-        const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [
-          number,
-          number,
-          number,
-        ];
-        assert.ok(!(r > 150 && g < 110 && b < 110), `${id}.${key} ${hex} is red`);
+        // Red by hue, not by channel thresholds: fur brown (hue about 30) is not red (H3 Druid).
+        assert.ok(!isRedHex(hex), `${id}.${key} ${hex} is red`);
       }
     }
   });
@@ -295,7 +292,7 @@ void describe('crafted class-art faults', () => {
     const foreign = cloneArt();
     const f = (foreign.effects['arrow'] as SpriteTemplate).animations['idle']?.[0];
     assert.ok(f);
-    f[0] = 'Z' + (f[0] ?? '').slice(1);
+    f[0] = '@' + (f[0] ?? '').slice(1);
     const errors = validateArtSet(foreign);
     assert.equal(errors.length, 1, errors.join('\n'));
     assert.ok(errors[0]?.startsWith('effects/arrow:'));
@@ -348,11 +345,11 @@ void describe('crafted validateClassArt faults', () => {
 
   void it('layers or a palette for an unknown class are reported', () => {
     const art = cloneArt();
-    art.classLayers['druid'] = classLayers(art, 'mage');
-    art.classPalettes['druid'] = {};
+    art.classLayers['ranger'] = classLayers(art, 'mage');
+    art.classPalettes['ranger'] = {};
     const errors = validateClassArt(art, ids, effects);
-    assert.ok(errors.includes('druid: class layers for an unknown class'));
-    assert.ok(errors.includes('druid: class palette for an unknown class'));
+    assert.ok(errors.includes('ranger: class layers for an unknown class'));
+    assert.ok(errors.includes('ranger: class palette for an unknown class'));
   });
 
   void it('a layer id that does not belong to the class is reported', () => {

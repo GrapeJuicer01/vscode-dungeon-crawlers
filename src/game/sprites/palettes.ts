@@ -3,13 +3,14 @@
 // Rules and meanings: docs/design/art-style-guide.md section 3 and docs/design/sprite-spec.md.
 
 import { CLASS_PALETTES_H2 } from './palettesH2';
+import { CLASS_PALETTES_H3 } from './palettesH3';
 import type { ClassPaletteId, ClassPaletteIdH1 } from './spriteTypes';
 
 /** One character -> '#rrggbb'. '.' is transparent and is never a key. */
 export type Palette = Record<string, string>;
 
 /**
- * The master palette (35 colors). Groups:
+ * The master palette (37 colors). Groups:
  * - hero:      o outline, s skin, h hair, e eye, c cloth, d cloth shade, b pants, k boots/wood trim,
  *              m metal, w white highlight, a accent (class color; neutral sand in the base hero)
  * - fire:      Y yellow core, O orange, R red-orange, D dark ember
@@ -19,6 +20,7 @@ export type Palette = Record<string, string>;
  * - light:     T torch light, F campfire light
  * - particle:  q water light, Q water mid
  * - summon:    L glow green, N shade green (skeleton eye and rise/sink puff)
+ * - copper:    C copper, Z copper shade (Artificer wrench effect, A3-1)
  */
 export const MASTER_PALETTE: Palette = {
   // hero
@@ -64,6 +66,9 @@ export const MASTER_PALETTE: Palette = {
   // summon glow (appended in A2-1 for the skeleton's eye and rise/sink puff)
   L: '#8fe03c',
   N: '#3f9a3c',
+  // copper (A3-1, the wrench effect; effects are never class-swapped so copper needs its own characters)
+  C: '#d9824a',
+  Z: '#9a4f26',
 };
 
 /** Four skin tones, partial palettes overriding only `s`. Index 0 equals the master skin. */
@@ -160,8 +165,9 @@ export const CLASS_PALETTES_H1: Readonly<Record<ClassPaletteIdH1, Palette>> = {
   },
 };
 
-/** All class palettes (H1 + H2, eight classes). */
+/** All class palettes (H1 + H2 + H3, twelve classes). */
 export const CLASS_PALETTES: Readonly<Record<ClassPaletteId, Palette>> = {
   ...CLASS_PALETTES_H1,
   ...CLASS_PALETTES_H2,
+  ...CLASS_PALETTES_H3,
 };

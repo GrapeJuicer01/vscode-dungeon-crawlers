@@ -1,24 +1,29 @@
 // THE HERO-INVARIANT TEST, summon extension (Core invariants 1, 2, and 4; H2 plan test notes 5, 6,
 // and 9; ADR 0011). Summon stimuli (raising, renewing, exhausting the pool, a throwing
 // Summon.update, a throwing Summon.draw, a throwing SummonPool.update, missing summon art) run for
-// 10 simulated minutes with 1, 8, 32, and 64 heroes of all eight classes; heroSnapshot() must equal
+// 10 simulated minutes with 1, 8, 32, and 64 heroes of all twelve classes; heroSnapshot() must equal
 // the pre-stimulus snapshot. Then each of the four host events is applied while a summon is
 // rising, active, and sinking: the hero's lifecycle follows the event exactly as before.
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { SUMMON_CAPACITY, STEP_MS, SUMMON_LEASE_MS } from '../../src/game/data/tuning';
+import { SUMMON_IDS } from '../../src/game/data/summons';
+import type { SummonId } from '../../src/game/data/summons';
+import type { ClassId } from '../../src/game/data/classes';
 import { createHero } from '../../src/game/entities/ClassHero';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
-import type { AgentInfo, AgentState } from '../../src/shared/protocol';
-import { idsOfClass, mixedIds } from '../support/classRig';
+import type { AgentInfo } from '../../src/shared/protocol';
+import { idsOfClass, mixedIds, partyState } from '../support/classRig';
 import { agent, feed, gameRig, heroLog, run, steps } from '../support/engineFakes';
 import type { GameRig } from '../support/engineFakes';
 import { patchPoolUpdate, patchSummon, spyOnPools } from '../support/summonRig';
 import type { PoolSpy } from '../support/summonRig';
 
 const SCALES = [1, 8, 32, 64];
+/** Rotates through the three kinds so slots change kind over time (a mismatched raise restarts). */
+const kindFor = (slot: number, second: number): SummonId =>
+  SUMMON_IDS[(slot + second) % SUMMON_IDS.length] ?? 'skeleton';
 const TEN_MINUTES = 10 * 60 * 1000;
-const STATES: readonly AgentState[] = ['working', 'spawned', 'idle'];
 
 const restores: (() => void)[] = [];
 let spy: PoolSpy | null = null;
@@ -31,7 +36,7 @@ afterEach(() => {
 });
 
 function party(n: number): AgentInfo[] {
-  return mixedIds(n).map((id, i) => agent(id, STATES[i % 3] ?? 'idle', null, 1));
+  return mixedIds(n).map((id, i) => agent(id, partyState(i), null, 1));
 }
 
 function scene(n: number, options: Parameters<typeof gameRig>[0] = {}): GameRig {
@@ -77,18 +82,31 @@ function hammerPool(rig: GameRig, perSecond: (second: number) => void): void {
 }
 
 void describe('summon stimuli never change a hero or remove one', () => {
-  unchanged('natural Bone Call summons (the Necromancers really fight)', (rig, n) => {
+  unchanged('natural summons (Necromancers, Druids, and Artificers really fight)', (rig, n) => {
     steps(rig, TEN_MINUTES);
-    assert.ok((spy?.calls.raise ?? 0) > 0 || n < 8, 'a Necromancer raised a skeleton');
+    assert.ok((spy?.calls.raise ?? 0) > 0 || n < 8, 'a summoner raised an ally');
     assert.deepEqual(rig.errors, []);
   });
 
-  unchanged('raising and renewing in every slot, every second', (rig, n) => {
+  unchanged('raising and renewing all three kinds in every slot, every second', (rig, n) => {
     const p = pool();
     hammerPool(rig, (second) => {
       for (let slot = 0; slot < Math.min(n, 64); slot++) {
-        p.raise(slot, 'skeleton', 50 + (slot % 20) * 10, 100 + (slot % 5) * 8, second % 2 === 0);
-        p.renew(slot, 50, 100, true, second % 2 === 0 ? 'walk' : 'attack');
+        p.raise(
+          slot,
+          kindFor(slot, second),
+          50 + (slot % 20) * 10,
+          100 + (slot % 5) * 8,
+          second % 2 === 0,
+        );
+        p.renew(
+          slot,
+          kindFor(slot, second + (slot % 2)),
+          50,
+          100,
+          true,
+          second % 2 === 0 ? 'walk' : 'attack',
+        );
       }
     });
     assert.ok(p.count <= SUMMON_CAPACITY);
@@ -100,7 +118,7 @@ void describe('summon stimuli never change a hero or remove one', () => {
     hammerPool(rig, () => {
       for (let round = 0; round < 5; round++) {
         for (let slot = 0; slot < 64; slot++) {
-          p.raise(slot, 'skeleton', 30 + slot, 100, true);
+          p.raise(slot, kindFor(slot, round), 30 + slot, 100, true);
         }
       }
       assert.ok(p.count <= SUMMON_CAPACITY);
@@ -116,7 +134,7 @@ void describe('summon stimuli never change a hero or remove one', () => {
     );
     hammerPool(rig, () => {
       for (let slot = 0; slot < Math.min(n, 16); slot++) {
-        p.raise(slot, 'skeleton', 60 + slot, 100, true);
+        p.raise(slot, kindFor(slot, slot), 60 + slot, 100, true);
       }
     });
     assert.equal(p.count <= SUMMON_CAPACITY, true);
@@ -131,8 +149,8 @@ void describe('summon stimuli never change a hero or remove one', () => {
     );
     hammerPool(rig, () => {
       for (let slot = 0; slot < Math.min(n, 8); slot++) {
-        p.raise(slot, 'skeleton', 60 + slot, 100, true);
-        p.renew(slot, 60 + slot, 100, true, 'attack');
+        p.raise(slot, kindFor(slot, slot), 60 + slot, 100, true);
+        p.renew(slot, kindFor(slot, slot), 60 + slot, 100, true, 'attack');
       }
     });
     assert.ok(
@@ -157,8 +175,8 @@ void describe('summon stimuli never change a hero or remove one', () => {
       const p = pool();
       hammerPool(rig, () => {
         for (let slot = 0; slot < Math.min(n, 8); slot++) {
-          p.raise(slot, 'skeleton', 60 + slot, 100, true);
-          p.renew(slot, 60 + slot, 100, true, 'attack');
+          p.raise(slot, kindFor(slot, slot), 60 + slot, 100, true);
+          p.renew(slot, kindFor(slot, slot), 60 + slot, 100, true, 'attack');
         }
       });
       assert.deepEqual(rig.errors, []);
@@ -198,77 +216,89 @@ void describe('after a pool fault the heroes still advance and keep their classe
   });
 });
 
-void describe('the four host events while a summon is rising, active, and sinking', () => {
-  const id = idsOfClass('necromancer', 1, 'hi-')[0] ?? 'x';
-  type SummonPhaseName = 'rise' | 'active' | 'sink';
+const OWNERS: readonly (readonly [ClassId, SummonId])[] = [
+  ['necromancer', 'skeleton'],
+  ['druid', 'beast'],
+  ['artificer', 'turret'],
+];
 
-  /** A Necromancer in a Game, with its skeleton brought to the wanted phase. */
-  function setup(phase: SummonPhaseName): { rig: GameRig; slot: number } {
-    spy = spyOnPools();
-    const log = heroLog(createHero);
-    const rig = gameRig({ heroFactory: log.factory });
-    if (phase === 'active') {
-      feed(rig, agent(id, 'working'));
-      let guard = 0;
-      while (guard++ < 40_000 / STEP_MS) {
-        rig.game.frame(STEP_MS, rig.surface);
-        if (pool0()?.entities()[0]?.phase === 'active') {
-          break;
-        }
-      }
-    } else {
-      // Rising and sinking are produced on the hero's slot while it rests (no renewals).
-      feed(rig, agent(id, 'idle'));
-      run(rig, 1500);
-      assert.equal(pool0()?.count, 0, 'a resting Necromancer has never raised a skeleton');
-    }
-    return { rig, slot: 0 };
-  }
-  const pool0 = (): PoolSpy['pools'][number] | undefined => spy?.pools[0];
+for (const [classId, kind] of OWNERS) {
+  void describe(`the four host events while a ${kind} (${classId}) is rising, active, and sinking`, () => {
+    const id = idsOfClass(classId, 1, 'hi-')[0] ?? 'x';
+    type SummonPhaseName = 'rise' | 'active' | 'sink';
 
-  for (const phase of ['rise', 'active', 'sink'] as const) {
-    for (const event of ['spawned', 'working', 'idle', 'despawned'] as const) {
-      void it(`${event} applied while the skeleton is ${phase}: the lifecycle follows the event exactly`, () => {
-        const { rig, slot } = setup(phase);
-        const p = pool0();
-        assert.ok(p);
-        if (phase === 'rise') {
-          p.raise(slot, 'skeleton', 80, 120, true);
-          assert.equal(p.entities()[0]?.phase, 'rise');
-        } else if (phase === 'sink') {
-          p.raise(slot, 'skeleton', 80, 120, true);
-          for (let i = 0; i < (SUMMON_LEASE_MS + 60) / STEP_MS; i++) {
-            rig.game.step();
+    /** A summoner in a Game, with its summon (of the owner's kind) brought to the wanted phase. */
+    function setup(phase: SummonPhaseName): { rig: GameRig; slot: number } {
+      spy = spyOnPools();
+      const log = heroLog(createHero);
+      const rig = gameRig({ heroFactory: log.factory });
+      if (phase === 'active') {
+        feed(rig, agent(id, 'working'));
+        let guard = 0;
+        while (guard++ < 40_000 / STEP_MS) {
+          rig.game.frame(STEP_MS, rig.surface);
+          if (pool0()?.entities()[0]?.phase === 'active') {
+            break;
           }
-          assert.equal(p.entities()[0]?.phase, 'sink');
-        } else {
-          assert.equal(p.entities()[0]?.phase, 'active');
         }
-        feed(rig, agent(id, event, null, 50));
-        rig.game.step();
-        const hero = rig.game.heroSnapshot().find((h) => h.id === id);
-        assert.ok(hero, 'the hero is still in the scene for the step the event arrived');
-        assert.equal(hero.lifecycle, event);
-        assert.equal(hero.classId, 'necromancer');
-        assert.equal(hero.exiting, event === 'despawned');
-        run(rig, 30_000);
-        const after = rig.game.heroSnapshot().find((h) => h.id === id);
-        if (event === 'despawned') {
-          assert.equal(after, undefined, 'removed after its warp-out, as always');
-        } else {
-          assert.equal(after?.lifecycle, event);
-          assert.equal(after?.exiting, false);
-          assert.equal(after?.classId, 'necromancer');
-        }
-        if (event === 'working') {
-          assert.ok(p.count <= 1);
-        } else {
-          assert.equal(p.count, 0, 'the skeleton is gone once the hero is not fighting');
-        }
-      });
+      } else {
+        // Rising and sinking are produced on the hero's slot while it rests (no renewals).
+        feed(rig, agent(id, 'idle'));
+        run(rig, 1500);
+        assert.equal(pool0()?.count, 0, 'a resting summoner has never raised an ally');
+      }
+      return { rig, slot: 0 };
     }
-  }
+    const pool0 = (): PoolSpy['pools'][number] | undefined => spy?.pools[0];
 
+    for (const phase of ['rise', 'active', 'sink'] as const) {
+      for (const event of ['spawned', 'working', 'idle', 'despawned'] as const) {
+        void it(`${event} applied while the ${kind} is ${phase}: the lifecycle follows the event exactly`, () => {
+          const { rig, slot } = setup(phase);
+          const p = pool0();
+          assert.ok(p);
+          if (phase === 'rise') {
+            p.raise(slot, kind, 80, 120, true);
+            assert.equal(p.entities()[0]?.phase, 'rise');
+          } else if (phase === 'sink') {
+            p.raise(slot, kind, 80, 120, true);
+            for (let i = 0; i < (SUMMON_LEASE_MS + 60) / STEP_MS; i++) {
+              rig.game.step();
+            }
+            assert.equal(p.entities()[0]?.phase, 'sink');
+          } else {
+            assert.equal(p.entities()[0]?.phase, 'active');
+          }
+          feed(rig, agent(id, event, null, 50));
+          rig.game.step();
+          const hero = rig.game.heroSnapshot().find((h) => h.id === id);
+          assert.ok(hero, 'the hero is still in the scene for the step the event arrived');
+          assert.equal(hero.lifecycle, event);
+          assert.equal(hero.classId, classId);
+          assert.equal(hero.exiting, event === 'despawned');
+          run(rig, 30_000);
+          const after = rig.game.heroSnapshot().find((h) => h.id === id);
+          if (event === 'despawned') {
+            assert.equal(after, undefined, 'removed after its warp-out, as always');
+          } else {
+            assert.equal(after?.lifecycle, event);
+            assert.equal(after?.exiting, false);
+            assert.equal(after?.classId, classId);
+          }
+          if (event === 'working') {
+            assert.ok(p.count <= 1);
+          } else {
+            assert.equal(p.count, 0, 'the summon is gone once the hero is not fighting');
+          }
+        });
+      }
+    }
+  });
+}
+
+void describe('a reload', () => {
+  const id = idsOfClass('necromancer', 1, 'hi-')[0] ?? 'x';
+  const pool0 = (): PoolSpy['pools'][number] | undefined => spy?.pools[0];
   void it('the pool is rebuilt empty with a new Game (webview reload) and no hero is affected', () => {
     spy = spyOnPools();
     const rig = gameRig();

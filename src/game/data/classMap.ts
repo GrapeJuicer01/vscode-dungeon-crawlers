@@ -6,7 +6,7 @@ import { hashId } from '../rng';
 import { CLASS_IDS } from './classes';
 import type { ClassId } from './classes';
 
-/** The classes that have art and behavior so far. H2: all eight, in CLASS_IDS order (H1 four first). */
+/** The classes that have art and behavior: all twelve (H3, final), in CLASS_IDS order (H1 four first). */
 export const DELIVERED_CLASSES: readonly ClassId[] = CLASS_IDS;
 
 /** Bit offset of the class slice of the FNV-1a hash (see classFor). */
@@ -20,7 +20,12 @@ const CLASS_SHIFT = 20;
  * gives seven, including Cleric, Paladin, and Necromancer. Because the modulus is a power of two
  * and the H1 classes keep indexes 0..3, at any one shift an id whose (h >>> shift) % 8 < 4 has the
  * same class under four and eight classes. The slice change itself reshuffles every id once
- * relative to H1 (H1 is unreleased, so no user sees it); skin x class and hair x class stay independent (all 32 and 48 pairs occur over 1,000 ids).
+ * relative to H1 (H1 is unreleased, so no user sees it).
+ * H3 (final, twelve classes) keeps `>>> 20`: 12 bits give a modulo bias of 0.02 percent. Measured
+ * (seeded 1,000 UUID-like ids, seed 7): per class 72..100 (7.2..10.0 percent); sim-0-0..sim-7-0 give
+ * necromancer, rogue, monk, mage, warrior, druid, cleric, artificer (8 distinct, three H3 classes,
+ * two summoners); all 48 skin x class pairs over 1,000 ids and all 72 hair x class pairs over 2,000
+ * ids occur; 314 of 1,000 ids keep their H2 class (x % 24 < 8). This is the last reshuffle.
  */
 export function classFor(id: string): ClassId {
   const index = (hashId(id) >>> CLASS_SHIFT) % DELIVERED_CLASSES.length;

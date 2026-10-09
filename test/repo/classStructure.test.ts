@@ -138,6 +138,25 @@ void describe('ClassHero cannot reach the lifecycle (invariant 2)', () => {
     assert.doesNotMatch(src, /\bRoster\b/);
   });
 
+  void it('imports no Combat, Enemy, or Boss, and the class files name none of them (E1 must not regress this)', () => {
+    for (const f of [
+      'src/game/entities/ClassHero.ts',
+      'src/game/data/classes.ts',
+      'src/game/data/classMap.ts',
+      'src/game/data/effects.ts',
+      'src/game/data/summons.ts',
+      'src/game/Effects.ts',
+      'src/game/Summons.ts',
+      'src/game/entities/Summon.ts',
+    ]) {
+      const text = code(f);
+      for (const spec of importSpecifiers(text)) {
+        assert.doesNotMatch(spec, /Combat|Enemy|Enemies|Boss|enemies/, `${f}: ${spec}`);
+      }
+      assert.doesNotMatch(text, /\b(Combat|Enemy|Boss)\b/, f);
+    }
+  });
+
   void it('never mentions applyAgentState, lifecycle, AgentInfo, or AgentState', () => {
     assert.doesNotMatch(
       src,

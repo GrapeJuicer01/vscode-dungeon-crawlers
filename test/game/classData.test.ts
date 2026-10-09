@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import { CLASSES, CLASS_IDS, classDef, validateClasses } from '../../src/game/data/classes';
 import type { ClassDef, EffectShot } from '../../src/game/data/classes';
 import { EFFECT_IDS } from '../../src/game/data/effects';
+import { SUMMON_IDS } from '../../src/game/data/summons';
 import { readText } from '../support/repo';
 
 const rows = CLASSES as readonly ClassDef[];
@@ -24,8 +25,8 @@ function withRow(replace: string, row: unknown): readonly ClassDef[] {
 }
 
 void describe('CLASSES', () => {
-  void it('has eight rows, one per CLASS_IDS entry, in order, with unique ids', () => {
-    assert.equal(rows.length, 8);
+  void it('has twelve rows, one per CLASS_IDS entry, in order, with unique ids', () => {
+    assert.equal(rows.length, 12);
     assert.deepEqual(
       rows.map((r) => r.id),
       [...CLASS_IDS],
@@ -40,7 +41,20 @@ void describe('CLASSES', () => {
     }
     assert.deepEqual(
       rows.map((r) => r.name),
-      ['Warrior', 'Mage', 'Archer', 'Rogue', 'Cleric', 'Paladin', 'Necromancer', 'Bard'],
+      [
+        'Warrior',
+        'Mage',
+        'Archer',
+        'Rogue',
+        'Cleric',
+        'Paladin',
+        'Necromancer',
+        'Bard',
+        'Druid',
+        'Monk',
+        'Artificer',
+        'Berserker',
+      ],
     );
   });
 
@@ -63,18 +77,29 @@ void describe('CLASSES', () => {
     }
   });
 
-  void it('summon is null for seven rows and a skeleton at dx 18, dy 1 for the necromancer only', () => {
+  void it('summon is null for nine rows; necromancer, druid, artificer own one kind each', () => {
+    const expected: Record<string, { kind: string; dx: number; dy: number }> = {
+      necromancer: { kind: 'skeleton', dx: 18, dy: 1 },
+      druid: { kind: 'beast', dx: 16, dy: 1 },
+      artificer: { kind: 'turret', dx: 14, dy: 1 },
+    };
     for (const r of rows) {
-      if (r.id === 'necromancer') {
-        assert.deepEqual(r.summon, { kind: 'skeleton', dx: 18, dy: 1 });
+      const want = expected[r.id];
+      if (want !== undefined) {
+        assert.deepEqual(r.summon, want, r.id);
         assert.deepEqual(Object.keys(r.summon ?? {}).sort(), ['dx', 'dy', 'kind']);
+        assert.ok(Math.abs(want.dx) <= 40 && Math.abs(want.dy) <= 24);
       } else {
         assert.equal(r.summon, null, r.id);
       }
     }
-    assert.ok(rows.filter((r) => r.summon !== null).length === 1);
-    const summon = rows.find((r) => r.id === 'necromancer')?.summon;
-    assert.ok(summon && Math.abs(summon.dx) <= 40 && Math.abs(summon.dy) <= 24);
+    assert.equal(rows.filter((r) => r.summon !== null).length, 3);
+    const kinds = rows.flatMap((r) => (r.summon === null ? [] : [r.summon.kind]));
+    assert.deepEqual(
+      [...kinds].sort(),
+      [...SUMMON_IDS].sort(),
+      'each kind used by exactly one class',
+    );
   });
 
   void it('roles are melee, ranged, or caster', () => {
@@ -101,14 +126,15 @@ void describe('CLASSES', () => {
     }
   });
 
-  void it('no shot moves backward (vx >= 0); only the self-centered Cleric blessing sits behind or on the hero', () => {
+  void it('no shot moves backward (vx >= 0); only the self-centered Cleric blessing and Berserker roar sit behind or on the hero', () => {
     for (const r of rows) {
       for (const s of allShots(r)) {
         assert.ok(s.vx >= 0, `${r.id} ${s.effect} vx`);
-        if (r.id !== 'cleric') {
+        if (r.id !== 'cleric' && r.id !== 'berserker') {
           assert.ok(s.dx >= 0, `${r.id} ${s.effect} dx`);
         } else {
-          // Plan section 3: the blessing is centered on the caster, within a few pixels.
+          // Plan section 3: the blessing and the roar (a ring and two puffs at the feet) are
+          // centered on the caster, within a few pixels.
           assert.ok(Math.abs(s.dx) <= 8, `${r.id} ${s.effect} dx`);
         }
       }
@@ -128,6 +154,10 @@ void describe('CLASSES', () => {
     assert.equal(by['necromancer']?.strike[0]?.effect, 'soulWisp');
     assert.equal(by['bard']?.strike.length, 1);
     assert.equal(by['bard']?.strike[0]?.effect, 'note');
+    assert.equal(by['druid']?.strike[0]?.effect, 'leaf');
+    assert.equal(by['monk']?.strike[0]?.effect, 'chiOrb');
+    assert.equal(by['artificer']?.strike[0]?.effect, 'wrench');
+    assert.equal(by['berserker']?.strike.length, 0, 'the axe swing is art, not an effect');
     assert.deepEqual(
       rows.map((r) => r.ability.id),
       [
@@ -139,6 +169,10 @@ void describe('CLASSES', () => {
         'radiantSmite',
         'boneCall',
         'chorus',
+        'wildCall',
+        'chiBurst',
+        'deployTurret',
+        'battleRoar',
       ],
     );
   });
@@ -153,7 +187,7 @@ void describe('CLASSES', () => {
       assert.equal(classDef(id).id, id);
     }
     assert.throws(
-      () => classDef('druid' as never),
+      () => classDef('ranger' as never),
       (e: unknown) => e instanceof RangeError && e.message === 'Unknown class',
     );
   });
@@ -242,10 +276,10 @@ void describe('validateClasses', () => {
 
   void it('rejects an id that is not in CLASS_IDS', () => {
     const row = copy('mage');
-    (row as { id: string }).id = 'druid';
+    (row as { id: string }).id = 'ranger';
     const errors = validateClasses([...rows.filter((r) => r.id !== 'mage'), row]);
     assert.ok(
-      errors.some((e) => /^druid: id is not in CLASS_IDS/.test(e)),
+      errors.some((e) => /^ranger: id is not in CLASS_IDS/.test(e)),
       errors.join('\n'),
     );
     assert.ok(errors.some((e) => e === 'mage: missing class row'));

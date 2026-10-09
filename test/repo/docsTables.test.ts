@@ -92,8 +92,8 @@ void describe('renderClassTable', () => {
     const a = renderClassTable(CLASSES);
     assert.equal(a, renderClassTable(CLASSES));
     const lines = a.split('\n');
-    assert.equal(lines[0], 'Delivered classes: 8 of 12.');
-    assert.equal(CLASSES.length, 8);
+    assert.equal(lines[0], 'Delivered classes: 12 of 12.');
+    assert.equal(CLASSES.length, 12);
     assert.equal(
       lines.filter((l) => l.startsWith('| ')).length,
       CLASSES.length + 1,
@@ -119,18 +119,24 @@ void describe('renderClassTable', () => {
     assert.match(table, /Dagger Flurry \(`smokePuff`, `dagger` x2\)/);
   });
 
-  void it('the Necromancer ability cell says it summons a skeleton; no other row mentions a summon', () => {
+  void it('summoner ability cells name their kind; no other row mentions a summon', () => {
     const rows = renderClassTable(CLASSES)
       .split('\n')
       .filter((l) => l.startsWith('| ') && !l.startsWith('| Class'));
-    assert.equal(rows.length, 8);
+    assert.equal(rows.length, 12);
+    const kinds: Record<string, string> = {
+      Necromancer: 'skeleton',
+      Druid: 'beast',
+      Artificer: 'turret',
+    };
     for (const row of rows) {
-      assert.equal(/summon/i.test(row), row.startsWith('| Necromancer |'), row);
+      const name = /^\| ([A-Za-z]+) \|/.exec(row)?.[1] ?? '';
+      assert.equal(/summon/i.test(row), name in kinds, row);
+      const kind = kinds[name];
+      if (kind !== undefined) {
+        assert.match(row, new RegExp(`summons a ${kind}\\) \\|$`), row);
+      }
     }
-    assert.match(
-      rows.find((l) => l.startsWith('| Necromancer |')) ?? '',
-      /summons a skeleton\) \|$/,
-    );
   });
 
   void it('puts the delivered count in the text', () => {
@@ -184,7 +190,7 @@ void describe('main (the generator entry point)', () => {
   void it('--check returns 1 for a stale count line, a missing row, or an edited cell', () => {
     for (const edit of [
       (d: string): string =>
-        d.replace('Delivered classes: 8 of 12.', 'Delivered classes: 7 of 12.'),
+        d.replace('Delivered classes: 12 of 12.', 'Delivered classes: 7 of 12.'),
       (d: string): string => d.replace(/\| Bard \|.*\n/, ''),
       (d: string): string => d.replace('teal + magenta', 'teal + pink'),
       (d: string): string => d.replace('; summons a skeleton', ''),

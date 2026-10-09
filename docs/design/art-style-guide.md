@@ -1,7 +1,7 @@
 # Art style guide
 
 Purpose: the visual rules for every sprite, tile, and effect in Pixel Agents, so all art stays consistent. Owned by the pixel-artist.
-Related: [sprite spec](sprite-spec.md), [game engine room layout](../architecture/game-engine.md#3-room-layout), [ADR 0010](../architecture/adr/0010-split-room-stage-layout.md), [classes](classes.md) (planned, M5), [enemies and stages](enemies-and-stages.md) (planned, M6), [accessibility](accessibility.md) (planned, M7), [security and safety](../architecture/security-and-safety.md).
+Related: [sprite spec](sprite-spec.md), [game engine room layout](../architecture/game-engine.md#3-room-layout), [ADR 0010](../architecture/adr/0010-split-room-stage-layout.md), [classes](classes.md), [enemies and stages](enemies-and-stages.md) (planned, M6), [accessibility](accessibility.md) (planned, M7), [security and safety](../architecture/security-and-safety.md).
 
 Heroes follow a **Tiny Towers-inspired** look: tiny, chunky, chibi characters with big heads and simple faces, seen from the side in cutaway rooms. All art is procedural: palette-indexed pixel maps in code, no image files.
 
@@ -48,7 +48,7 @@ Columns 0-7 are the alcove (campfire at x 64), column 8 is the door frame (16x12
 
 ## 3. Palettes
 
-- One **master palette** (33 colors; cap 48, unchanged by A1-1) in `src/game/sprites/palettes.ts`. Sprites reference palette characters, never hex.
+- One **master palette** (37 colors: 33 through H2 plus `L N` summon greens counted, then `C Z` copper in A3-1; cap 48) in `src/game/sprites/palettes.ts`. Sprites reference palette characters, never hex.
 - At most **12 colors per sprite**, outline included.
 - Standard hero characters (extend, never repurpose):
 
@@ -103,7 +103,7 @@ Heroes are invulnerable, so hits are theater, never damage.
 
 ## 6. Hero classes
 
-Delivered: all four H1 classes (A1-1 palettes and effects, A1-2 Warrior and Mage layers, A1-3 Archer and Rogue layers). Each layer set has all eleven animations (26 frames per layer, `attack` exactly 3). Body is shared; each class supplies `head`, `gear`, `weapon` (`classTemplates.ts`). The master palette stays at 33 colors (cap 48); classes use only `a c d b k m` overrides plus master characters, at most 11 colors per composited look (cap 12).
+Delivered: all four H1 classes (A1-1 palettes and effects, A1-2 Warrior and Mage layers, A1-3 Archer and Rogue layers). Each layer set has all eleven animations (26 frames per layer, `attack` exactly 3). Body is shared; each class supplies `head`, `gear`, `weapon` (`classTemplates.ts`). The master palette was 33 colors at A1-1 (counts: 35 after the `L N` summon greens, 37 after A3-1; cap 48); classes use only `a c d b k m` overrides plus master characters, at most 11 colors per composited look (cap 12).
 
 | Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
 |---|---|---|---|---|---|---|
@@ -140,7 +140,7 @@ The Rogue purple in `dagger` and `smokePuff` is the master indigo `b` and slate 
 
 ### H2 classes and effects (batch A2)
 
-Delivered: Cleric, Paladin, Necromancer, Bard (`classTemplatesH2.ts`, `palettesH2.ts`). Same layers, eleven animations, 26 frames per layer, anchors, and canvas sizes as H1. Master stays at 33 colors (cap 48). Cleric and Paladin use one extra master character, `Y`, for glow sparkles (12 colors composited, the cap).
+Delivered: Cleric, Paladin, Necromancer, Bard (`classTemplatesH2.ts`, `palettesH2.ts`). Same layers, eleven animations, 26 frames per layer, anchors, and canvas sizes as H1. Master was 35 colors at the end of H2 (an earlier text said 33, which missed `L N`; cap 48). Cleric and Paladin use one extra master character, `Y`, for glow sparkles (12 colors composited, the cap).
 
 | Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
 |---|---|---|---|---|---|---|
@@ -158,9 +158,38 @@ Delivered: Cleric, Paladin, Necromancer, Bard (`classTemplatesH2.ts`, `palettesH
 
 Effects (master characters, `idle` only, centre anchor, at most 8 colors, calm and never damage taken): `buffSparkle` 16x16 3 frames (twinkling gold stars; any buff or ability), `note` 7x8 2 frames (pale-blue eighth note, Bard strike and ability), `healGlow` 24x12 3 frames (gold ring at the feet, Cleric ability), `holyBurst` 24x24 3 frames (gold-white cross, rays, thin ring, Paladin ability), `soulWisp` 10x7 3 frames (pale-blue wisp flying right, Necromancer strike and ability). No sickly-green or magenta effect exists because effects use master characters only; the wisp and note read pale blue.
 
-Summon: `skeleton` 16x20 (`summonTemplates.ts`, `idle` 2, `walk` 4, `attack` 3, `spawn` 3). Convention is a proposal pending architect review: see [sprite spec section 9](sprite-spec.md#9-summon-sprites-proposal-unreviewed-the-architect-must-ratify).
+Summon: `skeleton` 16x20 (`summonTemplates.ts`, `idle` 2, `walk` 4, `attack` 3, `rise` 4, `sink` 3). Convention: [sprite spec section 9](sprite-spec.md#9-summon-sprites).
 
-Planned class list:
+### H3 classes, effects, and summons (batch A3)
+
+Delivered: Druid, Monk, Artificer, Berserker (`classTemplatesH3.ts`, palettes in `palettesH3.ts`), five effects (`effectTemplatesH3.ts`), and the `beast` and `turret` summons (`summonTemplatesH3.ts`). Same layers, eleven animations, 26 frames per layer, anchors, and canvas sizes as H1 and H2. The master palette is 37 colors (cap 48): H3 added only `C` copper `#d9824a` and `Z` copper shade `#9a4f26` (wrench and turret). Druid and Monk use the extra master character `Y` for glints and fist halos (12 colors composited, the cap); Artificer and Berserker use the 11 hero characters only. With H3 the class table is complete at twelve.
+
+| Class | `a` accent | `c` cloth | `d` shade | `b` pants | `k` boots | `m` metal |
+|---|---|---|---|---|---|---|
+| Druid | leaf green `#5cba4a` | earth brown `#9a6a3a` | `#6b4526` | moss `#4a5a30` | `#5a3c22` | pale bark `#d8c9a0` |
+| Monk | cream `#f3e6c4` | orange `#f08a2c` | `#b85a1a` | `#6a3a22` | `#5a3822` | warm glow `#ffe6a8` |
+| Artificer | teal `#2cb4a8` | copper `#c8743a` | `#8f4a24` | slate teal `#35566a` | `#4a2e22` | light steel `#bfd4dc` |
+| Berserker | war-paint red `#d03030` | fur brown `#9a6a3c` | `#6b4426` | `#4a3a34` | `#3a2616` | steel `#c4c8d0` |
+
+| Class | Head | Gear | Weapon | Cue |
+|---|---|---|---|---|
+| Druid | pale forked antlers over a leaf crown, a leaf tuft trailing behind (head 1 px lower) | leafy shoulder wrap, brown strap, leaf fringe at the hip | crooked wooden staff with a pale knot and a leaf cluster on top; the cluster gets `Y` glints on strike and ability | antlers, crooked staff |
+| Monk | cream headband with a knot and two tails trailing back, small topknot (head 1 px lower) | orange gi with cream lapel and sash, knotted tail behind, bare forearms (skin) | no weapon: both fists glow, a near fist (the pose's hand) and a far fist behind the body, each with a small `Y` halo; a 2-frame shimmer in `idle`, strongest in `attack` frame 1 and `ability` | headband, bare arms, glowing fists |
+| Artificer | steel-rimmed teal goggles pushed up on the forehead on a dark strap | big copper gear backpack (cog and two pipes) behind the shoulders, bandolier, belt, teal chest gauge | steel wrench with a copper grip; white glints at the goggles on `ability` frames 0 and 1 | big backpack bump, goggles, wrench |
+| Berserker | wild spiky hair (three spikes, two strands streaming back), war paint (below), head 1 px lower | fur collar and mantle, bare chest with a leather strap, belt, fur loincloth, bare arms | oversized axe: a 6x7 head on a long haft, a 4x9 head face-on on the forward swing | spiky hair, bare chest, huge axe |
+
+Berserker rules (invariant 1 safe look): war-paint red exists solely as `a`, and the class uses exactly **two** `a` pixels, a horizontal cheek bar at head `(x+4..x+5, y+5)`, drawn in the head layer so it is identical in every frame of every animation relative to the head (the gear layer leaves those two cells empty so a sleeping head never hides them). The torso scarf row of the base body is also `a`, and the Berserker's fur collar covers it in every pose; the composited look has exactly 2 red pixels in all 26 frames. No red in fur, body, weapon, or any effect. The mouth opens (two dark pixels at the chin, weapon layer) only in `ability` frames 0 and 1. Nothing grows, pulses, or varies with state, and there is no hurt face.
+
+Effects (A3-1): `leaf` 6x6 2 frames (`L N k w`, Druid strike and ability), `chiOrb` 7x7 2 (`O Y w`, Monk strike and ability), `chiBurst` 24x24 3 (star, ring, fading ring; `O Y w`, Monk ability), `warCry` 28x12 3 (tight, wide, thin dust ring; `a V O Y`, where `a` is the master sand-gold because effects are never class-swapped, so it is never the Berserker red; no red, transparent centre, Berserker ability), `wrench` 7x7 2 (`C Z m w`, Artificer strike and ability). Auras and bursts are one-shot, engine-driven; no effect is a persistent aura.
+
+Summons (A3-2, A3-3), master characters only, `idle` 2, `walk` 4, `attack` 3, `rise` 4, `sink` 3 (see [sprite spec section 9](sprite-spec.md#9-summon-sprites)):
+
+| Summon | Size, anchor | Colors | Look |
+|---|---|---|---|
+| `beast` (Druid) | 20x16, `(10, 15)` | 7: `o h W 7 e L N` | small friendly wolf cub: brown fur with a darker back, cream muzzle, belly, paw tips, and tail tip, leaf-green collar. `idle` tail and body bob, `walk` a trot in place, `attack` a short playful snap (crouch, lunge with open mouth, recover). `rise` sprouts up out of the floor in green leaf puffs; `sink` goes down upright and thins into drifting leaves. Never feral, never collapses. |
+| `turret` (Artificer) | 16x16, `(8, 15)` | 7: `o C Z m Q q Y` | clockwork walker: copper dome on two stubby steel-footed legs, steel back cog (turns in `idle`), blue lens (blinks in `idle`), short steel barrel. `walk` alternates the legs with a small body bob. `attack`: the barrel swivels up, levels with one pale `Y` muzzle pixel for one frame (no projectile, no beam), then settles down. `rise` unfolds out of the floor with a hop of cog sparks; `sink` folds down into the floor. Never smokes, breaks, or shows red. The lens is the master light blue `Q`; no teal master character was added. |
+
+Class list (final, all twelve delivered):
 
 | Class | Palette | Silhouette cues | Signature prop |
 |---|---|---|---|
@@ -172,9 +201,9 @@ Planned class list:
 | Paladin | gold + white | winged helm, tall kite shield | glowing sword |
 | Necromancer | dark purple + sickly green | hood, hunched | skull staff |
 | Bard | teal + magenta | big feathered hat | lute |
-| Druid | earth brown + leaf green | antler or leaf crown | gnarled wooden staff |
+| Druid | earth brown + leaf green | antlers, leaf crown | gnarled wooden staff |
 | Monk | orange + cream | headband, bare forearms | glowing fists, no weapon |
-| Artificer | copper + teal | goggles on forehead, gear backpack | wrench / bomb |
+| Artificer | copper + teal | goggles on forehead, gear backpack | wrench |
 | Berserker | fur brown + war-paint red | wild spiky hair, bare chest | oversized axe |
 
 ## 7. Enemy rules

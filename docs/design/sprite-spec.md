@@ -115,16 +115,27 @@ H2 exports (batch A2, new files so the H1 art files stay clean):
 | `CLASS_LAYERS_H2` | `classTemplatesH2.ts` | `Record<string, HeroLayerSet>`, keys `cleric`, `paladin`, `necromancer`, `bard`; same eleven animations, 26 frames per layer, same anchors and sizes as H1 |
 | `CLASS_PALETTES_H2`, `ClassPaletteIdH2` | `palettesH2.ts`, type in `spriteTypes.ts` | partial palettes over `a c d b k m` |
 | `EFFECT_SPRITES_H2`, `EffectSpriteIdH2` | `effectTemplatesH2.ts`, type in `spriteTypes.ts` | `buffSparkle`, `note`, `healGlow`, `holyBurst`, `soulWisp`; ids `effects/<name>`, `idle` only, centre anchor |
-| `SUMMON_SPRITES`, `SummonSpriteId` | `summonTemplates.ts`, type in `spriteTypes.ts` | `skeleton` (see section 9, unreviewed) |
+| `SUMMON_SPRITES`, `SummonSpriteId` | `summonTemplates.ts` (skeleton, merges `SUMMON_SPRITES_H3`), type in `spriteTypes.ts` | `skeleton`, `beast`, `turret` (section 9) |
+| `SUMMON_SPRITES_H3` | `summonTemplatesH3.ts` | `beast` 20x16 and `turret` 16x16, merged into `SUMMON_SPRITES` |
+| `CLASS_LAYERS_H3` | `classTemplatesH3.ts` | `Record<string, HeroLayerSet>`, keys `druid`, `monk`, `artificer`, `berserker`; same eleven animations, 26 frames per layer, same anchors and sizes as H1 |
+| `CLASS_PALETTES_H3`, `ClassPaletteIdH3` | `palettesH3.ts`, type in `spriteTypes.ts` | `druid`, `monk`, `artificer`, `berserker`; partial palettes over `a c d b k m` (Berserker red only as `a`, static stripes) |
+| `EFFECT_SPRITES_H3`, `EffectSpriteIdH3` | `effectTemplatesH3.ts`, type in `spriteTypes.ts` | `leaf`, `chiOrb`, `chiBurst`, `warCry`, `wrench`; ids `effects/<name>`, `idle` only, centre anchor |
 
-All are re-exported from `spriteTemplates.ts`. The H2 unions are separate from `ClassPaletteId` and `EffectSpriteId` on purpose: widening those would break the H1 `Record<...>` tables until the developer merges.
+All are re-exported from `spriteTemplates.ts`. From H3 the merged barrel exports `CLASS_PALETTES` (in `palettes.ts`, H1 + H2 + H3) and `EFFECT_SPRITES` (H1 + H2 + H3) hold every delivered id, and `ClassPaletteId` / `EffectSpriteId` are the unions of all batches. The merged `CLASS_LAYERS` (H1 + H2 + H3) now holds all twelve classes and `SUMMON_SPRITES` holds all three summons. The master palette is 37 colors (cap 48).
 
-## 9. Summon sprites (PROPOSAL, UNREVIEWED: the architect must ratify)
+## 9. Summon sprites
 
-A summon is a cosmetic ally a class may call (the Necromancer's skeleton). Nothing here changes who has health: only enemies do, and a summon has no gauge, no hurt, no death, and no downed art.
+A summon is a cosmetic ally a class may call (the Necromancer's skeleton, the Druid's beast, the Artificer's turret). Convention ratified in the [H2 plan section 3.5](../architecture/plans/h2-classes.md#35-sprites-classes-effects-and-the-summon-convention) and applied unchanged by the [H3 plan section 3.3](../architecture/plans/h3-classes.md#33-sprites-classes-effects-and-the-two-new-summons). Nothing here changes who has health: only enemies do, and a summon has no gauge, no hurt, no death, and no downed art.
 
-- **Template**: one composite `SpriteTemplate` (not layered), id `summons/<name>`, 16x20 for a hero-sized ally, anchor `(8, 19)` like a hero, facing right, 1px `o` outline, at most 12 colors.
-- **Animations**: `idle` 2, `walk` 4, `attack` 3, `spawn` 3. `spawn` is the pop-in (rises from a dust mound, then settles); the engine plays it in reverse to despawn, so there is no separate despawn name. Names matching `hurt|downed|death|dead|die|dying` are forbidden, the same rule as heroes.
-- **Palette**: master characters only (`skeleton` uses `o m w G d a P`). Assumption: the engine may resolve `a d m` through the owner's class palette (for the Necromancer: green eye glint, purple scarf, bone-colored `m`); drawn with the master alone it is a cool-gray skeleton with a gold glint, still valid.
-- **Exports**: `SUMMON_SPRITES: Readonly<Record<SummonSpriteId, SpriteTemplate>>`. A new `ArtSet.summons` field and a validator pass (sizes, anchor, names, colors) are developer work.
-- **Open questions for the architect**: is `spawn` reversed acceptable for despawn; should summons ever be mirrored with the hero; does a summon count in the sprite cache budget.
+- **Template**: one composite `SpriteTemplate` (not layered), id `summons/<name>` equal to its key, at most 24x24, anchor on the foot pixel (the bottom outline row), facing right, 1px `o` outline, at most 8 colors including the outline. The engine draws the shadow.
+- **Animations** (exactly): `idle` 2, `walk` 4, `attack` 3, `rise` 4, `sink` 3. `rise` and `sink` play once (a sprout from, and a descent into, the floor); there is no separate despawn name. Names matching `hurt|downed|death|dead|die|dying` are forbidden, the same rule as heroes. Every summon has a `walk`, so the turret is a clockwork walker, not a fixed emplacement.
+- **Palette**: master characters only, never class-swapped.
+
+| Summon | Size, anchor | Colors | Notes |
+|---|---|---|---|
+| `skeleton` | 16x20, `(8, 19)` | `o m w G d L N` | green puff on `rise` and `sink` |
+| `beast` | 20x16, `(10, 15)` | `o h W 7 e L N` | wolf cub; leaf puffs on `rise` and `sink`; open mouth only in `attack` frame 1 |
+| `turret` | 16x16, `(8, 15)` | `o C Z m Q q Y` | clockwork walker; one pale `Y` muzzle pixel for one frame in `attack`, no projectile; cog sparks on `rise` and `sink` |
+
+- **Floor frames**: `rise` and `sink` are the finished idle figure shifted down by N rows and clipped at the ground line (the inner row above the bottom outline), with a closing outline row, so the figure stays upright and never collapses. The shared helper is `floorFrame` in each summon file.
+- **Exports**: `SUMMON_SPRITES: Readonly<Record<SummonSpriteId, SpriteTemplate>>`, `SummonSpriteId = 'skeleton' | 'beast' | 'turret'`; `ArtSet.summons` and `validateSummonArt` (sizes, names, colors, the five animations) are developer-owned and already in place.

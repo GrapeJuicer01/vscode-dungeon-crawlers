@@ -113,12 +113,13 @@ Heroes are split into three batches of four classes, in style-guide table order,
 
 #### H3. Druid, Monk, Artificer, Berserker
 
-- **Scope**: final four classes; `Summon` extended for Druid and Artificer; class table complete (12 rows) and class map covers all tools.
-- **Files**: `src/game/entities/` (four class files, `Summon.ts`), `classes.ts`, `classMap.ts`, regenerated `docs/design/classes.md`. Pixel-artist: templates, palettes, art docs.
-- **Art (batch H3)**: Druid (earth brown + leaf green, antler or leaf crown, wooden staff) plus beast summon, Monk (orange + cream, headband, glowing fists), Artificer (copper + teal, goggles, gear pack, wrench/bomb) plus turret summon, Berserker (fur brown + war-paint red, spiky hair, oversized axe). Berserker rage is a cosmetic aura, never tied to being hit.
-- **Depends on**: H2.
-- **Done when**: G1-G7; a test asserts exactly 12 unique class ids and every class has a complete template set; class map fallback covers all 12; no class behavior reads enemy attacks as a trigger for hero state (rage and similar effects are timer or ability driven).
-- Status: todo
+- **Plan**: [H3 plan](../architecture/plans/h3-classes.md) (task list, interfaces, `classFor` over 12 and the spread analysis, summon capacity, Berserker rules, test notes, exact art list, decisions H3-1 to H3-10). Like H1 and H2, H3 needs no enemies and no `Combat`.
+- **Scope**: final four classes as rows (no class files; decision H3-10); `SUMMON_IDS` gains `beast` and `turret`; the summon pool becomes kind-aware (`raise` restarts on a different kind, `renew` takes a kind) and summon shadows are per kind; class table complete (12 rows); `classFor` runs over 12 classes (last one-time reshuffle; one third of ids keep their H2 class). The Berserker's roar is a timer-driven one-shot burst, never a meter and never tied to being hit.
+- **Files**: `src/game/data/classes.ts`, `classMap.ts` (comment), `effects.ts`, `summons.ts`, `tuning.ts`, `src/game/Summons.ts`, `entities/Summon.ts`, `entities/ClassHero.ts` (one argument), `sprites/` (`artSet.ts`, `spriteTypes.ts` unions), `scripts/generate-doc-tables.ts`, regenerated `docs/design/classes.md`. Pixel-artist: `classTemplatesH3.ts`, `effectTemplatesH3.ts`, class palettes, beast and turret templates, barrel exports, art docs.
+- **Art (batch H3)**: delivered in three steps (A3-1 class palettes, five effects `leaf chiOrb chiBurst warCry wrench`, merged exports; A3-2 Druid + beast summon and Monk; A3-3 Artificer + turret summon and Berserker). Druid (earth brown + leaf green, antler or leaf crown, wooden staff), Monk (orange + cream, headband, glowing fists), Artificer (copper + teal, goggles, gear pack, wrench), Berserker (fur brown + static war-paint red, spiky hair, oversized axe). Exact list in [H3 plan section 10](../architecture/plans/h3-classes.md#10-art-needs-batch-h3).
+- **Depends on**: H2 (committed), H3 art.
+- **Done when**: G1-G7; a test asserts exactly 12 unique class ids and every class and summon has a complete template set; class map fallback covers all 12 and the measured distribution is within 5 to 13 percent per class over 1,000 ids; the pool is kind-correct; no class behavior reads enemy attacks, hits, or any count as a trigger for hero state (the Berserker roar is timer driven and identical on every cast); the reviewer confirms the Berserker does not read as hurt.
+- Status: done
 
 ### M6. Enemies (5 batches)
 
@@ -238,7 +239,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 4 | M4 engine | A0 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 5 | M5 heroes | H1 Warrior, Mage, Archer, Rogue | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

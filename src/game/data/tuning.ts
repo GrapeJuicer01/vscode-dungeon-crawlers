@@ -3,6 +3,8 @@
 // H4-5). Every name carries its unit. Assumption: a default marked as such is a guess to be tuned
 // by eye during the manual benchmark.
 
+import type { SummonId } from './summons';
+
 // ---- Loop ----
 export const STEP_MS = 1000 / 60;
 export const MAX_FRAME_MS = 100;
@@ -92,5 +94,12 @@ export const EFFECT_FAULT_LIMIT = 3;
 export const SUMMON_CAPACITY = 8;
 /** How long a summon lives past its owner's last renewal, in ms. Assumption: 250 ms (15 steps) rides over a frame hitch. */
 export const SUMMON_LEASE_MS = 250;
-/** Summon shadow width in px (a flat translucent bar drawn by the renderer). */
-export const SUMMON_SHADOW_WIDTH_PX = 8;
+/**
+ * Summon shadow width in px per kind (a flat translucent bar drawn by the renderer).
+ * Assumption (H3-8): 8 for the skeleton, 12 for the wider wolf, 10 for the turret; art-tunable data.
+ */
+export const SUMMON_SHADOW_PX: Readonly<Record<SummonId, number>> = {
+  skeleton: 8,
+  beast: 12,
+  turret: 10,
+};

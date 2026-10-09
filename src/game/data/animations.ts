@@ -24,14 +24,58 @@ export const TORCH_FRAME_MS = 130;
 /** Other looping props (a puddle ripple). Assumption: slow, so it stays calm. */
 export const PROP_FRAME_MS = 500;
 
+/**
+ * Summon animation name -> per-frame durations in ms (H2, docs/architecture/plans/h2-classes.md
+ * section 3.5). `idle`, `walk`, and `attack` loop; `rise` and `sink` play once (onceFrameIndex).
+ */
+export const SUMMON_FRAME_MS: Readonly<Record<string, readonly number[]>> = {
+  idle: [400],
+  walk: [130],
+  attack: [140, 90, 160],
+  rise: [110],
+  sink: [100],
+};
+
+/** Frames of the once-only summon animations (the validator requires exactly these). */
+export const SUMMON_RISE_FRAMES = 4;
+export const SUMMON_SINK_FRAMES = 3;
+/** Total play time of `rise` and `sink`, in ms, computed from SUMMON_FRAME_MS. */
+export const SUMMON_RISE_TOTAL_MS: number =
+  (SUMMON_FRAME_MS['rise']?.[0] ?? 110) * SUMMON_RISE_FRAMES;
+export const SUMMON_SINK_TOTAL_MS: number =
+  (SUMMON_FRAME_MS['sink']?.[0] ?? 100) * SUMMON_SINK_FRAMES;
+
 const FALLBACK_FRAME_MS: readonly number[] = [500];
 
-/** Frame index for `elapsedMs` into the named animation. Allocation-free. */
+/** Frame index for `elapsedMs` into the named hero animation. Allocation-free. */
 export function heroFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
+  return tableFrameIndex(HERO_FRAME_MS, name, elapsedMs, frameCount);
+}
+
+/** Looping frame index of a summon animation (`idle`, `walk`, `attack`). Allocation-free. */
+export function summonFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
+  return tableFrameIndex(SUMMON_FRAME_MS, name, elapsedMs, frameCount);
+}
+
+/** Frame index of a once-only summon animation: clamps at the last frame. Allocation-free. */
+export function onceFrameIndex(name: string, elapsedMs: number, frameCount: number): number {
+  if (frameCount <= 1 || !(elapsedMs > 0)) {
+    return 0;
+  }
+  const frameMs = SUMMON_FRAME_MS[name]?.[0] ?? FALLBACK_FRAME_MS[0] ?? 500;
+  return Math.min(frameCount - 1, Math.floor(elapsedMs / frameMs));
+}
+
+function tableFrameIndex(
+  table: Readonly<Record<string, readonly number[]>>,
+  name: string,
+  elapsedMs: number,
+  frameCount: number,
+): number {
   if (frameCount <= 1) {
     return 0;
   }
-  const durations = HERO_FRAME_MS[name] ?? FALLBACK_FRAME_MS;
+  const durations = table[name] ?? FALLBACK_FRAME_MS;
   const cycle = durations.length === 1 ? (durations[0] ?? 500) * frameCount : sum(durations);
   let t = elapsedMs % cycle;
   if (!(t >= 0)) {

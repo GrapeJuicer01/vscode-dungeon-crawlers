@@ -109,7 +109,7 @@ Heroes are split into three batches of four classes, in style-guide table order,
 - **Art (batch H2)**: delivered in three steps (A2-1 class palettes, five effects, skeleton summon, merged exports; A2-2 Cleric and Paladin; A2-3 Necromancer and Bard). Cleric (white + gold, hood or mitre, mace), Paladin (gold + white, winged helm, kite shield, glowing sword), Necromancer (dark purple + sickly green, skull staff) plus the skeleton summon (`idle 2, walk 4, attack 3, rise 4, sink 3`), Bard (teal + magenta, feathered hat, lute); effects `buffSparkle`, `note`, `blessGlow`, `holyBurst`, `soulWisp`. Exact list in [H2 plan section 10](../architecture/plans/h2-classes.md#10-art-needs-batch-h2).
 - **Depends on**: H1 (reviewed and committed), H2 art.
 - **Done when**: G1-G7; summons never change or despawn a hero and are removed only because their owner stopped fighting (a cosmetic phase derived from host events; owner lifecycle still comes only from host events); the structural check covers `Summon`, the pool, and the buff effects (no gauge, no `heal`, no hit or health semantics); class-mapping tests cover all eight classes; the hero-invariant test is extended with summon stimuli.
-- Status: todo
+- Status: done
 
 #### H3. Druid, Monk, Artificer, Berserker
 
@@ -237,7 +237,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 3 | M3 monitor | none | Ar, Dv, (Ar), Te, Rv, Dv commit | done |
 | 4 | M4 engine | A0 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 5 | M5 heroes | H1 Warrior, Mage, Archer, Rogue | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 6 | M5 heroes | H2 Cleric, Paladin, Necromancer, Bard | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

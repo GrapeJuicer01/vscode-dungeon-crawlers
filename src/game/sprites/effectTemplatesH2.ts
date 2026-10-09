@@ -62,8 +62,8 @@ function sparkleFrame(step: number): string[] {
   return g.rows();
 }
 
-// healGlow 24x12: a soft gold ring seen edge-on around the feet, widening, with motes rising.
-function healFrame(
+// blessGlow 24x12: a soft gold ring seen edge-on around the feet, widening, with motes rising.
+function blessFrame(
   rx: number,
   ry: number,
   dashed: boolean,
@@ -145,19 +145,19 @@ export const EFFECT_SPRITES_H2: Readonly<Record<EffectSpriteIdH2, SpriteTemplate
     ],
     { x: 3, y: 4 },
   ),
-  healGlow: loopTemplate(
-    'effects/healGlow',
+  blessGlow: loopTemplate(
+    'effects/blessGlow',
     [
-      healFrame(5, 2.4, false, [
+      blessFrame(5, 2.4, false, [
         [9, 3],
         [14, 2],
       ]),
-      healFrame(8.5, 3.8, false, [
+      blessFrame(8.5, 3.8, false, [
         [7, 2],
         [12, 1],
         [16, 3],
       ]),
-      healFrame(11, 5, true, [
+      blessFrame(11, 5, true, [
         [5, 1],
         [18, 2],
       ]),

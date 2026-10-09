@@ -44,7 +44,10 @@ void describe('class code vocabulary (invariant 1)', () => {
 
   void it('the shipped class rows carry exactly the cosmetic keys and nothing numeric but shot geometry', () => {
     const src = code('src/game/data/classes.ts');
-    const rows = blockAt(src, src.indexOf('[', src.indexOf('export const CLASSES')));
+    // blockAt counts braces only and would stop after the first row, so slice the whole array.
+    const start = src.indexOf('[', src.indexOf('export const CLASSES'));
+    const rows = src.slice(start, src.indexOf('] as const', start));
+    assert.ok(rows.includes("id: 'bard'"), 'the scan reaches the last row');
     const keys = new Set([...rows.matchAll(/\b([A-Za-z]+)\s*:/g)].map((m) => m[1]));
     assert.deepEqual(
       [...keys].sort(),
@@ -60,7 +63,9 @@ void describe('class code vocabulary (invariant 1)', () => {
         'role',
         'shots',
         'silhouette',
+        'kind',
         'strike',
+        'summon',
         'vx',
         'vy',
       ].sort(),
@@ -83,7 +88,9 @@ void describe('class code vocabulary (invariant 1)', () => {
       'role',
       'silhouette',
       'strike',
+      'summon',
     ]);
+    assert.deepEqual(fields('SummonDef'), ['dx', 'dy', 'kind']);
     assert.deepEqual(fields('ClassAbility'), ['id', 'name', 'shots']);
     assert.deepEqual(fields('EffectShot'), ['dx', 'dy', 'effect', 'lifeMs', 'vx', 'vy']);
   });
@@ -179,6 +186,7 @@ void describe('ClassHero cannot reach the lifecycle (invariant 2)', () => {
       'particles',
       'rng',
       'stage',
+      'summons',
     ]);
   });
 
@@ -198,6 +206,11 @@ void describe('classFor reads nothing but the id', () => {
     assert.match(src, /import \{ hashId \} from '\.\.\/rng'/);
   });
 
+  void it('the class slice starts at bit 20 (changing it reshuffles every hero; pinned on purpose)', () => {
+    assert.match(src, /\bconst CLASS_SHIFT\s*=\s*20\s*;/);
+    assert.match(src, /hashId\(id\)\s*>>>\s*CLASS_SHIFT/);
+  });
+
   void it('classFor takes one string id and its body uses only that id, hashId, and the delivered list', () => {
     const sig = src.indexOf('export function classFor(id: string): ClassId');
     assert.ok(sig >= 0);
@@ -211,6 +224,7 @@ void describe('classFor reads nothing but the id', () => {
       'id',
       'hashId',
       'DELIVERED_CLASSES',
+      'CLASS_SHIFT',
       'index',
       'const',
       'length',
@@ -250,16 +264,33 @@ void describe('every phase switch knows ability (invariant 2, cosmetic phase)', 
   });
 
   void it('no other file switches on a hero phase', () => {
+    // Summon.ts switches on its own SummonPhase (rise, active, sink), which is not a hero phase.
     const offenders = gameFiles
-      .filter((f) => f !== 'src/game/entities/Hero.ts')
+      .filter((f) => f !== 'src/game/entities/Hero.ts' && f !== 'src/game/entities/Summon.ts')
       .filter((f) => /\bswitch\s*\([^)]*\bphase\b[^)]*\)/.test(code(f)));
     assert.deepEqual(offenders, []);
+  });
+
+  void it("Summon.ts's phase switch handles only rise, active, and sink, and ends in assertNever", () => {
+    const src = code('src/game/entities/Summon.ts');
+    const m = /\bswitch\s*\(([^)]*phase[^)]*)\)\s*\{/.exec(src);
+    assert.ok(m, 'Summon.ts has a phase switch');
+    const body = blockAt(src, (m?.index ?? 0) + (m?.[0].length ?? 1) - 1);
+    const cases = [...body.matchAll(/case '(\w+)':/g)].map((c) => c[1]).sort();
+    assert.deepEqual(cases, ['active', 'rise', 'sink']);
+    assert.match(body, /\bdefault\s*:[\s\S]*\bassertNever\s*\(/);
   });
 });
 
 void describe('art files for classes carry characters only (invariant 5)', () => {
-  void it('classTemplates.ts and effectTemplates.ts hold no hex colour and no data URI', () => {
-    for (const f of ['src/game/sprites/classTemplates.ts', 'src/game/sprites/effectTemplates.ts']) {
+  void it('class, effect, and summon template files hold no hex colour and no data URI', () => {
+    for (const f of [
+      'src/game/sprites/classTemplates.ts',
+      'src/game/sprites/effectTemplates.ts',
+      'src/game/sprites/classTemplatesH2.ts',
+      'src/game/sprites/effectTemplatesH2.ts',
+      'src/game/sprites/summonTemplates.ts',
+    ]) {
       assert.doesNotMatch(code(f), /#[0-9a-fA-F]{3,8}\b/, f);
       assert.doesNotMatch(code(f), /data:/, f);
     }

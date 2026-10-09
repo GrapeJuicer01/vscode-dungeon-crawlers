@@ -200,10 +200,10 @@ void describe('draw-call budget (game-engine section 15)', () => {
     return { bitmaps, fills, multiplies };
   }
 
-  void it('8 heroes: at most 144 bitmap draws, 450 fills, and exactly 1 multiply blit per frame', (t) => {
+  void it('8 heroes: at most 152 bitmap draws, 450 fills, and exactly 1 multiply blit per frame', (t) => {
     const c = counts(8);
     t.diagnostic(`8 heroes, worst of 600 frames: ${JSON.stringify(c)}`);
-    assert.ok(c.bitmaps <= 144, `${c.bitmaps} bitmap draws`);
+    assert.ok(c.bitmaps <= 152, `${c.bitmaps} bitmap draws`);
     assert.ok(c.fills <= 450, `${c.fills} fills`);
     assert.equal(c.multiplies, 1);
   });
@@ -231,7 +231,7 @@ void describe('draw-call budget (game-engine section 15)', () => {
       fills = Math.max(fills, rig.surface.count('fillRect'));
     }
     t.diagnostic(`8 warping heroes: ${bitmaps} bitmap draws, ${fills} fills (worst frame)`);
-    assert.ok(bitmaps <= 144 && fills <= 450);
+    assert.ok(bitmaps <= 152 && fills <= 450);
   });
 
   void it('a steady 8-hero frame (no warps) is about 34 bitmap draws', (t) => {

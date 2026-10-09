@@ -13,11 +13,15 @@ A hero is exactly as alive as its agent. Its state changes only when the host re
 
 ## Classes
 
-Every hero is one of the delivered classes (Warrior, Mage, Archer, and Rogue so far; twelve are planned). The class is chosen from the session id alone, so it never changes for a session. A class is a look (palette, silhouette, weapon) plus a small effect it plays while fighting, and nothing more: no stats, no roles that matter to your agents. See [classes](classes.md).
+Every hero is one of the delivered classes (Warrior, Mage, Archer, Rogue, Cleric, Paladin, Necromancer, and Bard so far; twelve are planned). The class is chosen from the session id alone, so it never changes for a session. A class is a look (palette, silhouette, weapon) plus a small effect it plays while fighting, and nothing more: no stats, no roles that matter to your agents. See [classes](classes.md).
 
 ## Effects
 
 While the party fights, class heroes release small effects: an orb bolt, an arrow, a whirl, a burst, a thrown dagger. They are short pictures that fly right and fade, kept calm and small (at most 24 live at once, never a full-screen flash). They do not hit or mark a hero. In H1 there are no enemies, so they play into the empty corridor.
+
+## Summons and aura effects
+
+A class may raise a summon: the Necromancer's Bone Call lifts a small skeleton beside it. A summon is decoration. It has no health, is never a target, and has no effect on any hero; it walks in place while the hero advances, swings at nothing while the hero fights, and sinks into the floor shortly after the hero stops fighting. Blessings and music (Cleric, Paladin, Bard) are one-shot aura effects of at most a second, centered on the caster: calm gold sparkles, a glow at the feet, drifting notes. They restore, buff, and mark nothing, and no icon or bar stays on a hero.
 
 ## Rhythm
 

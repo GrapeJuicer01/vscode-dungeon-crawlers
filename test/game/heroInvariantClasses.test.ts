@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { classFor } from '../../src/game/data/classMap';
-import { classDef } from '../../src/game/data/classes';
+import { CLASS_IDS, classDef } from '../../src/game/data/classes';
 import { EFFECT_IDS } from '../../src/game/data/effects';
 import { EXIT_FAILSAFE_MS, STEP_MS, VICTORY_MS, WARP_OUT_MS } from '../../src/game/data/tuning';
 import { EffectPool } from '../../src/game/Effects';
@@ -83,11 +83,11 @@ function unchanged(
   }
 }
 
-void describe('the scene itself covers all four classes and all three live states', () => {
+void describe('the scene itself covers all eight classes and all three live states', () => {
   void it('64 heroes: every class and every state appears', () => {
     const rig = scene(64);
     const snap = rig.game.heroSnapshot();
-    assert.equal(new Set(snap.map((h) => h.classId)).size, 4);
+    assert.equal(new Set(snap.map((h) => h.classId)).size, 8);
     assert.equal(new Set(snap.map((h) => h.lifecycle)).size, 3);
     for (const h of snap) {
       assert.equal(h.classId, classFor(h.id));
@@ -195,7 +195,7 @@ void describe('class stimuli never change a hero or remove one', () => {
 });
 
 void describe('host events on class heroes behave as in M4', () => {
-  for (const classId of ['warrior', 'mage', 'archer', 'rogue'] as const) {
+  for (const classId of CLASS_IDS) {
     const id = idsOfClass(classId, 1, 'ev-')[0] ?? 'x';
 
     void describe(`${classId}`, () => {

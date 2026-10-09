@@ -1,6 +1,5 @@
 // Class palettes for batch H2 (Cleric, Paladin, Necromancer, Bard). Owned by the pixel-artist.
-// Kept in its own file so the committed H1 palettes.ts stays untouched; the developer merges
-// CLASS_PALETTES_H2 into CLASS_PALETTES when wiring H2 (see docs/design/sprite-spec.md section 4).
+// Kept in its own file; palettes.ts merges it into the exported CLASS_PALETTES (docs/design/sprite-spec.md section 4).
 // Same rules as H1: partial palettes that recolor only `a c d b k m`, never `o s h e w`. No new
 // master characters were needed, so the master palette stays at 33 colors (cap 48).
 

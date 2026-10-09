@@ -24,7 +24,8 @@ function withRow(replace: string, row: unknown): readonly ClassDef[] {
 }
 
 void describe('CLASSES', () => {
-  void it('has one row per CLASS_IDS entry, in order, with unique ids', () => {
+  void it('has eight rows, one per CLASS_IDS entry, in order, with unique ids', () => {
+    assert.equal(rows.length, 8);
     assert.deepEqual(
       rows.map((r) => r.id),
       [...CLASS_IDS],
@@ -39,11 +40,11 @@ void describe('CLASSES', () => {
     }
     assert.deepEqual(
       rows.map((r) => r.name),
-      ['Warrior', 'Mage', 'Archer', 'Rogue'],
+      ['Warrior', 'Mage', 'Archer', 'Rogue', 'Cleric', 'Paladin', 'Necromancer', 'Bard'],
     );
   });
 
-  void it('every row has exactly the keys id, name, role, colors, silhouette, strike, ability', () => {
+  void it('every row has exactly the keys id, name, role, colors, silhouette, strike, ability, summon', () => {
     for (const r of rows) {
       assert.deepEqual(Object.keys(r).sort(), [
         'ability',
@@ -53,12 +54,27 @@ void describe('CLASSES', () => {
         'role',
         'silhouette',
         'strike',
+        'summon',
       ]);
       assert.deepEqual(Object.keys(r.ability).sort(), ['id', 'name', 'shots']);
       for (const s of allShots(r)) {
         assert.deepEqual(Object.keys(s).sort(), ['dx', 'dy', 'effect', 'lifeMs', 'vx', 'vy']);
       }
     }
+  });
+
+  void it('summon is null for seven rows and a skeleton at dx 18, dy 1 for the necromancer only', () => {
+    for (const r of rows) {
+      if (r.id === 'necromancer') {
+        assert.deepEqual(r.summon, { kind: 'skeleton', dx: 18, dy: 1 });
+        assert.deepEqual(Object.keys(r.summon ?? {}).sort(), ['dx', 'dy', 'kind']);
+      } else {
+        assert.equal(r.summon, null, r.id);
+      }
+    }
+    assert.ok(rows.filter((r) => r.summon !== null).length === 1);
+    const summon = rows.find((r) => r.id === 'necromancer')?.summon;
+    assert.ok(summon && Math.abs(summon.dx) <= 40 && Math.abs(summon.dy) <= 24);
   });
 
   void it('roles are melee, ranged, or caster', () => {
@@ -85,10 +101,16 @@ void describe('CLASSES', () => {
     }
   });
 
-  void it('the shots point forward (never at a hero): vx is not negative and dx is not behind the hero', () => {
+  void it('no shot moves backward (vx >= 0); only the self-centered Cleric blessing sits behind or on the hero', () => {
     for (const r of rows) {
       for (const s of allShots(r)) {
-        assert.ok(s.vx >= 0 && s.dx >= 0, `${r.id} ${s.effect}`);
+        assert.ok(s.vx >= 0, `${r.id} ${s.effect} vx`);
+        if (r.id !== 'cleric') {
+          assert.ok(s.dx >= 0, `${r.id} ${s.effect} dx`);
+        } else {
+          // Plan section 3: the blessing is centered on the caster, within a few pixels.
+          assert.ok(Math.abs(s.dx) <= 8, `${r.id} ${s.effect} dx`);
+        }
       }
     }
   });
@@ -100,9 +122,24 @@ void describe('CLASSES', () => {
     assert.equal(by['mage']?.strike[0]?.effect, 'orbBolt');
     assert.equal(by['archer']?.strike[0]?.effect, 'arrow');
     assert.equal(by['archer']?.ability.shots.length, 3);
+    assert.equal(by['cleric']?.strike.length, 0);
+    assert.equal(by['paladin']?.strike.length, 0);
+    assert.equal(by['necromancer']?.strike.length, 1);
+    assert.equal(by['necromancer']?.strike[0]?.effect, 'soulWisp');
+    assert.equal(by['bard']?.strike.length, 1);
+    assert.equal(by['bard']?.strike[0]?.effect, 'note');
     assert.deepEqual(
       rows.map((r) => r.ability.id),
-      ['whirlwind', 'arcaneBurst', 'volley', 'daggerFlurry'],
+      [
+        'whirlwind',
+        'arcaneBurst',
+        'volley',
+        'daggerFlurry',
+        'blessing',
+        'radiantSmite',
+        'boneCall',
+        'chorus',
+      ],
     );
   });
 
@@ -116,7 +153,7 @@ void describe('CLASSES', () => {
       assert.equal(classDef(id).id, id);
     }
     assert.throws(
-      () => classDef('paladin' as never),
+      () => classDef('druid' as never),
       (e: unknown) => e instanceof RangeError && e.message === 'Unknown class',
     );
   });
@@ -167,6 +204,37 @@ void describe('validateClasses', () => {
     assert.match(errors[0] ?? '', /^archer\/strike: a shot has an unexpected key set/);
   });
 
+  void it('rejects an extra summon key, an unknown summon kind, and a far summon offset', () => {
+    const extra = copy('necromancer');
+    (extra.summon as unknown as Record<string, unknown>)['hp'] = 5;
+    let errors = validateClasses(withRow('necromancer', extra));
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0] ?? '', /^necromancer: the summon has an unexpected key set/);
+
+    const kind = copy('necromancer');
+    (kind.summon as unknown as { kind: string }).kind = 'dragon';
+    errors = validateClasses(withRow('necromancer', kind));
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0] ?? '', /^necromancer: the summon uses an unknown kind/);
+    assert.doesNotMatch(errors[0] ?? '', /dragon/);
+
+    const far = copy('necromancer');
+    (far.summon as unknown as { dx: number }).dx = 60;
+    errors = validateClasses(withRow('necromancer', far));
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0] ?? '', /^necromancer: the summon offset is too far/);
+
+    const farY = copy('necromancer');
+    (farY.summon as unknown as { dy: number }).dy = 25;
+    assert.equal(validateClasses(withRow('necromancer', farY)).length, 1);
+  });
+
+  void it('rejects a row missing the summon key', () => {
+    const row = copy('mage');
+    delete (row as Mutable).summon;
+    assert.match(validateClasses(withRow('mage', row)).join('\n'), /^mage: unexpected key set/);
+  });
+
   void it('rejects a missing class row', () => {
     const errors = validateClasses(rows.filter((r) => r.id !== 'archer'));
     assert.deepEqual(errors, ['archer: missing class row']);
@@ -174,10 +242,10 @@ void describe('validateClasses', () => {
 
   void it('rejects an id that is not in CLASS_IDS', () => {
     const row = copy('mage');
-    (row as { id: string }).id = 'paladin';
+    (row as { id: string }).id = 'druid';
     const errors = validateClasses([...rows.filter((r) => r.id !== 'mage'), row]);
     assert.ok(
-      errors.some((e) => /^paladin: id is not in CLASS_IDS/.test(e)),
+      errors.some((e) => /^druid: id is not in CLASS_IDS/.test(e)),
       errors.join('\n'),
     );
     assert.ok(errors.some((e) => e === 'mage: missing class row'));

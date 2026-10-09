@@ -12,6 +12,7 @@ import type { HeroLayerSet } from '../sprites/spriteTypes';
 import { Hero } from './Hero';
 import type { HeroInit } from './Hero';
 import type { World } from './Entity';
+import type { SummonPose } from './Summon';
 
 export class ClassHero extends Hero {
   readonly #def: ClassDef;
@@ -49,6 +50,52 @@ export class ClassHero extends Hero {
 
   protected override onAbilityRelease(world: World): void {
     this.#spawn(this.#def.ability.shots, world);
+    const summon = this.#def.summon;
+    if (summon !== null) {
+      const sign = this.faceRight ? 1 : -1;
+      world.summons.raise(
+        this.slot,
+        summon.kind,
+        Math.floor(this.x) + summon.dx * sign,
+        Math.floor(this.y) + summon.dy,
+        this.faceRight,
+      );
+    }
+  }
+
+  override update(dtMs: number, world: World): void {
+    super.update(dtMs, world);
+    if (this.#def.summon !== null) {
+      this.#tendSummon(world);
+    }
+  }
+
+  /**
+   * Pushes plain numbers into the pool while fighting (the lease). Reads only phase, slot,
+   * position, and facing; never the lifecycle (ADR 0011).
+   */
+  #tendSummon(world: World): void {
+    const summon = this.#def.summon;
+    if (summon === null) {
+      return;
+    }
+    const phase = this.phase;
+    let pose: SummonPose;
+    if (phase === 'advance') {
+      pose = 'walk';
+    } else if (phase === 'attack' || phase === 'ability') {
+      pose = 'attack';
+    } else {
+      return;
+    }
+    const sign = this.faceRight ? 1 : -1;
+    world.summons.renew(
+      this.slot,
+      Math.floor(this.x) + summon.dx * sign,
+      Math.floor(this.y) + summon.dy,
+      this.faceRight,
+      pose,
+    );
   }
 
   #nextInterval(world: World): number {

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { STEP_MS } from '../../src/game/data/tuning';
+import { mixedIds } from '../support/classRig';
 import { agent, feed, gameRig } from '../support/engineFakes';
 
 void describe('engine CPU cost (counting surface, node)', () => {
@@ -28,6 +29,24 @@ void describe('engine CPU cost (counting surface, node)', () => {
     );
     assert.ok(avg < 4, `average ${avg} ms`);
     assert.ok(bootMs < 1000, `boot ${bootMs} ms`);
+    assert.deepEqual(rig.errors, []);
+  });
+
+  void it('8 mixed class heroes with live summons over 10 simulated minutes average under 4 ms per frame (target 1 ms)', (t) => {
+    const rig = gameRig();
+    for (const id of mixedIds(8)) {
+      feed(rig, agent(id, 'working'));
+    }
+    const frames = 36_000;
+    const start = process.hrtime.bigint();
+    for (let i = 0; i < frames; i++) {
+      rig.game.frame(STEP_MS, rig.surface);
+    }
+    const avg = Number(process.hrtime.bigint() - start) / 1e6 / frames;
+    t.diagnostic(
+      `8 mixed heroes with summons: average ${avg.toFixed(3)} ms per frame (target 1 ms)`,
+    );
+    assert.ok(avg < 4, `average ${avg} ms`);
     assert.deepEqual(rig.errors, []);
   });
 });

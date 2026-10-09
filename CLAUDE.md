@@ -52,11 +52,11 @@ src/webview/                index.html.ts (host-side HTML + CSP builder), main.t
                             (DOM-free), canvasSurface.ts (the only canvas adapter) (M4); ui.ts (M7), audio.ts (M8)
 src/game/                   (M4) DOM-free, clock-free engine (ADR 0008): ports, layout, rng, Game, Roster, Engagement,
                             Renderer, Camera, Lighting, Pathfinding, Collision, Particles, Ambience, Stage; Effects (H1, cosmetic
-                            effect pool); Summons (H2, SummonPool: leased cosmetic allies, ADR 0011); Combat (E1)
+                            effect pool); Summons.ts (H2, SummonPool: leased cosmetic allies, ADR 0011); Combat (E1)
 src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero + createHero (H1, data-driven: the
-                            12 classes are rows, subclass files only where code is needed), Summon (H2, not a hero,
-                            never in the roster), Enemy, Boss (E1)
-src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1), summons (H2);
+                            12 classes are rows, subclass files only where code is needed), Summon.ts (H2, not a
+                            hero, never in the roster), Enemy, Boss (E1)
+src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1), summons.ts (H2, SUMMON_IDS);
                             enemies, drops (E1); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,

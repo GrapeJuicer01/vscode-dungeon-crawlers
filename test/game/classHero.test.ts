@@ -402,7 +402,7 @@ void describe('the hidden ability timer', () => {
 });
 
 void describe('what the hooks receive', () => {
-  void it('hooks are given a World with exactly the seven engine fields: no roster, no host channel', () => {
+  void it('hooks are given a World with exactly the eight engine fields: no roster, no host channel', () => {
     const seen: World[] = [];
     class Peek extends ClassHero {
       protected override onAttackStrike(world: World): void {
@@ -439,6 +439,7 @@ void describe('what the hooks receive', () => {
         'particles',
         'rng',
         'stage',
+        'summons',
       ]);
       for (const value of Object.values(world)) {
         assert.equal(typeof (value as { applyAgentState?: unknown }).applyAgentState, 'undefined');

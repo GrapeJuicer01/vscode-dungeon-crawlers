@@ -22,12 +22,23 @@ export const REQUIRED_HERO_ANIMATIONS: Readonly<Record<string, number>> = {
   victory: 2,
 };
 
+/** Required summon animation name -> frame count (plan h2-classes.md section 3.5). */
+export const REQUIRED_SUMMON_ANIMATIONS: Readonly<Record<string, number>> = {
+  idle: 2,
+  walk: 4,
+  attack: 3,
+  rise: 4,
+  sink: 3,
+};
+
 /** Hero animations must never imply damage or defeat (Core invariant 1 at the asset level). */
 const FORBIDDEN_HERO_ANIMATION = /hurt|downed|death|dead|die|dying/i;
 const HERO_CHARS = 'oshecdbkmwa';
 /** The only master characters a class palette may recolour (never o s h e w). */
 const CLASS_PALETTE_CHARS = 'acdbkm';
 const MAX_EFFECT_COLORS = 8;
+const MAX_SUMMON_COLORS = 8;
+const MAX_SUMMON_SIZE = 24;
 const MAX_EFFECT_SIZE = 32;
 const MAX_HERO_COLORS = 12;
 const MAX_STAGE_COLORS = 8;
@@ -310,6 +321,50 @@ export function validateClassArt(
   return errors;
 }
 
+function validateSummonTemplate(key: string, t: SpriteTemplate, palette: Palette): string[] {
+  const errors = [...validateTemplate(t, palette, null, MAX_SUMMON_COLORS)];
+  if (t.w > MAX_SUMMON_SIZE || t.h > MAX_SUMMON_SIZE) {
+    errors.push(`${t.id}: summon is larger than ${MAX_SUMMON_SIZE}x${MAX_SUMMON_SIZE}`);
+  }
+  if (t.id !== `summons/${key}`) {
+    errors.push(`${t.id}: summon id does not match its key ${key}`);
+  }
+  for (const name of Object.keys(t.animations)) {
+    if (FORBIDDEN_HERO_ANIMATION.test(name)) {
+      errors.push(`${t.id}: forbidden summon animation name ${name}`);
+    }
+  }
+  for (const [name, count] of Object.entries(REQUIRED_SUMMON_ANIMATIONS)) {
+    const frames = t.animations[name];
+    if (frames === undefined) {
+      errors.push(`${t.id}: missing required animation ${name}`);
+    } else if (frames.length !== count) {
+      errors.push(`${t.id}: animation ${name} has ${frames.length} frames, expected ${count}`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * Summons: every template is well formed (master palette characters only, at most 8 colors,
+ * 24x24, the five animations), every summon id has a template, and nothing is extra.
+ */
+export function validateSummonArt(art: ArtSet, summonIds: readonly string[]): readonly string[] {
+  const errors: string[] = [];
+  for (const [key, t] of Object.entries(art.summons)) {
+    errors.push(...validateSummonTemplate(key, t, art.palette));
+    if (!summonIds.includes(key)) {
+      errors.push(`${key}: summon template for an unknown summon`);
+    }
+  }
+  for (const id of summonIds) {
+    if (art.summons[id] === undefined) {
+      errors.push(`${id}: no summon template`);
+    }
+  }
+  return errors;
+}
+
 function luminance(hex: string): number {
   const [r, g, b] = hexToRgb(hex).map((v) => {
     const s = v / 255;
@@ -474,6 +529,7 @@ export function validateArtSet(art: ArtSet): readonly string[] {
   for (const [key, t] of Object.entries(art.effects)) {
     errors.push(...validateEffectTemplate(key, t, palette));
   }
+  errors.push(...validateSummonArt(art, Object.keys(art.summons)));
   for (const t of [art.campfire.logs, art.campfire.flameSmall, art.campfire.flameLarge]) {
     errors.push(...validateTemplate(t, palette, null, MAX_HERO_COLORS));
     if (Object.keys(t.animations).join() !== 'idle') {

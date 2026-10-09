@@ -1,5 +1,5 @@
 // Draw-call budget and CPU cost with class heroes and live effects (H1 plan test notes 7 and 13;
-// game-engine section 15). The M4 ceiling of 120 bitmap draws rises to 144 by the 24-effect cap.
+// game-engine section 15). The M4 ceiling of 120 bitmap draws rises to 144 by the 24-effect cap and to 152 by the 8 summons (H2).
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { EFFECT_CAPACITY, STEP_MS } from '../../src/game/data/tuning';
@@ -9,7 +9,7 @@ import type { BitmapTracker } from '../support/classRig';
 import { agent, feed, gameRig, run } from '../support/engineFakes';
 import type { GameRig } from '../support/engineFakes';
 
-const MAX_BITMAPS = 144;
+const MAX_BITMAPS = 152;
 const MAX_FILLS = 450;
 
 let tracker: BitmapTracker | null = null;
@@ -81,7 +81,7 @@ function measure(rig: GameRig, frames: number): Worst {
 }
 
 void describe('draw-call ceiling with class heroes and effects', () => {
-  void it('8 class heroes with the effect pool kept full: at most 144 bitmap draws, 450 fills, 1 multiply', (t) => {
+  void it('8 class heroes with the effect pool kept full: at most 152 bitmap draws, 450 fills, 1 multiply', (t) => {
     tracker = trackBitmaps();
     floodEffects();
     const rig = party(8, ['working']);

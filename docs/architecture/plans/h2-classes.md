@@ -88,6 +88,12 @@ export class Summon extends GuardedEntity {
   update(dtMs: number, world: World): void;  // advances the animation clock only
   draw(ctx: DrawContext): void;              // drawBitmap only; art missing => skip
   // pool-only mutators (plain numbers in, nothing returned): place(), begin(kind, ...), setPhase(...)
+  // AS BUILT (H2-10): the extra pool-only API is
+  //   get pose(): SummonPose; get slot(): number; get inUse(): boolean; get finished(): boolean;
+  //   begin(slot, kind, x, y, faceRight, leaseMs): void;
+  //   place(x, y, faceRight, pose, leaseMs): void;
+  //   step(dtMs, riseMs, sinkMs): void;   // phase and lease arithmetic (rise -> active -> sink -> finished)
+  //   release(): void;                    // frees the item; there is no setPhase
 }
 
 // Summons.ts (new, like Effects.ts)
@@ -103,9 +109,11 @@ export class SummonPool {
 }
 // entities/Entity.ts: World gains   readonly summons: SummonPool;
 // sprites/spriteFactory.ts: SpriteCache gains
-//   summon(id: SummonId): HeroSprites | null;   // every animation of the template, master palette, cached by template id; null if the art set lacks it
+//   summon(id: string): HeroSprites | null;   // AS BUILT takes a string (own-key lookup, like effect()); every animation of the template, master palette, cached by template id; null if the art set lacks it
 //   ArtSet gains: readonly summons: Readonly<Record<string, SpriteTemplate>>;
 // data/animations.ts: SUMMON_FRAME_MS and onceFrameIndex(name, elapsedMs, frameCount)   // clamps at the last frame, for rise and sink
+//   AS BUILT also exports SUMMON_RISE_FRAMES (4), SUMMON_SINK_FRAMES (3), SUMMON_RISE_TOTAL_MS, SUMMON_SINK_TOTAL_MS
+//   (frame ms x frames; the pool passes them to Summon.step), and summonFrameIndex(name, elapsedMs, frameCount) (looping idle/walk/attack)
 ```
 
 Behavior (the whole contract):
@@ -183,10 +191,12 @@ Animation timings (developer, `animations.ts`, `SUMMON_FRAME_MS`): `idle` 400, `
 
 ### 3.6 `classFor` with eight classes
 
-`classFor` is unchanged in form: `DELIVERED_CLASSES[(hashId(id) >>> 16) % DELIVERED_CLASSES.length]`, now over eight. `DELIVERED_CLASSES` stays in `CLASS_IDS` order, with the H1 four first.
+`classFor` keeps its form but **as built the shift is 20, not 16** (as-built decision H2-9, below): `DELIVERED_CLASSES[(hashId(id) >>> CLASS_SHIFT) % DELIVERED_CLASSES.length]` with `const CLASS_SHIFT = 20`, now over eight. `DELIVERED_CLASSES` stays in `CLASS_IDS` order, with the H1 four first.
+
+**As-built decision H2-9 (shift 16 to 20).** With `>>> 16` the simulator ids `sim-0-0` to `sim-7-0` gave only four distinct classes, which fails the "at least five, including an H2 class" check below. The developer applied the fallback this section already allowed (change only the bit selection) and moved the slice to `>>> 20`, which gives seven distinct classes including Cleric, Paladin, and Necromancer. Skin (`h % 4`) and hair (`(h >>> 8) % 6`) stay independent of class (all 32 and 48 pairs occur over 1,000 ids). Consequence: the "half keep their H1 class" statement below holds only for a fixed shift; because the shift itself changed, every id is reshuffled once relative to H1. That is harmless because H1 was never released. The reasoning is recorded in the `classFor` comment in `src/game/data/classMap.ts`.
 
 - **Stable within a running extension.** The table is a build-time constant and the function is pure, so a given id gives the same class on every call, after replacement, snapshot rebuild, and webview reload, exactly as in H1.
-- **One-time reshuffle on update (accepted, roadmap A5).** Because 8 is a power of two and the H1 classes keep indexes 0 to 3, a hero whose `(hash >>> 16) % 8` is 0 to 3 keeps its H1 class (about half of all ids) and the other half become Cleric, Paladin, Necromancer, or Bard. The change happens only when the extension updates (which restarts the webview anyway). H3 moves to `% 12`, which reshuffles more; also accepted.
+- **One-time reshuffle on update (accepted, roadmap A5).** Because 8 is a power of two and the H1 classes keep indexes 0 to 3, at a fixed shift, a hero whose `(hash >>> shift) % 8` is 0 to 3 keeps its class (about half of all ids) and the other half become Cleric, Paladin, Necromancer, or Bard. The change happens only when the extension updates (which restarts the webview anyway). H3 moves to `% 12`, which reshuffles more; also accepted.
 - **Simulator.** `sim-0-0` to `sim-7-0` must show at least five distinct classes and at least one of the four H2 classes. If the current slice of the hash does not give that, the developer changes only the bit selection (a different shift or a fixed mix constant), records the reason in the `classFor` comment, and re-checks independence from skin and hair. Simulator ids cannot change (monitor-owned). Seeing a Necromancer in the simulator is the F5 check for summons; if no sim id maps to it, use a test hero (task 10).
 
 ### 3.7 Seam for E1 (recorded, not built)
@@ -270,7 +280,7 @@ Do the tasks in order; each is independently verifiable. No new packages. Work o
 
 Unit suites use the H1 fakes plus a test `ArtSet` extended with one tiny summon template (five animations) and the new effect ids, so engine tests do not depend on H2 art. Suggested files: `test/game/summons.test.ts`, `test/game/summonHero.test.ts`, extensions to `classMap.test.ts`, `classData.test.ts`, `heroInvariantClasses.test.ts`, `crashIsolation`, `renderer` draw-call and order tests, `classArt.test.ts`, `spriteValidator.test.ts`, `test/repo/engineStructure.test.ts`, `classStructure.test.ts`, `docsTables.test.ts`, `test/build/classBundle.test.ts`.
 
-1. **Class mapping.** `classFor` pure and total; the same id gives the same class on every call and in a fresh process; 1,000 UUID-like ids use all eight classes, none under 8 percent; all 32 skin-and-class pairs occur over 1,000 ids; `sim-0-0` to `sim-7-0` give at least five classes including at least one H2 class (section 3.6); `DELIVERED_CLASSES` equals `CLASS_IDS` (eight). Through `Game`: a hero's `classId` is unchanged across 10 simulated minutes of working/idle cycles, replacement, snapshot rebuild, and a fresh `Game` fed the same list (reload). Explicitly assert the documented reshuffle property for known ids: an id whose `(hash >>> 16) % 8 < 4` has the same class under 4 and 8 (documents the accepted behavior, not a requirement the code must keep).
+1. **Class mapping.** `classFor` pure and total; the same id gives the same class on every call and in a fresh process; 1,000 UUID-like ids use all eight classes, none under 8 percent; all 32 skin-and-class pairs occur over 1,000 ids; `sim-0-0` to `sim-7-0` give at least five classes including at least one H2 class (section 3.6); `DELIVERED_CLASSES` equals `CLASS_IDS` (eight). Through `Game`: a hero's `classId` is unchanged across 10 simulated minutes of working/idle cycles, replacement, snapshot rebuild, and a fresh `Game` fed the same list (reload). Explicitly assert the documented reshuffle property for known ids: an id whose `(hash >>> 20) % 8 < 4` (the as-built `CLASS_SHIFT`, H2-9) has the same class under 4 and 8 (documents the accepted behavior, not a requirement the code must keep).
 2. **Class data.** Eight rows, unique ids, names equal the art style guide, key set equals exactly `id name role colors silhouette strike ability summon`; `summon` is `null` for seven rows and `{ kind: 'skeleton', dx, dy }` for `necromancer`; every shot effect id is in `EFFECT_IDS`; lifetimes 100 to 1500 ms; `|dx| <= 40`, `|dy| <= 24`; speeds at most 240 px/s; at most 4 shots per list; `validateClasses` fails crafted rows (extra key, unknown summon kind, `dx` 60).
 3. **Art.** Shipped art passes `validateArtSet` and `validateClassArt` for eight classes (eleven animations, 26 frames per layer, at most 12 colors per composited look under 4 skins by 6 hair colors, class palettes override only `a c d b k m`). Effects: the five new ids exist, `idle` only, at most 32x32, at most 8 colors. Summon: `summons/skeleton` has exactly `idle 2, walk 4, attack 3, rise 4, sink 3`, at most 24x24, at most 8 colors, anchor inside, master characters only, no forbidden animation name. Crafted faults each give exactly one error naming the id. No hex and no `data:` URI in any new template file. Master palette at most 48 colors.
 4. **Summon pool.** Raise, renew, and lease behave per section 3.2: one summon per slot; `raise` on `rise`/`active` is a no-op; on `sink` it restarts; a full pool (`SUMMON_CAPACITY`) drops silently; after the last renewal the summon is freed within `SUMMON_LEASE_MS` plus the sink total (assert at most 700 ms, with margin); `renew` on a missing or sinking summon does nothing; NaN and out-of-range inputs are ignored; deterministic; `update` and `entities()` allocate nothing; `clear` empties it; a summon whose `update` throws three times is freed and the pool keeps working.

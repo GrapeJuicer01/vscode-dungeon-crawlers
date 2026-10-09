@@ -4,7 +4,8 @@
 // each. No red, no full-body white, no cracks, no stars, no ticks: nothing reads as damage taken.
 
 import { Grid, loopTemplate } from './spriteBuilder';
-import type { EffectSpriteId, SpriteTemplate } from './spriteTypes';
+import { EFFECT_SPRITES_H2 } from './effectTemplatesH2';
+import type { EffectSpriteId, EffectSpriteIdH1, SpriteTemplate } from './spriteTypes';
 
 /** Plots a connected 1px ellipse outline; `pick` chooses the character from the angle (radians). */
 function ellipse(
@@ -111,7 +112,7 @@ const arrow = loopTemplate('effects/arrow', [['ww.....m..', 'wkkkkkkmmm', 'ww...
   y: 1,
 });
 
-export const EFFECT_SPRITES: Readonly<Record<EffectSpriteId, SpriteTemplate>> = {
+export const EFFECT_SPRITES_H1: Readonly<Record<EffectSpriteIdH1, SpriteTemplate>> = {
   whirl: loopTemplate(
     'effects/whirl',
     [
@@ -172,4 +173,10 @@ export const EFFECT_SPRITES: Readonly<Record<EffectSpriteId, SpriteTemplate>> = 
     ],
     { x: 6, y: 5 },
   ),
+};
+
+/** All effect sprites (H1 + H2). */
+export const EFFECT_SPRITES: Readonly<Record<EffectSpriteId, SpriteTemplate>> = {
+  ...EFFECT_SPRITES_H1,
+  ...EFFECT_SPRITES_H2,
 };

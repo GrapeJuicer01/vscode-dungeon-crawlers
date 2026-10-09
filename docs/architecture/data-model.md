@@ -140,7 +140,7 @@ From E1, `enemies.ts` adds its own validator (50 unique ids, 5 per stage, one bo
 
 There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) % SKIN_TONE_COUNT`, `hairIndex = (hashId(id) >>> 8) % HAIR_COLOR_COUNT`, `accent: null` (implemented by the exported `lookFor(id)` in `Roster.ts`).
 
-**Classes (built to the [H1 plan](plans/h1-classes.md)).** `classes.ts` holds `CLASSES: readonly ClassDef[]`, one compact row per class: `id`, `name`, `role`, `colors`, `silhouette` (the last two are documentation text for the generated table), `strike` (a list of cosmetic `EffectShot`), and `ability` (id, name, effect shots). A row has no health, mana, power, or cooldown field and none may be added without a Core invariant review; the structural test pins the key set. `effects.ts` lists the `EffectId` union. `classMap.ts` exports `DELIVERED_CLASSES` and the pure `classFor(id)`: `DELIVERED_CLASSES[(hashId(id) >>> 16) % length]`. The class is therefore sticky by construction, stable across webview reloads, held nowhere, and never persisted (persisting it would store session ids, Core invariant 7). H1 delivers four classes; H2 and H3 extend `CLASS_IDS` to 12, and the validator then requires exactly 12 unique ids with complete template sets.
+**Classes (built to the [H1 plan](plans/h1-classes.md)).** `classes.ts` holds `CLASSES: readonly ClassDef[]`, one compact row per class: `id`, `name`, `role`, `colors`, `silhouette` (the last two are documentation text for the generated table), `strike` (a list of cosmetic `EffectShot`), and `ability` (id, name, effect shots). A row has no health, mana, power, or cooldown field and none may be added without a Core invariant review; the structural test pins the key set. `effects.ts` lists the `EffectId` union. `classMap.ts` exports `DELIVERED_CLASSES` and the pure `classFor(id)`: `DELIVERED_CLASSES[(hashId(id) >>> CLASS_SHIFT) % length]` (`CLASS_SHIFT` was 16 in H1 and is 20 from H2, see below). The class is therefore sticky by construction, stable across webview reloads, held nowhere, and never persisted (persisting it would store session ids, Core invariant 7). H1 delivers four classes; H2 and H3 extend `CLASS_IDS` to 12, and the validator then requires exactly 12 unique ids with complete template sets.
 
 | Check (`validateClasses`, `validateClassArt`; tests only) | Rule |
 |---|---|
@@ -154,15 +154,16 @@ There is no per-hero table. A hero's look is computed: `skinIndex = hashId(id) %
 **H1 as built (HEAD ec76b05; full list in [H1 plan section 13](plans/h1-classes.md#13-as-built-drift-checked-against-head-ec76b05-on-feat-h1-classes)).**
 
 - `validateClasses(defs)` takes no art parameter. The art cross-check is `validateClassArt(art, classIds, effectIds)` in `spriteValidator.ts`.
-- Simulator ids `sim-0-0` to `sim-7-0` map to rogue, warrior, warrior, mage, rogue, mage, archer, mage.
+- Simulator ids `sim-0-0` to `sim-7-0` mapped to rogue, warrior, warrior, mage, rogue, mage, archer, mage under H1's `>>> 16` slice (superseded by the H2 shift below).
 - Effect sprite ids are the local union `EffectSpriteId` in `sprites/spriteTypes.ts` until `EFFECT_SPRITES` is keyed by `EffectId` from `data/effects.ts`.
 - Effects are drawn with master colours; class palettes apply to hero looks only.
 - `HERO_POSES`, `HERO_HEAD`, and `HeroPose` (in `heroTemplates.ts`) are exported for art files only; the engine must not import them.
 - Static effects play once at 90 ms per frame and hold the last frame; moving effects loop. A class without class layers falls back to the base hero recoloured by its class palette.
 
-**H2 design (to the [H2 plan](plans/h2-classes.md); not yet built).**
+**H2 as built (to the [H2 plan](plans/h2-classes.md)).**
 
-- `CLASS_IDS` appends `cleric paladin necromancer bard` (H1 order unchanged); `DELIVERED_CLASSES` is all eight; `classFor` keeps its form. About half of all ids keep their H1 class and half reshuffle once on update (the H1 four keep indexes 0 to 3); stable within a running extension.
+- `CLASS_IDS` appends `cleric paladin necromancer bard` (H1 order unchanged); `DELIVERED_CLASSES` is all eight; `classFor` keeps its form but **the shift is now `CLASS_SHIFT = 20`** (as-built decision H2-9): with eight classes `>>> 16` gave only four distinct classes for `sim-0-0` to `sim-7-0`, and `>>> 20` gives seven (including Cleric, Paladin, Necromancer) while staying independent of skin (`h % 4`) and hair (`(h >>> 8) % 6`). Every id is reshuffled once relative to H1 (never released, so unseen); stable within a running extension.
+- Beyond the plan, `animations.ts` also exports `SUMMON_RISE_FRAMES` (4), `SUMMON_SINK_FRAMES` (3), `SUMMON_RISE_TOTAL_MS`, `SUMMON_SINK_TOTAL_MS`, and `summonFrameIndex`; `SpriteCache.summon` takes a string id. `Summon` has extra pool-only members (`step`, `release`, `inUse`, `finished`, `slot`, `pose`); see [game engine 13.2](game-engine.md).
 - `ClassDef` gains one required key, `summon: SummonDef | null` with `SummonDef = { kind: SummonId, dx, dy }`. The key set becomes `id name role colors silhouette strike ability summon`. Only the Necromancer has a non-null summon (`skeleton`). No health, mana, power, or cooldown field is added, and none may be.
 - `data/summons.ts` holds `SUMMON_IDS` (`skeleton` in H2; `beast`, `turret` in H3) and `SummonId`. `EFFECT_IDS` appends `buffSparkle note blessGlow holyBurst soulWisp`.
 - Art contract additions: `ArtSet.summons` (id to a single `SpriteTemplate`, ids `summons/<name>`), `SpriteTemplate` unchanged; required summon animations `idle 2, walk 4, attack 3, rise 4, sink 3`, at most 24x24 and 8 colors, master palette, no forbidden animation name; `CLASS_PALETTES` and class layers extend to eight.

@@ -5,6 +5,7 @@ import type { EffectPool } from '../Effects';
 import type { Engagement } from '../Engagement';
 import type { ErrorSink, Surface } from '../ports';
 import type { Particles } from '../Particles';
+import type { SummonPool } from '../Summons';
 import type { Rng } from '../rng';
 import type { SpriteCache } from '../sprites/spriteFactory';
 import type { StageRuntime } from '../Stage';
@@ -16,6 +17,7 @@ export interface World {
   readonly campfire: Campfire;
   readonly particles: Particles;
   readonly effects: EffectPool;
+  readonly summons: SummonPool;
   readonly engagement: Engagement;
   readonly rng: Rng;
   readonly cache: SpriteCache;

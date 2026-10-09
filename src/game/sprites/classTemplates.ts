@@ -20,14 +20,14 @@ import { Grid, type Px } from './spriteBuilder';
 import { BASE_HERO, HERO_HEAD, HERO_POSES, type HeroPose } from './heroTemplates';
 import type { HeroLayerSet, SpriteTemplate } from './spriteTypes';
 
-const W = 16;
-const H = 20;
-const WEAPON_W = 24;
-const ANCHOR = { x: 8, y: 19 } as const;
+export const W = 16;
+export const H = 20;
+export const WEAPON_W = 24;
+export const ANCHOR = { x: 8, y: 19 } as const;
 
-type Role = 'up' | 'fwd' | 'low' | 'angle' | 'lap';
+export type Role = 'up' | 'fwd' | 'low' | 'angle' | 'lap';
 
-interface Ctx {
+export interface Ctx {
   readonly anim: string;
   readonly frame: number;
   readonly role: Role | null;
@@ -38,7 +38,7 @@ interface Ctx {
   readonly pose: HeroPose;
 }
 
-interface ClassSpec {
+export interface ClassSpec {
   readonly id: string;
   /** Head shift in pixels (crouch and lean). */
   readonly shift: { readonly dx: number; readonly dy: number };
@@ -52,7 +52,7 @@ interface ClassSpec {
 
 // ---- Shared helpers ----
 
-function roleOf(anim: string, frame: number): Role | null {
+export function roleOf(anim: string, frame: number): Role | null {
   switch (anim) {
     case 'idle':
     case 'walk':
@@ -70,7 +70,7 @@ function roleOf(anim: string, frame: number): Role | null {
 }
 
 /** Top-left of the 2x2 hand in the body layer (the skin pixels of the pose's arm). */
-function handOf(p: HeroPose): { x: number; y: number } {
+export function handOf(p: HeroPose): { x: number; y: number } {
   let x = 99;
   let y = 99;
   for (const [px, py, ch] of p.arm ?? []) {
@@ -87,7 +87,12 @@ function handOf(p: HeroPose): { x: number; y: number } {
  * Draws a piece into `target` with a 1px outline. `ring` 'all' keeps the outline over the body;
  * 'outside' keeps it only where nothing is underneath. Outline never covers skin or the eye.
  */
-function piece(target: Grid, under: Grid, ring: 'all' | 'outside', draw: (s: Grid) => void): void {
+export function piece(
+  target: Grid,
+  under: Grid,
+  ring: 'all' | 'outside',
+  draw: (s: Grid) => void,
+): void {
   const s = new Grid(target.w, target.h);
   draw(s);
   const filled = s.rows();
@@ -106,11 +111,11 @@ function piece(target: Grid, under: Grid, ring: 'all' | 'outside', draw: (s: Gri
   }
 }
 
-const ROW = (g: Grid, x0: number, x1: number, y: number, ch: string): void =>
+export const ROW = (g: Grid, x0: number, x1: number, y: number, ch: string): void =>
   g.rect(x0, y, x1 - x0 + 1, 1, ch);
 
 /** A rag-wiping hand over a lap item, as in the base hero (rag in white cloth). */
-function ragOverlay(g: Grid, rx: number): void {
+export function ragOverlay(g: Grid, rx: number): void {
   const s = new Grid(g.w, g.h);
   s.line(10, 13, rx + 1, 11, 'd');
   s.rect(rx, 11, 2, 2, 's');
@@ -518,7 +523,7 @@ const ROGUE: ClassSpec = {
 
 // ---- Rendering ----
 
-function renderHead(spec: ClassSpec, p: HeroPose): string[] {
+export function renderHead(spec: ClassSpec, p: HeroPose): string[] {
   const x = p.head.x + spec.shift.dx;
   const y = p.head.y + spec.shift.dy;
   const g = new Grid(W, H);
@@ -544,7 +549,7 @@ function renderHead(spec: ClassSpec, p: HeroPose): string[] {
   return g.rows();
 }
 
-function layerSet(spec: ClassSpec): HeroLayerSet {
+export function layerSet(spec: ClassSpec): HeroLayerSet {
   const head: Record<string, string[][]> = {};
   const gear: Record<string, string[][]> = {};
   const weapon: Record<string, string[][]> = {};
@@ -607,8 +612,8 @@ function layerSet(spec: ClassSpec): HeroLayerSet {
   };
 }
 
-/** Class id -> layers. A1-2 delivers warrior and mage, A1-3 archer and rogue. */
-export const CLASS_LAYERS: Readonly<Record<string, HeroLayerSet>> = {
+/** H1 class id -> layers. The merged table with all eight classes is `CLASS_LAYERS` in spriteTemplates.ts. */
+export const CLASS_LAYERS_H1: Readonly<Record<string, HeroLayerSet>> = {
   warrior: layerSet(WARRIOR),
   mage: layerSet(MAGE),
   archer: layerSet(ARCHER),

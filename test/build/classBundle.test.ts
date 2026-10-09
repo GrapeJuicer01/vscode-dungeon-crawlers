@@ -54,6 +54,18 @@ void describe('class code in the bundles (H1)', () => {
     );
   });
 
+  void it('dist/webview.js contains SummonPool and the skeleton template; dist/extension.js has neither (H2)', () => {
+    assert.match(webview, classDecl('SummonPool'));
+    assert.match(webview, classDecl('Summon'));
+    assert.ok(webview.includes('summons/skeleton'));
+    assert.ok(webview.includes('Bone Call'));
+    assert.doesNotMatch(host, classDecl('SummonPool'));
+    assert.doesNotMatch(host, classDecl('Summon'));
+    assert.ok(!host.includes('summons/skeleton'));
+    assert.ok(!host.includes('Bone Call'));
+    assert.doesNotMatch(host, /\b(SUMMON_IDS|SUMMON_CAPACITY|summonFrameIndex)\b/);
+  });
+
   void it('package.json has no runtime dependencies', () => {
     const pkg = readJson('package.json') as { dependencies?: Record<string, string> };
     assert.deepEqual(pkg.dependencies ?? {}, {});

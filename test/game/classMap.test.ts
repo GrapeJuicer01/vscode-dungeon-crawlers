@@ -63,56 +63,63 @@ void describe('classFor is pure and total', () => {
     }
   });
 
-  void it('matches an independent reference (FNV-1a, upper 16 bits, modulo the delivered count) and pinned answers', () => {
+  void it('matches an independent reference (FNV-1a, bits 20 and up, modulo the delivered count) and pinned answers', () => {
     const reference = (id: string): string => {
       let h = 0x811c9dc5;
       for (let i = 0; i < id.length; i++) {
         h ^= id.charCodeAt(i);
         h = Math.imul(h, 0x01000193);
       }
-      return CLASS_IDS[((h >>> 0) >>> 16) % CLASS_IDS.length] ?? '';
+      return CLASS_IDS[((h >>> 0) >>> 20) % CLASS_IDS.length] ?? '';
     };
     for (const id of [...awkward, ...uuids(500, 21)]) {
       assert.equal(classFor(id), reference(id), id.slice(0, 20));
     }
     // Pinned: a change here reshuffles every user's heroes and must be a deliberate decision.
+    // H2 moved the slice from >>> 16 to >>> 20 (developer deviation, see classMap.ts).
     assert.deepEqual(['', 'a', 'alpha', 'sim-0-0', 'sim-1-0', 'sim-3-0', 'sim-6-0'].map(classFor), [
-      'warrior',
-      'warrior',
-      'rogue',
-      'rogue',
-      'warrior',
       'mage',
-      'archer',
+      'warrior',
+      'warrior',
+      'necromancer',
+      'rogue',
+      'mage',
+      'warrior',
     ]);
   });
 
-  void it('DELIVERED_CLASSES equals CLASS_IDS in H1, and CLASSES has one row per id in the same order', () => {
+  void it('DELIVERED_CLASSES equals CLASS_IDS (eight in H2), and CLASSES has one row per id in the same order', () => {
     assert.deepEqual([...DELIVERED_CLASSES], [...CLASS_IDS]);
     assert.deepEqual(
       CLASSES.map((c) => c.id),
       [...CLASS_IDS],
     );
-    assert.equal(CLASS_IDS.length, 4);
+    assert.equal(CLASS_IDS.length, 8);
+    assert.equal(DELIVERED_CLASSES.length, 8);
   });
 });
 
 void describe('classFor distribution', () => {
-  void it('1,000 UUID-like ids use all four classes and none is under 15 percent', () => {
+  void it('1,000 UUID-like ids use all eight classes and none is under 8 percent', () => {
     const counts = tally(uuids(1000));
-    assert.equal(counts.size, 4);
+    assert.equal(counts.size, 8);
     for (const [cls, n] of counts) {
-      assert.ok(n >= 150, `${cls} has only ${n} of 1000`);
+      assert.ok(n >= 80, `${cls} has only ${n} of 1000`);
     }
   });
 
-  void it('sim-0-0 to sim-7-0 (the default simulator party) use at least three classes', () => {
+  void it('sim-0-0 to sim-7-0 (the default simulator party) use at least five classes, including an H2 class', () => {
     const ids = Array.from({ length: 8 }, (_, i) => `sim-${i}-0`);
     const used = new Set(ids.map(classFor));
-    assert.ok(used.size >= 3, [...used].join());
+    assert.ok(used.size >= 5, [...used].join());
+    const h2 = ['cleric', 'paladin', 'necromancer', 'bard'];
+    assert.ok(
+      [...used].some((c) => h2.includes(c)),
+      [...used].join(),
+    );
   });
 
-  void it('is independent of skin tone and hair: all 16 skin and class pairs occur over 1,000 ids', () => {
+  void it('is independent of skin tone and hair: all 32 skin and class pairs occur over 1,000 ids', () => {
     const pairs = new Set<string>();
     for (const id of uuids(1000, 3)) {
       pairs.add(`${lookFor(id).skin}|${classFor(id)}`);
@@ -141,6 +148,33 @@ void describe('classFor distribution', () => {
     assert.equal(hero.look.skin, lookFor(id).skin);
     assert.equal(hero.look.hair, lookFor(id).hair);
     assert.equal(classDef(classFor(id)).id, classFor(id));
+  });
+});
+
+void describe('the documented reshuffle property (H1 to H2)', () => {
+  void it('an id whose class slice modulo 8 is below 4 has the same class under four and eight classes', () => {
+    // Documents accepted behavior, not a requirement: the H1 classes keep indexes 0..3.
+    const slice = (id: string): number => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < id.length; i++) {
+        h ^= id.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+      }
+      return (h >>> 0) >>> 20;
+    };
+    let checked = 0;
+    for (const id of uuids(500, 9)) {
+      const s = slice(id);
+      if (s % 8 < 4) {
+        assert.equal(classFor(id), CLASS_IDS[s % 4]);
+        checked++;
+      } else {
+        assert.ok(
+          (['cleric', 'paladin', 'necromancer', 'bard'] as string[]).includes(classFor(id)),
+        );
+      }
+    }
+    assert.ok(checked > 100);
   });
 });
 

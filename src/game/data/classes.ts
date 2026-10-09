@@ -1,11 +1,23 @@
-// The hero class table (H1; H2 and H3 grow it to 12). Classes are purely cosmetic: a look (art),
+// The hero class table (H1 four, H2 four more; H3 grows it to 12). Classes are purely cosmetic: a look (art),
 // and the effects a hero plays while attacking. A row deliberately holds no combat or resource
 // number (Core invariant 1). docs/design/classes.md embeds a table generated from this file by
 // `npm run docs:tables`; this module is pure data so the generator can import it without art.
 import type { EffectId } from './effects';
 import { EFFECT_IDS } from './effects';
+import type { SummonId } from './summons';
+import { SUMMON_IDS } from './summons';
 
-export const CLASS_IDS = ['warrior', 'mage', 'archer', 'rogue'] as const;
+/** H1 order is kept (indexes 0 to 3); H2 appends four, H3 appends four more. */
+export const CLASS_IDS = [
+  'warrior',
+  'mage',
+  'archer',
+  'rogue',
+  'cleric',
+  'paladin',
+  'necromancer',
+  'bard',
+] as const;
 export type ClassId = (typeof CLASS_IDS)[number];
 export type ClassRole = 'melee' | 'ranged' | 'caster';
 
@@ -30,6 +42,17 @@ export interface ClassAbility {
   readonly shots: readonly EffectShot[];
 }
 
+/**
+ * A cosmetic ally a class raises with its ability (H2, ADR 0011). dx/dy are from the owner's foot
+ * pixel; dx is mirrored when the owner faces left, and a small positive dy sorts the summon in
+ * front of its owner. No number here can be a resource.
+ */
+export interface SummonDef {
+  readonly kind: SummonId;
+  readonly dx: number;
+  readonly dy: number;
+}
+
 export interface ClassDef {
   readonly id: ClassId;
   /** From the art style guide. */
@@ -42,6 +65,8 @@ export interface ClassDef {
   /** Spawned on the attack strike frame; empty for a pure melee swing. */
   readonly strike: readonly EffectShot[];
   readonly ability: ClassAbility;
+  /** The ally raised with the ability, or null (all classes but the Necromancer in H2). */
+  readonly summon: SummonDef | null;
 }
 
 export const CLASSES = [
@@ -57,6 +82,7 @@ export const CLASSES = [
       name: 'Whirlwind',
       shots: [{ effect: 'whirl', dx: 0, dy: -6, vx: 0, vy: 0, lifeMs: 460 }],
     },
+    summon: null,
   },
   {
     id: 'mage',
@@ -70,6 +96,7 @@ export const CLASSES = [
       name: 'Arcane Burst',
       shots: [{ effect: 'arcaneBurst', dx: 28, dy: -10, vx: 0, vy: 0, lifeMs: 420 }],
     },
+    summon: null,
   },
   {
     id: 'archer',
@@ -87,6 +114,7 @@ export const CLASSES = [
         { effect: 'arrow', dx: 12, dy: -6, vx: 180, vy: 10, lifeMs: 500 },
       ],
     },
+    summon: null,
   },
   {
     id: 'rogue',
@@ -104,6 +132,79 @@ export const CLASSES = [
         { effect: 'dagger', dx: 4, dy: -8, vx: 200, vy: 0, lifeMs: 400 },
       ],
     },
+    summon: null,
+  },
+  {
+    id: 'cleric',
+    name: 'Cleric',
+    role: 'melee',
+    colors: 'white + gold',
+    silhouette: 'rounded hood or mitre, soft glow pixel, mace',
+    strike: [],
+    // A picture of a blessing, centered on the caster. It targets and restores nothing.
+    ability: {
+      id: 'blessing',
+      name: 'Blessing',
+      shots: [
+        { effect: 'blessGlow', dx: 0, dy: -3, vx: 0, vy: 0, lifeMs: 600 },
+        { effect: 'buffSparkle', dx: -5, dy: -12, vx: 0, vy: -16, lifeMs: 640 },
+        { effect: 'buffSparkle', dx: 5, dy: -10, vx: 0, vy: -12, lifeMs: 640 },
+      ],
+    },
+    summon: null,
+  },
+  {
+    id: 'paladin',
+    name: 'Paladin',
+    role: 'melee',
+    colors: 'gold + white',
+    silhouette: 'winged helm, tall kite shield, glowing sword',
+    strike: [],
+    ability: {
+      id: 'radiantSmite',
+      name: 'Radiant Smite',
+      shots: [
+        { effect: 'holyBurst', dx: 16, dy: -10, vx: 0, vy: 0, lifeMs: 440 },
+        { effect: 'buffSparkle', dx: 4, dy: -14, vx: 0, vy: -14, lifeMs: 560 },
+      ],
+    },
+    summon: null,
+  },
+  {
+    id: 'necromancer',
+    name: 'Necromancer',
+    role: 'caster',
+    colors: 'dark purple + sickly green',
+    silhouette: 'hood, hunched, skull staff, skeleton beside it',
+    strike: [{ effect: 'soulWisp', dx: 12, dy: -12, vx: 130, vy: 0, lifeMs: 520 }],
+    ability: {
+      id: 'boneCall',
+      name: 'Bone Call',
+      shots: [
+        { effect: 'soulWisp', dx: 16, dy: -4, vx: 0, vy: -22, lifeMs: 560 },
+        { effect: 'soulWisp', dx: 20, dy: -4, vx: 0, vy: -14, lifeMs: 560 },
+      ],
+    },
+    // Decoration: no health, no target, no effect on any hero (ADR 0011).
+    summon: { kind: 'skeleton', dx: 18, dy: 1 },
+  },
+  {
+    id: 'bard',
+    name: 'Bard',
+    role: 'caster',
+    colors: 'teal + magenta',
+    silhouette: 'big feathered hat, lute',
+    strike: [{ effect: 'note', dx: 8, dy: -14, vx: 28, vy: -18, lifeMs: 700 }],
+    ability: {
+      id: 'chorus',
+      name: 'Chorus',
+      shots: [
+        { effect: 'note', dx: 6, dy: -16, vx: 24, vy: -26, lifeMs: 760 },
+        { effect: 'note', dx: 8, dy: -14, vx: 36, vy: -18, lifeMs: 760 },
+        { effect: 'note', dx: 10, dy: -12, vx: 48, vy: -10, lifeMs: 760 },
+      ],
+    },
+    summon: null,
   },
 ] as const satisfies readonly ClassDef[];
 
@@ -118,7 +219,7 @@ export function classDef(id: ClassId): ClassDef {
   return def;
 }
 
-const ROW_KEYS = 'ability,colors,id,name,role,silhouette,strike';
+const ROW_KEYS = 'ability,colors,id,name,role,silhouette,strike,summon';
 const SHOT_KEYS = 'dx,dy,effect,lifeMs,vx,vy';
 const MAX_SHOTS = 4;
 
@@ -147,6 +248,27 @@ function shotErrors(owner: string, shots: readonly EffectShot[]): string[] {
   return errors;
 }
 
+function summonErrors(owner: string, summon: SummonDef | null): string[] {
+  if (summon === null) {
+    return [];
+  }
+  if (summon === undefined || typeof summon !== 'object') {
+    // A row missing the key entirely (JS callers, hand-built rows) is a key-set error.
+    return [`${owner}: the summon has an unexpected key set`];
+  }
+  const errors: string[] = [];
+  if (Object.keys(summon).sort().join() !== 'dx,dy,kind') {
+    errors.push(`${owner}: the summon has an unexpected key set`);
+  }
+  if (!(SUMMON_IDS as readonly string[]).includes(summon.kind)) {
+    errors.push(`${owner}: the summon uses an unknown kind`);
+  }
+  if (!(Math.abs(summon.dx) <= 40 && Math.abs(summon.dy) <= 24)) {
+    errors.push(`${owner}: the summon offset is too far from the hero`);
+  }
+  return errors;
+}
+
 /** Pure check of a class table (tests only; not run at boot). Errors name ids, never content. */
 export function validateClasses(defs: readonly ClassDef[]): readonly string[] {
   const errors: string[] = [];
@@ -164,6 +286,7 @@ export function validateClasses(defs: readonly ClassDef[]): readonly string[] {
     }
     errors.push(...shotErrors(`${def.id}/strike`, def.strike));
     errors.push(...shotErrors(`${def.id}/ability`, def.ability.shots));
+    errors.push(...summonErrors(def.id, def.summon));
   }
   for (const id of CLASS_IDS) {
     if (!seen.has(id)) {

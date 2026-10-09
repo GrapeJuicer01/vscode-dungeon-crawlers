@@ -2,13 +2,14 @@
 // Owned by the pixel-artist. Sprites reference single characters; raw hex lives only in this file.
 // Rules and meanings: docs/design/art-style-guide.md section 3 and docs/design/sprite-spec.md.
 
-import type { ClassPaletteId } from './spriteTypes';
+import { CLASS_PALETTES_H2 } from './palettesH2';
+import type { ClassPaletteId, ClassPaletteIdH1 } from './spriteTypes';
 
 /** One character -> '#rrggbb'. '.' is transparent and is never a key. */
 export type Palette = Record<string, string>;
 
 /**
- * The master palette (33 colors). Groups:
+ * The master palette (35 colors). Groups:
  * - hero:      o outline, s skin, h hair, e eye, c cloth, d cloth shade, b pants, k boots/wood trim,
  *              m metal, w white highlight, a accent (class color; neutral sand in the base hero)
  * - fire:      Y yellow core, O orange, R red-orange, D dark ember
@@ -17,6 +18,7 @@ export type Palette = Record<string, string>;
  * - world:     n clear color (near-black), g ambient darkness tint
  * - light:     T torch light, F campfire light
  * - particle:  q water light, Q water mid
+ * - summon:    L glow green, N shade green (skeleton eye and rise/sink puff)
  */
 export const MASTER_PALETTE: Palette = {
   // hero
@@ -59,6 +61,9 @@ export const MASTER_PALETTE: Palette = {
   // water particles
   q: '#cfeaff',
   Q: '#8fc0ec',
+  // summon glow (appended in A2-1 for the skeleton's eye and rise/sink puff)
+  L: '#8fe03c',
+  N: '#3f9a3c',
 };
 
 /** Four skin tones, partial palettes overriding only `s`. Index 0 equals the master skin. */
@@ -116,7 +121,7 @@ export const PARTICLE_PALETTE: Readonly<
  * and hair. Red stays on small parts (Warrior plume, accents, shield), never the whole body.
  * No new master characters were needed, so the master stays at 33 colors (cap 48).
  */
-export const CLASS_PALETTES: Readonly<Record<ClassPaletteId, Palette>> = {
+export const CLASS_PALETTES_H1: Readonly<Record<ClassPaletteIdH1, Palette>> = {
   // red + steel: steel cloth, red accent (plume, trim, shield), dark brown leather
   warrior: {
     a: '#d83a3a',
@@ -153,4 +158,10 @@ export const CLASS_PALETTES: Readonly<Record<ClassPaletteId, Palette>> = {
     k: '#392a3c',
     m: '#c4cad8',
   },
+};
+
+/** All class palettes (H1 + H2, eight classes). */
+export const CLASS_PALETTES: Readonly<Record<ClassPaletteId, Palette>> = {
+  ...CLASS_PALETTES_H1,
+  ...CLASS_PALETTES_H2,
 };

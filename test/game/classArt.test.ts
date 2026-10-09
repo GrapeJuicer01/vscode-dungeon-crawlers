@@ -348,11 +348,11 @@ void describe('crafted validateClassArt faults', () => {
 
   void it('layers or a palette for an unknown class are reported', () => {
     const art = cloneArt();
-    art.classLayers['paladin'] = classLayers(art, 'mage');
-    art.classPalettes['paladin'] = {};
+    art.classLayers['druid'] = classLayers(art, 'mage');
+    art.classPalettes['druid'] = {};
     const errors = validateClassArt(art, ids, effects);
-    assert.ok(errors.includes('paladin: class layers for an unknown class'));
-    assert.ok(errors.includes('paladin: class palette for an unknown class'));
+    assert.ok(errors.includes('druid: class layers for an unknown class'));
+    assert.ok(errors.includes('druid: class palette for an unknown class'));
   });
 
   void it('a layer id that does not belong to the class is reported', () => {

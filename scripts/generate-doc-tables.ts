@@ -29,6 +29,11 @@ function shotsText(shots: readonly EffectShot[]): string {
     .join(', ');
 }
 
+/** "; summons a skeleton" for a class that raises a cosmetic ally (H2), else empty. */
+function summonText(def: ClassDef): string {
+  return def.summon === null ? '' : `; summons a ${def.summon.kind}`;
+}
+
 /** The generated region body (without the markers). Pure and deterministic. */
 export function renderClassTable(
   classes: readonly ClassDef[],
@@ -42,7 +47,7 @@ export function renderClassTable(
   ];
   for (const def of classes) {
     lines.push(
-      `| ${def.name} | ${def.role} | ${def.colors} | ${def.silhouette} | ${shotsText(def.strike)} | ${def.ability.name} (${shotsText(def.ability.shots)}) |`,
+      `| ${def.name} | ${def.role} | ${def.colors} | ${def.silhouette} | ${shotsText(def.strike)} | ${def.ability.name} (${shotsText(def.ability.shots)}${summonText(def)}) |`,
     );
   }
   return lines.join('\n');

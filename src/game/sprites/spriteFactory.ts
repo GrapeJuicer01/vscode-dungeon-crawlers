@@ -49,6 +49,8 @@ export interface ArtSet {
   readonly classPalettes: Readonly<Record<string, Palette>>;
   /** Effect id -> template (animation `idle`, centre anchor) (H1). */
   readonly effects: Readonly<Record<string, SpriteTemplate>>;
+  /** Summon id -> single non-layered template with idle, walk, attack, rise, sink (H2). */
+  readonly summons: Readonly<Record<string, SpriteTemplate>>;
 }
 
 /** Extents in pixels left of, right of, above, and below the anchor. */
@@ -197,6 +199,7 @@ export class SpriteCache {
   readonly #art: ArtSet;
   readonly #heroes = new Map<string, HeroSprites>();
   readonly #sheets = new Map<string, FrameSet>();
+  readonly #summons = new Map<string, HeroSprites>();
 
   constructor(bitmaps: BitmapFactory, art: ArtSet) {
     this.#bitmaps = bitmaps;
@@ -210,13 +213,42 @@ export class SpriteCache {
 
   /** The layers of a class, or null when the art set has none (the caller falls back to base). */
   classLayers(id: string): HeroLayerSet | null {
-    return this.#art.classLayers[id] ?? null;
+    return Object.hasOwn(this.#art.classLayers, id) ? (this.#art.classLayers[id] ?? null) : null;
   }
 
   /** The frames of a cosmetic effect, or null when the art set lacks it (the draw is skipped). */
   effect(id: string): FrameSet | null {
-    const template = this.#art.effects[id];
+    // Own keys only: '__proto__' and other inherited names must not resolve to a template.
+    const template = Object.hasOwn(this.#art.effects, id) ? this.#art.effects[id] : undefined;
     return template === undefined ? null : this.sheet(template);
+  }
+
+  /**
+   * Every animation of a summon template, rasterized with the master palette (no class palette,
+   * skin, or hair swap) and cached by template id. Null when the art set lacks it (H2).
+   */
+  summon(id: string): HeroSprites | null {
+    const template = Object.hasOwn(this.#art.summons, id) ? this.#art.summons[id] : undefined;
+    if (template === undefined) {
+      return null;
+    }
+    const hit = this.#summons.get(template.id);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const out: Record<string, FrameSet> = {};
+    for (const [name, animation] of Object.entries(template.animations)) {
+      const frames = animation.map((rows) =>
+        this.#bitmaps.fromRgba(
+          template.w,
+          template.h,
+          rasterizeFrame(rows, template.w, template.h, this.#art.palette),
+        ),
+      );
+      out[name] = { w: template.w, h: template.h, anchor: template.anchor, frames };
+    }
+    this.#summons.set(template.id, out);
+    return out;
   }
 
   /** Built lazily per look and layer set, then cached. */

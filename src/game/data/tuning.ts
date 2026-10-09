@@ -86,3 +86,11 @@ export const EFFECT_FRAME_MS = 90;
 export const EFFECT_CULL_MARGIN_PX = 32;
 /** Consecutive draw faults before the renderer disables the effect pass. */
 export const EFFECT_FAULT_LIMIT = 3;
+
+// ---- Summons (H2, ADR 0011) ----
+/** Live summons in total. Assumption: one per Necromancer-like hero slot; 8 matches the 8-hero target. */
+export const SUMMON_CAPACITY = 8;
+/** How long a summon lives past its owner's last renewal, in ms. Assumption: 250 ms (15 steps) rides over a frame hitch. */
+export const SUMMON_LEASE_MS = 250;
+/** Summon shadow width in px (a flat translucent bar drawn by the renderer). */
+export const SUMMON_SHADOW_WIDTH_PX = 8;

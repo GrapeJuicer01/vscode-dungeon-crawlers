@@ -337,6 +337,9 @@ export class Renderer {
     for (const hero of heroes) {
       buf.push(hero);
     }
+    for (const summon of world.summons.entities()) {
+      buf.push(summon);
+    }
     buf.push(world.campfire);
     for (const prop of world.stage.solidProps) {
       buf.push(prop);

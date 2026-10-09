@@ -1,11 +1,14 @@
-// Summon sprites (batch A2-3): cosmetic allies a class may call. Owned by the pixel-artist.
-// PROPOSAL, UNREVIEWED by the architect: the convention is described in docs/design/sprite-spec.md
-// section 9. A summon is one composite (non-layered) template, 16x20, anchor (8, 19), with the
-// animations idle 2, walk 4, attack 3, and spawn 3 (a pop-in; despawn plays it in reverse). No
-// hurt, death, or downed names exist: a summon is a cosmetic ally and only enemies have health.
-// Drawn with master characters: bone `m` (highlight `w`, shade `G`), a scarf `d`, and an eye glint
-// `a` (sand in the master palette; the engine may recolor `a d m` through the owner's class
-// palette, which turns them green, purple, and bone for the Necromancer). Dust `G P` for the pop.
+// Summon sprites (batch A2-1): cosmetic allies a class may call. Owned by the pixel-artist.
+// Convention (ratified, docs/architecture/plans/h2-classes.md section 3.5, docs/design/sprite-spec.md
+// section 9): one composite (non-layered) template, id `summons/<name>`, at most 24x24, at most 8
+// colours, master palette only (never class-swapped), anchor on the foot pixel, facing right, no
+// shadow (the engine draws it). Animations: idle 2, walk 4, attack 3, rise 4, sink 3 (rise and
+// sink play once). No hurt, death, or downed names exist: a summon is a cosmetic ally and only
+// enemies have health.
+// Skeleton, 16x20, anchor (8, 19). Colours (7): outline `o`, bone `m` with highlight `w` and shade
+// `G`, scarf `d`, and the green glow `L` (eye) with `N` (puff shade), both appended to the master.
+// `rise` climbs out of the floor in a small green puff; `sink` descends upright and thins into a
+// green puff. It never collapses, falls apart, flashes, or shows red.
 
 import { Grid } from './spriteBuilder';
 import type { SpriteTemplate, SummonSpriteId } from './spriteTypes';
@@ -17,7 +20,7 @@ const SKULL = [
   '.mmmmmmm.',
   'mmwmmmmmm',
   'mmmmooomm',
-  'mmmmoaomm',
+  'mmmmoLomm',
   'mmmmmmmmm',
   '.mmGmGmm.',
   '..mmmmm..',
@@ -91,47 +94,83 @@ const POSES: Readonly<Record<'idle' | 'walk' | 'attack', readonly Pose[]>> = {
   ],
 };
 
-/** Rises from the ground: the standing skeleton sunk by `sink` rows, clipped at the ground line. */
-function spawnFrame(sink: number, dust: readonly (readonly [number, number, string])[]): string[] {
+/**
+ * The standing skeleton sunk into the floor by `sink` rows (clipped at the ground line, upright),
+ * with a green puff. Used for both `rise` (sinking amount shrinks) and `sink` (grows).
+ */
+function floorFrame(sink: number, puff: readonly (readonly [number, number, string])[]): string[] {
   const full = skeleton(POSES.idle[0] as Pose);
   const g = new Grid(W, H);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const ch = full.get(x, y);
       const ty = y + sink;
-      if (ch !== '.' && ty <= 18) g.set(x, ty, ch === 'o' && ty === 18 ? 'o' : ch);
+      if (ch !== '.' && ty <= 18) g.set(x, ty, ch);
     }
   }
   if (sink > 0) {
     // close the clipped body with an outline row at the ground line
     for (let x = 0; x < W; x++) if (g.get(x, 18) !== '.' && g.get(x, 18) !== 'o') g.set(x, 19, 'o');
   }
-  g.plot(dust);
+  for (const [x, y, ch] of puff) if (g.get(x, y) === '.') g.set(x, y, ch);
   return g.rows();
 }
 
-const DUST_MOUND: readonly (readonly [number, number, string])[] = [
-  [3, 18, 'P'],
-  [4, 17, 'G'],
-  [5, 18, 'G'],
-  [6, 17, 'G'],
-  [9, 18, 'G'],
-  [10, 17, 'G'],
-  [11, 18, 'P'],
-  [12, 18, 'G'],
+type Puff = readonly (readonly [number, number, string])[];
+const PUFF_LOW: Puff = [
+  [3, 18, 'N'],
+  [4, 17, 'L'],
+  [5, 18, 'L'],
+  [6, 17, 'N'],
+  [9, 18, 'N'],
+  [10, 17, 'L'],
+  [11, 18, 'L'],
+  [12, 18, 'N'],
 ];
-const DUST_WIDE: readonly (readonly [number, number, string])[] = [
-  [2, 18, 'G'],
-  [3, 17, 'P'],
-  [12, 17, 'P'],
-  [13, 18, 'G'],
-  [1, 16, 'G'],
-  [14, 16, 'G'],
+const PUFF_WIDE: Puff = [
+  [2, 18, 'N'],
+  [3, 17, 'L'],
+  [12, 17, 'L'],
+  [13, 18, 'N'],
+  [1, 16, 'N'],
+  [14, 16, 'N'],
+  [4, 16, 'L'],
+  [11, 16, 'L'],
 ];
-const DUST_SPECK: readonly (readonly [number, number, string])[] = [
-  [2, 18, 'G'],
-  [13, 18, 'G'],
-  [14, 16, 'P'],
+const PUFF_RISE_3: Puff = [
+  [2, 18, 'N'],
+  [13, 18, 'N'],
+  [14, 16, 'L'],
+  [1, 17, 'L'],
+];
+const PUFF_SINK_1: Puff = [
+  [2, 18, 'N'],
+  [3, 17, 'L'],
+  [12, 17, 'L'],
+  [13, 18, 'N'],
+];
+const PUFF_SINK_2: Puff = [
+  [2, 18, 'N'],
+  [3, 17, 'L'],
+  [4, 16, 'N'],
+  [11, 16, 'N'],
+  [12, 17, 'L'],
+  [13, 18, 'N'],
+  [5, 18, 'L'],
+  [10, 18, 'L'],
+];
+const PUFF_SINK_3: Puff = [
+  [3, 18, 'N'],
+  [4, 17, 'L'],
+  [6, 18, 'N'],
+  [8, 17, 'L'],
+  [10, 18, 'N'],
+  [11, 17, 'L'],
+  [5, 15, 'N'],
+  [9, 15, 'N'],
+  [7, 13, 'L'],
+  [12, 15, 'L'],
+  [2, 16, 'L'],
 ];
 
 function build(): SpriteTemplate {
@@ -145,7 +184,13 @@ function build(): SpriteTemplate {
       idle: anim(POSES.idle),
       walk: anim(POSES.walk),
       attack: anim(POSES.attack),
-      spawn: [spawnFrame(10, DUST_MOUND), spawnFrame(5, DUST_WIDE), spawnFrame(0, DUST_SPECK)],
+      rise: [
+        floorFrame(13, PUFF_LOW),
+        floorFrame(9, PUFF_WIDE),
+        floorFrame(4, PUFF_WIDE),
+        floorFrame(0, PUFF_RISE_3),
+      ],
+      sink: [floorFrame(4, PUFF_SINK_1), floorFrame(9, PUFF_SINK_2), floorFrame(15, PUFF_SINK_3)],
     },
   };
 }

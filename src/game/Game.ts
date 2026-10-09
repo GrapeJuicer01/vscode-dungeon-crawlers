@@ -16,6 +16,7 @@ import type { StageDef } from './data/stages';
 import {
   EVENT_QUEUE_CAP,
   EFFECT_CAPACITY,
+  SUMMON_CAPACITY,
   MAX_FRAME_MS,
   MAX_STEPS_PER_FRAME,
   PARTICLE_CAPACITY,
@@ -25,6 +26,7 @@ import { Particles } from './Particles';
 import type { BitmapFactory, ErrorSink, Surface } from './ports';
 import { Renderer } from './Renderer';
 import { Roster } from './Roster';
+import { SummonPool } from './Summons';
 import { mulberry32 } from './rng';
 import { buildStage, validateStages } from './Stage';
 import { SpriteCache } from './sprites/spriteFactory';
@@ -112,6 +114,7 @@ export class Game implements AgentEventSink {
       campfire,
       particles: new Particles(PARTICLE_CAPACITY, rng),
       effects: new EffectPool(EFFECT_CAPACITY),
+      summons: new SummonPool(SUMMON_CAPACITY),
       engagement: new TimedEngagement(),
       rng,
       cache,
@@ -192,6 +195,7 @@ export class Game implements AgentEventSink {
       this.#ambience.update(STEP_MS, world, this.#camera);
       world.particles.update(STEP_MS);
       this.#updateEffects(world);
+      this.#updateSummons(world);
       this.#renderer.advanceClock(STEP_MS);
     } catch (error: unknown) {
       this.#sink(error, 'step');
@@ -234,6 +238,7 @@ export class Game implements AgentEventSink {
     this.#resync = false;
     this.#world.particles.clear();
     this.#world.effects.clear();
+    this.#world.summons.clear();
   }
 
   /** Effects get their own guard: a fault here must not stop heroes, the campfire, or the loop. */
@@ -243,6 +248,16 @@ export class Game implements AgentEventSink {
     } catch (error: unknown) {
       this.#sink(error, 'update');
       world.effects.clear();
+    }
+  }
+
+  /** Summons get their own guard too; a fault clears the pool and never touches a hero. */
+  #updateSummons(world: World): void {
+    try {
+      world.summons.update(STEP_MS, world);
+    } catch (error: unknown) {
+      this.#sink(error, 'update');
+      world.summons.clear();
     }
   }
 

@@ -1,7 +1,6 @@
 // Class layers for H2 (batch A2-1 Cleric and Paladin, A2-2 Necromancer and Bard).
-// Owned by the pixel-artist. New file so the committed H1 classTemplates.ts stays clean: the small
-// layer-building helpers below mirror the ones in classTemplates.ts on purpose (they are private
-// there). When H1 lands, a dedupe pass can export them and delete the copies. Every class reuses
+// Owned by the pixel-artist. The shared layer-building helpers (`layerSet`, `piece`, `ROW`, the
+// pose and context types) are exported from classTemplates.ts and reused here. Every class reuses
 // the shared base body (`hero/body`, recolored by its class palette) and supplies `head`, `gear`,
 // and `weapon` rendered from the same poses as the base hero (HERO_POSES), so all eleven
 // animations and all 26 frames line up with the body.
@@ -19,106 +18,9 @@
 // Paladin, so a composited look is at most 12 colors. No hurt, downed, or dying frames exist; sleep
 // is a closed-eye line and a small "z" (Core invariant 1). Format: docs/design/sprite-spec.md.
 
-import { Grid, type Px } from './spriteBuilder';
-import { BASE_HERO, HERO_HEAD, HERO_POSES, type HeroPose } from './heroTemplates';
-import type { HeroLayerSet, SpriteTemplate } from './spriteTypes';
-
-const W = 16;
-const H = 20;
-const WEAPON_W = 24;
-const ANCHOR = { x: 8, y: 19 } as const;
-
-type Role = 'up' | 'fwd' | 'low' | 'angle' | 'lap';
-
-interface Ctx {
-  readonly anim: string;
-  readonly frame: number;
-  readonly role: Role | null;
-  readonly hx: number;
-  readonly hy: number;
-  readonly tx: number;
-  readonly ty: number;
-  readonly pose: HeroPose;
-}
-
-interface ClassSpec {
-  readonly id: string;
-  /** Head shift in pixels (lowered for tall hats, leaned for a hunch). */
-  readonly shift: { readonly dx: number; readonly dy: number };
-  /** Draws head gear over the base head (HERO_HEAD already blitted at x, y). Pre-outline. */
-  readonly head: (g: Grid, x: number, y: number) => void;
-  readonly gear: (g: Grid, under: Grid, c: Ctx) => void;
-  readonly weapon: (g: Grid, under: Grid, c: Ctx) => void;
-  /** Polish pose: the item across the lap (pre-outline); the rag overlay is added by the caller. */
-  readonly lap: (g: Grid) => void;
-}
-
-// ---- Helpers (mirrors of the private ones in classTemplates.ts) ----
-
-function roleOf(anim: string, frame: number): Role | null {
-  switch (anim) {
-    case 'idle':
-    case 'walk':
-    case 'victory':
-      return 'up';
-    case 'attack':
-      return (['up', 'fwd', 'low'] as const)[frame] ?? 'up';
-    case 'ability':
-      return (['up', 'fwd', 'angle'] as const)[frame] ?? 'up';
-    case 'polish':
-      return 'lap';
-    default:
-      return null;
-  }
-}
-
-function handOf(p: HeroPose): { x: number; y: number } {
-  let x = 99;
-  let y = 99;
-  for (const [px, py, ch] of p.arm ?? []) {
-    if (ch !== 's') continue;
-    if (py < y || (py === y && px < x)) {
-      x = px;
-      y = py;
-    }
-  }
-  return { x: x === 99 ? 13 : x, y: y === 99 ? 12 : y };
-}
-
-/**
- * Draws a piece into `target` with a 1px outline. `ring` 'all' keeps the outline over the body;
- * 'outside' keeps it only where nothing is underneath. Outline never covers skin or the eye.
- */
-function piece(target: Grid, under: Grid, ring: 'all' | 'outside', draw: (s: Grid) => void): void {
-  const s = new Grid(target.w, target.h);
-  draw(s);
-  const filled = s.rows();
-  s.outline('o');
-  for (let y = 0; y < s.h; y++) {
-    for (let x = 0; x < s.w; x++) {
-      const ch = s.get(x, y);
-      if (ch === '.') continue;
-      if (filled[y]?.charAt(x) === '.') {
-        const u = under.get(x, y);
-        if (ring === 'outside' && u !== '.') continue;
-        if (u === 's' || u === 'e') continue;
-      }
-      target.set(x, y, ch);
-    }
-  }
-}
-
-const ROW = (g: Grid, x0: number, x1: number, y: number, ch: string): void =>
-  g.rect(x0, y, x1 - x0 + 1, 1, ch);
-
-function ragOverlay(g: Grid, rx: number): void {
-  const s = new Grid(g.w, g.h);
-  s.line(10, 13, rx + 1, 11, 'd');
-  s.rect(rx, 11, 2, 2, 's');
-  s.rect(rx, 13, 3, 4, 'w');
-  s.outline('o');
-  g.blit(s.rows(), 0, 0);
-}
+import type { Grid } from './spriteBuilder';
+import { ROW, layerSet, piece, type ClassSpec, type Ctx } from './classTemplates';
+import type { HeroLayerSet } from './spriteTypes';
 
 /** Robe skirt over the legs (boots stay visible), shared by the robed classes. */
 function skirt(s: Grid, c: Ctx, body: string, hem: string, ragged: boolean): void {
@@ -499,98 +401,7 @@ const BARD: ClassSpec = {
   },
 };
 
-// ---- Rendering ----
-
-function renderHead(spec: ClassSpec, p: HeroPose): string[] {
-  const x = p.head.x + spec.shift.dx;
-  const y = p.head.y + spec.shift.dy;
-  const g = new Grid(W, H);
-  g.blit(HERO_HEAD, x, y);
-  spec.head(g, x, y);
-  g.outline('o');
-  const ex = x + 6;
-  const ey = y + 3;
-  if (p.head.closed) {
-    g.set(ex, ey, 'o');
-    g.set(ex + 1, ey, 'o');
-  } else {
-    g.set(ex, ey, 'e');
-  }
-  if (p.deco) {
-    const shifted: Px[] = p.deco.map(([dx, dy, ch]) => [
-      dx + spec.shift.dx,
-      dy + spec.shift.dy,
-      ch,
-    ]);
-    g.plot(shifted);
-  }
-  return g.rows();
-}
-
-function layerSet(spec: ClassSpec): HeroLayerSet {
-  const head: Record<string, string[][]> = {};
-  const gear: Record<string, string[][]> = {};
-  const weapon: Record<string, string[][]> = {};
-  for (const [anim, poses] of Object.entries(HERO_POSES)) {
-    const headFrames: string[][] = [];
-    const gearFrames: string[][] = [];
-    const weaponFrames: string[][] = [];
-    head[anim] = headFrames;
-    gear[anim] = gearFrames;
-    weapon[anim] = weaponFrames;
-    poses.forEach((p, frame) => {
-      const bodyRows = BASE_HERO.body.animations[anim]?.[frame] ?? [];
-      const headRows = renderHead(spec, p);
-      const under = new Grid(W, H);
-      under.blit(bodyRows, 0, 0);
-      under.blit(headRows, 0, 0);
-      const hand = handOf(p);
-      const ctx: Ctx = {
-        anim,
-        frame,
-        role: roleOf(anim, frame),
-        hx: hand.x,
-        hy: hand.y,
-        tx: p.torso.x,
-        ty: p.torso.y,
-        pose: p,
-      };
-      const gearG = new Grid(W, H);
-      spec.gear(gearG, under, ctx);
-      under.blit(gearG.rows(), 0, 0);
-      const weaponG = new Grid(WEAPON_W, H);
-      if (ctx.role === 'lap') {
-        spec.lap(weaponG);
-        weaponG.outline('o');
-        ragOverlay(weaponG, frame === 0 ? 16 : 19);
-      } else if (ctx.role !== null) {
-        spec.weapon(weaponG, under, ctx);
-      }
-      headFrames.push(headRows);
-      gearFrames.push(gearG.rows());
-      weaponFrames.push(weaponG.rows());
-    });
-  }
-  const mk = (
-    suffix: string,
-    w: number,
-    animations: Record<string, string[][]>,
-  ): SpriteTemplate => ({
-    id: `${spec.id}/${suffix}`,
-    w,
-    h: H,
-    anchor: { x: ANCHOR.x, y: ANCHOR.y },
-    animations,
-  });
-  return {
-    body: BASE_HERO.body,
-    head: mk('head', W, head),
-    gear: mk('gear', W, gear),
-    weapon: mk('weapon', WEAPON_W, weapon),
-  };
-}
-
-/** Class id -> layers for batch H2. Merge with `CLASS_LAYERS` when wiring. */
+/** Class id -> layers for batch H2 (rendered by the shared `layerSet` in classTemplates.ts). */
 export const CLASS_LAYERS_H2: Readonly<Record<string, HeroLayerSet>> = {
   cleric: layerSet(CLERIC),
   paladin: layerSet(PALADIN),

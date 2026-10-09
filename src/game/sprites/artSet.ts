@@ -18,6 +18,7 @@ import {
   CLASS_LAYERS,
   EFFECT_SPRITES,
   STAGE_SPRITES,
+  SUMMON_SPRITES,
 } from './spriteTemplates';
 
 export const SHIPPED_ART: ArtSet = {
@@ -35,4 +36,5 @@ export const SHIPPED_ART: ArtSet = {
   classLayers: CLASS_LAYERS,
   classPalettes: CLASS_PALETTES,
   effects: EFFECT_SPRITES,
+  summons: SUMMON_SPRITES,
 };

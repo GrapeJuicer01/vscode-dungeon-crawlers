@@ -10,12 +10,14 @@ import {
   ENGINE_SEED,
   PARTICLE_CAPACITY,
   STEP_MS,
+  SUMMON_CAPACITY,
 } from '../../src/game/data/tuning';
 import { EffectPool } from '../../src/game/Effects';
 import { Campfire } from '../../src/game/entities/Campfire';
 import type { World } from '../../src/game/entities/Entity';
 import type { Engagement } from '../../src/game/Engagement';
 import { Particles } from '../../src/game/Particles';
+import { SummonPool } from '../../src/game/Summons';
 import { mulberry32 } from '../../src/game/rng';
 import { lookFor } from '../../src/game/Roster';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
@@ -56,6 +58,7 @@ export interface ClassWorld {
   readonly engagement: ManualEngagement;
   readonly effects: EffectPool;
   readonly particles: Particles;
+  readonly summons: SummonPool;
   /** Every EffectPool.spawn call on this world, in order. */
   readonly spawns: SpawnRecord[];
 }
@@ -87,6 +90,7 @@ export function makeWorld(art: ArtSet = SHIPPED_ART, seed: number = ENGINE_SEED)
   });
   const particles = new Particles(PARTICLE_CAPACITY, rng);
   const effects = new EffectPool(EFFECT_CAPACITY);
+  const summons = new SummonPool(SUMMON_CAPACITY);
   const spawns: SpawnRecord[] = [];
   const original = effects.spawn.bind(effects);
   effects.spawn = (effect, x, y, vx, vy, lifeMs, flipX): boolean => {
@@ -100,16 +104,18 @@ export function makeWorld(art: ArtSet = SHIPPED_ART, seed: number = ENGINE_SEED)
     campfire,
     particles,
     effects,
+    summons,
     engagement,
     rng,
     cache,
   };
-  return { world, bitmaps, engagement, effects, particles, spawns };
+  return { world, bitmaps, engagement, effects, particles, summons, spawns };
 }
 
 /** One 60 Hz step of the pieces a hero test needs besides the hero itself. */
 export function stepWorld(w: ClassWorld): void {
   w.effects.update(STEP_MS, w.particles);
+  w.summons.update(STEP_MS, w.world);
   w.particles.update(STEP_MS);
 }
 
@@ -129,12 +135,12 @@ export function idsOfClass(classId: ClassId, count: number, prefix = 'c-'): stri
   return out;
 }
 
-/** `n` ids whose classes cycle warrior, mage, archer, rogue, so every class appears once n >= 4. */
+/** `n` ids whose classes cycle through all eight classes, so every class appears once n >= 8. */
 export function mixedIds(n: number, prefix = 'm-'): string[] {
   const perClass = CLASS_IDS.map((c) => idsOfClass(c, Math.ceil(n / CLASS_IDS.length), prefix));
   return Array.from(
     { length: n },
-    (_, i) => perClass[i % CLASS_IDS.length]?.[Math.floor(i / 4)] ?? '',
+    (_, i) => perClass[i % CLASS_IDS.length]?.[Math.floor(i / CLASS_IDS.length)] ?? '',
   );
 }
 

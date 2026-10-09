@@ -48,6 +48,35 @@ export const STAGE_PALETTES: Readonly<Record<string, Palette>> = {
     g: '#6a5a92', // ambient tint, dusty violet
     T: '#8fe8d8', // candle light
   },
+  // Enchanted Forest Ruins (batch E3): moss green over ruin gray, glowing blue flora. The stone
+  // stays darker and less saturated than the stage's enemies (moss and bright accents).
+  'enchanted-forest-ruins': {
+    '1': '#0b1511', // deepest shadow
+    '2': '#222f29', // dark ruin stone
+    '3': '#3b4f43', // mid stone
+    '4': '#62786a', // lit stone
+    '5': '#5fa24a', // moss green
+    '6': '#7fe4ff', // glowing blue flora
+    '7': '#e6f3dc', // pale highlight
+    '8': '#3f8cff', // deep blue bloom
+    g: '#3f7468', // ambient tint, dark blue-green
+    T: '#7fd0ff', // soft blue bloom light
+  },
+  // Molten Core (batch E3): basalt black and charcoal, rust iron, orange glow, hot yellow-white.
+  // The ambient tint is a dark neutral warm gray-brown (red at most 1.3 times the larger of green
+  // and blue); the glow reads through lights and bright art, never a red wash over a hero.
+  'molten-core': {
+    '1': '#0e0a0c', // basalt black
+    '2': '#241d22', // dark charcoal
+    '3': '#3a3238', // mid charcoal
+    '4': '#5d5059', // lit basalt
+    '5': '#a8643c', // rust iron
+    '6': '#ff7a1c', // glowing orange
+    '7': '#ffe49a', // hot yellow-white
+    '8': '#7a2a1c', // deep red-brown
+    g: '#6b6058', // ambient tint, gray-brown
+    T: '#ffa040', // warm orange light
+  },
 };
 
 /**

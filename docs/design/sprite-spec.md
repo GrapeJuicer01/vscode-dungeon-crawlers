@@ -182,3 +182,29 @@ Delivered in steps A-E2-1 to A-E2-6 ([E2 plan section 11](../architecture/plans/
 | `BOSS_PHASE_PALETTES_E2` | `palettesE2.ts` | phase 2 palettes for `ooze-queen` and `tomb-lich` (four overrides each); merged into `ENEMY_PHASE_PALETTES` by `enemyTemplates.ts` |
 
 Notes: stage props follow the same rules as Stages 1 and 2 (characters `1`-`8` only, at most 8 colors, `idle` only). Light props: `glowShroom` 2 frames (a slow pulse, no flicker) and `candelabra` 4 frames; the developer adds both to `FLAME_PROPS` (`glowShroom: 2`, `candelabra: 4`) and the required-prop lists. Solid alcove props are `toxicBarrel` and `sarcophagus` (foot anchor `(8, 14)`, drawn at foot y 134). Do not name a prop `puddle`. The preview tool accepts `SPRITE_ENTRY=<file.ts>` to preview art that is not wired yet.
+
+## 12. Batch E3 art (Stages 5 and 6)
+
+Delivered in steps A-E3-0 to A-E3-6 ([E3 plan section 11](../architecture/plans/e3-stages-5-6.md#11-art-needs-batch-e3)). Atomic wiring as in E2: the new files exist on their own until the final step edits the barrels (`enemyTemplates.ts`, `spriteTemplates.ts`).
+
+| Export | File | Content |
+|---|---|---|
+| `STAGE_PALETTES['enchanted-forest-ruins']`, `['molten-core']` | `palettesE1.ts` | overrides of `1`-`8`, `g`, `T` only |
+| `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR` entries for both ids | `palettes.ts` | `12345678`, `n`, `g` |
+| `PARTICLE_PALETTE.firefly` | `palettes.ts` | `['Y', 'N', 'L', 'N', 'Y']`; the type is widened to eight kinds |
+| `ENCHANTED_FOREST_RUINS` | `stage5Templates.ts` | `StageSprites`; props `brokenPillar hangingRoots glowBloom(2) ruinedStatue fernPatch flowerBed doorFrame`, ids `enchanted-forest-ruins/<name>` |
+| `MOLTEN_CORE` | `stage6Templates.ts` | `StageSprites`; props `obsidianPillar lavaFall(4) lavaChannel(2) anvil slagHeap toolRack doorFrame`, ids `molten-core/<name>` |
+| `ENEMIES_STAGE5` | `enemiesStage5.ts` | `thorn-sprout moss-wolf bramble-pixie ancient-treant` |
+| `ENEMIES_STAGE6` | `enemiesStage6.ts` | `ember-imp slag-snail magma-crab furnace-guard` |
+| `ELDER_DRYAD`, `MOLTEN_COLOSSUS` | `elderDryadTemplate.ts`, `moltenColossusTemplate.ts` | boss templates (11 frames each) |
+| `BOSS_PHASE_PALETTES_E3` | `palettesE3.ts` | phase 2 palettes for `elder-dryad` and `molten-colossus` (four overrides each); merged into `ENEMY_PHASE_PALETTES` by `enemyTemplates.ts` |
+| `fromFill`, `shiftRows`, `lift`, `squash`, `stretch`, `patch`, `recolorRows`, `checked` | `enemyFrames.ts` | row-level frame helpers (pure, run at module load); `fromFill` draws a fill-only picture and adds the outline |
+
+Notes:
+
+- Stage props follow the same rules as Stages 1 to 4 (characters `1`-`8` only, at most 8 colors, `idle` only). Light props: `glowBloom` 2 frames (a slow pulse), `lavaFall` 4 frames (a slow flow), `lavaChannel` 2 frames (a shimmer); the developer adds them to `FLAME_PROPS` (`glowBloom: 2`, `lavaFall: 4`, `lavaChannel: 2`) with the required-prop lists, and their lights use `flicker: false`. Solid alcove props are `ruinedStatue` and `anvil` (foot anchor `(8, 14)`, drawn at foot y 134). No prop is named `puddle` or `lava...` on the floor layer; lava (`6`, `7`) appears only in wall props, wall tiles, and the backdrop.
+- Hand-drawn enemies: the base frame is a fill-only picture (`fromFill` adds the outline), and the other frames are derived with the helpers; the helper `patch` treats `.` as "leave" and `,` as "clear".
+- The new enemies are checked against the look-alike policy before wiring: `node test/support/lookAlikesReport.mjs src/game/sprites/enemiesStage5.ts:ENEMIES_STAGE5:5` (and the same for the other files), see the art style guide.
+- Two enemies are drawn off their frame center to clear an older silhouette (`furnace-guard` about four pixels left, `wailing-ghost` two pixels right); the anchor is unchanged. `bramble-pixie` hovers: its lowest pixels are three rows above the bottom outline row.
+- A-E3-0 reworked six shipped E2 templates in place (`green-slime`, `spore-shroom`, `toxic-toad`, `jelly-cube`, `ooze-queen`, `wailing-ghost`) with the same ids, sizes, anchors, and animation sets, so no data change follows.
+- The preview tool knows the new stage ids (`node tools/sprite-preview.mjs enemies enchanted-forest-ruins out.png`); `SPRITE_ENTRY=<file.ts>` previews unwired art.

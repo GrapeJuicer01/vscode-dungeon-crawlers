@@ -411,6 +411,35 @@ void describe('Progression (stage progress by cumulative work)', () => {
     assert.equal(one.stageIndex, 1);
   });
 
+  void it('with the shipped six stages: Stages 1 to 5 advance with no cycle, the Stage 6 boss wraps to Stage 1 with cycle + 1', () => {
+    const p = new Progression(STAGES.length);
+    assert.equal(STAGES.length, 6);
+    for (let stage = 1; stage <= 5; stage++) {
+      assert.equal(p.stageIndex, stage);
+      p.onBossDefeated();
+      assert.equal(p.cycle, 0, `after the Stage ${stage} boss`);
+    }
+    assert.equal(p.stageIndex, 6);
+    p.onBossDefeated();
+    assert.equal(p.stageIndex, 1);
+    assert.equal(p.cycle, 1);
+    assert.equal(p.snapshot().bossesDefeated, 6);
+  });
+
+  void it('with six stages a stored stageIndex 7 to 12 wraps by ((i - 1) % 6) + 1 and the counters are kept', () => {
+    const p = new Progression(6);
+    for (let i = 7; i <= 12; i++) {
+      p.load(
+        stored({ stageIndex: i, killsInStage: 3, totalKills: 40, bossesDefeated: 2, cycle: 1 }),
+      );
+      assert.equal(p.stageIndex, ((i - 1) % 6) + 1, `stored ${i}`);
+      assert.deepEqual(
+        [p.snapshot().killsInStage, p.snapshot().totalKills, p.snapshot().bossesDefeated, p.cycle],
+        [3, 40, 2, 1],
+      );
+    }
+  });
+
   void it('load keeps the counters and wraps a stageIndex above the delivered count instead of failing', () => {
     const p = new Progression(2);
     p.load(stored({ stageIndex: 2, killsInStage: 7, totalKills: 70, bossesDefeated: 1, cycle: 3 }));
@@ -575,16 +604,20 @@ void describe('StageDirector (the dark fade swap)', () => {
     d.show(4);
     assert.equal(d.runtime.def.id, 'ancient-catacombs');
     d.show(5);
-    assert.equal(d.runtime.def.id, 'forgotten-cellar', 'index 5 wraps to Stage 1 of 4');
+    assert.equal(d.runtime.def.id, 'enchanted-forest-ruins');
     d.show(6);
+    assert.equal(d.runtime.def.id, 'molten-core');
+    d.show(7);
+    assert.equal(d.runtime.def.id, 'forgotten-cellar', 'index 7 wraps to Stage 1 of 6');
+    d.show(8);
     assert.equal(d.runtime.def.id, 'goblin-mine-shafts');
     d.show(0);
-    assert.equal(d.runtime.def.id, 'ancient-catacombs', 'index 0 wraps to the last stage');
+    assert.equal(d.runtime.def.id, 'molten-core', 'index 0 wraps to the last stage');
   });
 
-  void it('walks Stage 1 to 4 by fades and then wraps to Stage 1 by a fade (E2)', () => {
+  void it('walks Stage 1 to 6 by fades and then wraps to Stage 1 by a fade (E3)', () => {
     const { d, swaps } = director();
-    for (const next of [2, 3, 4, 1]) {
+    for (const next of [2, 3, 4, 5, 6, 1]) {
       d.begin(next);
       for (let t = 0; t < 2 * STAGE_FADE_MS + 40; t += STEP_MS) d.update(STEP_MS);
       assert.equal(d.transitioning, false);
@@ -593,6 +626,8 @@ void describe('StageDirector (the dark fade swap)', () => {
       'goblin-mine-shafts',
       'toxic-slime-caverns',
       'ancient-catacombs',
+      'enchanted-forest-ruins',
+      'molten-core',
       'forgotten-cellar',
     ]);
   });
@@ -618,9 +653,8 @@ void describe('StageDirector (the dark fade swap)', () => {
   void it('the director is handed no hero: its constructor takes builders and stages only', () => {
     assert.equal(StageDirector.length >= 2, true);
     assert.ok(
-      STAGES.length === 4 &&
-        SHIPPED_ART.stageSprites['toxic-slime-caverns'] !== undefined &&
-        SHIPPED_ART.stageSprites['ancient-catacombs'] !== undefined,
+      STAGES.length === 6 &&
+        STAGES.every((stage) => SHIPPED_ART.stageSprites[stage.id] !== undefined),
     );
   });
 });

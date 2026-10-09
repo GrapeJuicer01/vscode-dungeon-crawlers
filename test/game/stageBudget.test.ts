@@ -32,7 +32,16 @@ import type { GameRig } from '../support/engineFakes';
 
 const MAX_BITMAPS = 200;
 const MAX_FILLS = 520;
-const KINDS: ParticleKind[] = ['ember', 'spark', 'drip', 'splash', 'mote', 'bubble', 'wisp'];
+const KINDS: ParticleKind[] = [
+  'ember',
+  'spark',
+  'drip',
+  'splash',
+  'mote',
+  'bubble',
+  'wisp',
+  'firefly',
+];
 
 function worstFrame(stage: number): { bitmaps: number; fills: number } {
   const w = makeWorld(SHIPPED_ART, undefined, stage);
@@ -175,6 +184,41 @@ void describe('the ambients reach the screen through the renderer colour map', (
       const fills = colorsOfSize(stage, 6, 2);
       for (const c of fills) assert.ok(!css('wisp').includes(c), `stage ${stage}: ${c}`);
     }
+  });
+});
+
+void describe('the E3 ambients reach the screen through the renderer colour map', () => {
+  const lime = SHIPPED_ART.palette[SHIPPED_ART.particlePalette.firefly[2]!];
+
+  /** Whether any 1x1 fillRect of the colour is drawn in 12 simulated seconds. */
+  function draws1x1(stage: number, color: string | undefined): boolean {
+    const rig = gameRig({ record: true });
+    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: stage });
+    rig.game.applyConfig({ enemiesEnabled: false, killsPerStage: 5, maxEnemies: 6 });
+    feed(rig, agent('solo', 'working'));
+    for (let i = 0; i < 60 * 12; i++) {
+      rig.surface.reset();
+      rig.game.frame(STEP_MS, rig.surface);
+      for (const c of rig.surface.calls) {
+        if (c.method === 'fillRect' && c.args[3] === 1 && c.args[4] === 1 && c.args[0] === color) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  void it('Stage 5 draws 1x1 rects in the firefly ramp (lime step); no other stage does', () => {
+    assert.ok(lime !== undefined);
+    assert.equal(draws1x1(5, lime), true, 'fireflies were drawn');
+    for (const stage of [1, 2, 3, 4, 6])
+      assert.equal(draws1x1(stage, lime), false, `stage ${stage}`);
+  });
+
+  void it('Stage 6 draws 1x1 rects in the ember ramp (dark red step) and no firefly colour', () => {
+    const ember = SHIPPED_ART.palette[SHIPPED_ART.particlePalette.ember[3]!];
+    assert.equal(draws1x1(6, ember), true, 'embers were drawn');
+    assert.equal(draws1x1(6, lime), false);
   });
 });
 

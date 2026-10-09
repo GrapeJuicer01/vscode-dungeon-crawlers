@@ -11,6 +11,12 @@ import type { AmbientEffect } from '../../src/game/data/stages';
 import {
   BUBBLE_MAX_Y,
   BUBBLE_MIN_Y,
+  FIREFLY_DRIFT,
+  FIREFLY_LIFE_MIN_MS,
+  FIREFLY_MAX_Y,
+  FIREFLY_MIN_Y,
+  STAGE_EMBER_MAX_Y,
+  STAGE_EMBER_MIN_Y,
   FOG_MAX_Y,
   FOG_MIN_Y,
   MOTE_MAX_Y,
@@ -23,6 +29,7 @@ import { CORRIDOR_X, INTERNAL_WIDTH } from '../../src/game/layout';
 import { Particles } from '../../src/game/Particles';
 import type { ParticleColors } from '../../src/game/Particles';
 import { mulberry32 } from '../../src/game/rng';
+import { PARTICLE_PALETTE, MASTER_PALETTE } from '../../src/game/sprites/palettes';
 import { RecordingSurface } from '../support/engineFakes';
 import { repoPath } from '../support/repo';
 
@@ -34,6 +41,7 @@ const COLORS: ParticleColors = {
   mote: ['#m1'],
   bubble: ['#b1'],
   wisp: ['#w1'],
+  firefly: ['#f1'],
 };
 
 interface Rig {
@@ -233,6 +241,8 @@ void describe('the debt cap and a full pool', () => {
   void it('the shipped stage rows use the planned kinds and rates', () => {
     assert.deepEqual(STAGES[2]?.ambient, { kind: 'bubbles', perSecond: 7 });
     assert.deepEqual(STAGES[3]?.ambient, { kind: 'fog', perSecond: 4, dustPerSecond: 3 });
+    assert.deepEqual(STAGES[4]?.ambient, { kind: 'fireflies', perSecond: 5 });
+    assert.deepEqual(STAGES[5]?.ambient, { kind: 'embers', perSecond: 6 });
   });
 
   void it('steady-state ambient load is far below the pool, so ambients cannot starve combat sparks', () => {
@@ -262,6 +272,7 @@ void describe('Particles: the new kinds', () => {
     ['mote', 1, 1],
     ['bubble', 2, 2],
     ['wisp', 6, 2],
+    ['firefly', 1, 1],
   ];
 
   void it('every kind is drawn as exactly one fillRect with its documented size, in its own ramp', () => {
@@ -286,14 +297,23 @@ void describe('Particles: the new kinds', () => {
     const surface = new RecordingSurface();
     surface.record = true;
     pool.draw(surface, COLORS);
-    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 7);
+    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 8);
   });
 
-  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp', () => {
+  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp firefly', () => {
     const src = readFileSync(repoPath('src/game/Particles.ts'), 'utf8');
     const list = /const KIND_NAMES[^=]*=\s*\[([^\]]*)\]/.exec(src)?.[1] ?? '';
     const names = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
-    assert.deepEqual(names, ['ember', 'spark', 'drip', 'splash', 'mote', 'bubble', 'wisp']);
+    assert.deepEqual(names, [
+      'ember',
+      'spark',
+      'drip',
+      'splash',
+      'mote',
+      'bubble',
+      'wisp',
+      'firefly',
+    ]);
     assert.match(src, /KIND_EMBER = 0;/);
     assert.match(src, /KIND_DRIP = 2;/);
     assert.match(src, /KIND_SPLASH = 3;/);
@@ -305,5 +325,159 @@ void describe('Particles: the new kinds', () => {
     assert.equal(pool.emit('bubble', 0, 0, 0, -10, 1000), true);
     assert.equal(pool.emit('wisp', 0, 0, -5, 0, 1000), false);
     assert.doesNotThrow(() => pool.update(STEP_MS));
+  });
+});
+
+function luminance(hex: string): number {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+}
+
+void describe('Ambience fireflies (Stage 5, E3)', () => {
+  void it('10 simulated seconds at 5 per second emit 50 fireflies (+- 1), each exactly one 1x1 fillRect, inside the corridor view and the firefly band', () => {
+    const r = rig({ kind: 'fireflies', perSecond: 5 });
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 50) <= 1, `${out.length} fireflies`);
+    assert.equal(r.particles.count, out.length, 'one fillRect per live particle');
+    for (const p of out) {
+      assert.equal(p.color, '#f1', 'only the firefly ramp');
+      assert.deepEqual([p.w, p.h], [1, 1]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= FIREFLY_MIN_Y - 1 && p.y <= FIREFLY_MAX_Y, `y ${p.y}`);
+    }
+    assert.ok(new Set(out.map((p) => p.x)).size > 20, 'positions are spread');
+  });
+
+  void it('the same seed gives the same field', () => {
+    const a = rig({ kind: 'fireflies', perSecond: 5 });
+    const b = rig({ kind: 'fireflies', perSecond: 5 });
+    emitOnly(a, 5_000);
+    emitOnly(b, 5_000);
+    assert.deepEqual(drawn(a), drawn(b));
+  });
+
+  void it('with particles updating, the live set is about rate times life (about 25) and every one stays near its band', () => {
+    const r = rig({ kind: 'fireflies', perSecond: 5 });
+    const camera = new Camera();
+    for (let t = 0; t < 20_000; t += STEP_MS) {
+      r.ambience.update(STEP_MS, r.world, camera);
+      r.particles.update(STEP_MS);
+    }
+    assert.ok(r.particles.count >= 12 && r.particles.count <= 40, `${r.particles.count} live`);
+    // A wander of +-24 px/s^2 over at most 6.5 s keeps a firefly within a few tens of pixels.
+    const slack = 6 + 0.5 * 24 * 6.5 * 6.5 * 0.1;
+    for (const p of drawn(r)) {
+      assert.ok(p.y > FIREFLY_MIN_Y - slack && p.y < FIREFLY_MAX_Y + slack, `y ${p.y}`);
+    }
+  });
+
+  void it('a firefly hangs in the air: it is not scrolled and has no net rise (drift is symmetric and small)', () => {
+    assert.ok(FIREFLY_DRIFT <= 10, 'initial drift is tiny');
+    const pool = new Particles(1, mulberry32(5));
+    pool.emit('firefly', 200, 100, 0, 0, 5000);
+    let maxDy = 0;
+    for (let i = 0; i < 150; i++) {
+      pool.update(STEP_MS);
+      const surface = new RecordingSurface();
+      surface.record = true;
+      pool.draw(surface, COLORS);
+      maxDy = Math.max(maxDy, Math.abs(Number(surface.calls[0]?.args[2]) - 100));
+    }
+    assert.ok(maxDy < 40, `moved ${maxDy} px`);
+  });
+
+  void it('the shipped firefly ramp alternates bright and dim, has at least 4 steps, and no step is shorter than 0.5 s at the minimum life (no flashing)', () => {
+    const ramp = PARTICLE_PALETTE.firefly;
+    assert.ok(ramp.length >= 4, `${ramp.length} steps`);
+    const lum = ramp.map((ch) => luminance(MASTER_PALETTE[ch] ?? '#000000'));
+    const signs: number[] = [];
+    for (let i = 1; i < lum.length; i++) signs.push(Math.sign(lum[i]! - lum[i - 1]!));
+    assert.ok(
+      signs.every((v) => v !== 0),
+      'every step changes brightness',
+    );
+    for (let i = 1; i < signs.length; i++) {
+      assert.notEqual(signs[i], signs[i - 1], `step ${i} reverses direction (a blink, not a fade)`);
+    }
+    assert.ok(
+      FIREFLY_LIFE_MIN_MS / ramp.length >= 500,
+      `${FIREFLY_LIFE_MIN_MS / ramp.length} ms per step`,
+    );
+  });
+});
+
+void describe('Ambience embers (Stage 6, E3)', () => {
+  void it('10 simulated seconds at 6 per second emit 60 embers (+- 1) of the existing ember kind, 1x1, inside the corridor view and the floor band', () => {
+    const r = rig({ kind: 'embers', perSecond: 6 });
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 60) <= 1, `${out.length} embers`);
+    for (const p of out) {
+      assert.equal(p.color, '#e1', 'the ember ramp');
+      assert.deepEqual([p.w, p.h], [1, 1]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= STAGE_EMBER_MIN_Y - 1 && p.y <= STAGE_EMBER_MAX_Y, `y ${p.y}`);
+    }
+  });
+
+  void it('embers rise: y decreases for every live ember over its life', () => {
+    const r = rig({ kind: 'embers', perSecond: 6 });
+    const camera = new Camera();
+    r.ambience.update(1000, r.world, camera);
+    const before = drawn(r);
+    assert.ok(before.length >= 5);
+    r.particles.update(500);
+    const after = drawn(r);
+    assert.equal(after.length, before.length);
+    for (let i = 0; i < before.length; i++)
+      assert.ok(after[i]!.y < before[i]!.y, `ember ${i} rose`);
+  });
+
+  void it('the ember and firefly rates do not couple through a shared debt (switching stage starts clean)', () => {
+    const camera = new Camera();
+    const r = rig({ kind: 'fireflies', perSecond: 5 });
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 5, `${r.particles.count} after a hidden-tab step`);
+    r.particles.clear();
+    r.effect = { kind: 'embers', perSecond: 6 };
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 6, `${r.particles.count} after the switch to embers`);
+    r.particles.clear();
+    r.effect = { kind: 'fireflies', perSecond: 5 };
+    r.ambience.update(STEP_MS, r.world, camera);
+    assert.ok(r.particles.count <= 1, `${r.particles.count} after one step back`);
+    r.particles.clear();
+    emitOnly(r, 10_000);
+    assert.ok(Math.abs(r.particles.count - 50) <= 1, `${r.particles.count}`);
+  });
+
+  void it('emitting into a full pool never throws and never grows the pool', () => {
+    for (const effect of [
+      { kind: 'fireflies', perSecond: 5 },
+      { kind: 'embers', perSecond: 6 },
+    ] as const) {
+      const r = rig(effect, 8);
+      for (let i = 0; i < 8; i++) r.particles.emit('spark', 0, 0, 0, 0, 60_000);
+      assert.doesNotThrow(() => emitOnly(r, 10_000));
+      assert.equal(r.particles.count, 8);
+    }
+  });
+
+  void it('steady-state E3 ambient load is far below the pool', () => {
+    for (const effect of [
+      { kind: 'fireflies', perSecond: 5 },
+      { kind: 'embers', perSecond: 6 },
+    ] as const) {
+      const r = rig(effect);
+      const camera = new Camera();
+      let peak = 0;
+      for (let t = 0; t < 30_000; t += STEP_MS) {
+        r.ambience.update(STEP_MS, r.world, camera);
+        r.particles.update(STEP_MS);
+        peak = Math.max(peak, r.particles.count);
+      }
+      assert.ok(peak < PARTICLE_CAPACITY / 4, `${effect.kind}: peak ${peak}`);
+    }
   });
 });

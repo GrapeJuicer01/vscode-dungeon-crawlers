@@ -10,6 +10,11 @@ import {
   BUBBLE_RISE_MIN,
   DRIP_FALL_HEIGHT_PX,
   DRIP_GRAVITY_PX_PER_S2,
+  FIREFLY_DRIFT,
+  FIREFLY_LIFE_MAX_MS,
+  FIREFLY_LIFE_MIN_MS,
+  FIREFLY_MAX_Y,
+  FIREFLY_MIN_Y,
   FOG_DRIFT_MAX,
   FOG_DRIFT_MIN,
   FOG_LIFE_MAX_MS,
@@ -20,6 +25,12 @@ import {
   MOTE_LIFE_MIN_MS,
   MOTE_MAX_Y,
   MOTE_MIN_Y,
+  STAGE_EMBER_LIFE_MAX_MS,
+  STAGE_EMBER_LIFE_MIN_MS,
+  STAGE_EMBER_MAX_Y,
+  STAGE_EMBER_MIN_Y,
+  STAGE_EMBER_RISE_MAX,
+  STAGE_EMBER_RISE_MIN,
 } from './data/tuning';
 import type { World } from './entities/Entity';
 import { CORRIDOR_SEGMENT_PX, CORRIDOR_X, DOOR_X, INTERNAL_WIDTH } from './layout';
@@ -33,6 +44,9 @@ export class Ambience {
   #bubbleDebt = 0;
   #fogDebt = 0;
   #fogDustDebt = 0;
+  // Separate debts for the E3 ambients too.
+  #fireflyDebt = 0;
+  #emberDebt = 0;
 
   update(dtMs: number, world: World, camera: Camera): void {
     const effect = world.stage.def.ambient;
@@ -49,6 +63,12 @@ export class Ambience {
       case 'fog':
         this.#fog(dtMs, effect.perSecond, effect.dustPerSecond, world);
         return;
+      case 'fireflies':
+        this.#fireflies(dtMs, effect.perSecond, world);
+        return;
+      case 'embers':
+        this.#embers(dtMs, effect.perSecond, world);
+        return;
       default:
         assertNever(effect);
     }
@@ -57,6 +77,38 @@ export class Ambience {
   /** Adds elapsed emissions to a debt, capped at one second's worth (guards a stage switch). */
   static #accrue(debt: number, dtMs: number, perSecond: number): number {
     return Math.min(debt + (perSecond * dtMs) / 1000, Math.max(1, perSecond));
+  }
+
+  /** Fireflies hover and wander in the corridor view; not scrolled. */
+  #fireflies(dtMs: number, perSecond: number, world: World): void {
+    this.#fireflyDebt = Ambience.#accrue(this.#fireflyDebt, dtMs, perSecond);
+    while (this.#fireflyDebt >= 1) {
+      this.#fireflyDebt -= 1;
+      world.particles.emit(
+        'firefly',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        FIREFLY_MIN_Y + world.rng() * (FIREFLY_MAX_Y - FIREFLY_MIN_Y),
+        (world.rng() - 0.5) * 2 * FIREFLY_DRIFT,
+        (world.rng() - 0.5) * 2 * FIREFLY_DRIFT,
+        FIREFLY_LIFE_MIN_MS + world.rng() * (FIREFLY_LIFE_MAX_MS - FIREFLY_LIFE_MIN_MS),
+      );
+    }
+  }
+
+  /** Stage embers rise from the floor band using the existing ember kind; not scrolled. */
+  #embers(dtMs: number, perSecond: number, world: World): void {
+    this.#emberDebt = Ambience.#accrue(this.#emberDebt, dtMs, perSecond);
+    while (this.#emberDebt >= 1) {
+      this.#emberDebt -= 1;
+      world.particles.emit(
+        'ember',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        STAGE_EMBER_MIN_Y + world.rng() * (STAGE_EMBER_MAX_Y - STAGE_EMBER_MIN_Y),
+        0,
+        -(STAGE_EMBER_RISE_MIN + world.rng() * (STAGE_EMBER_RISE_MAX - STAGE_EMBER_RISE_MIN)),
+        STAGE_EMBER_LIFE_MIN_MS + world.rng() * (STAGE_EMBER_LIFE_MAX_MS - STAGE_EMBER_LIFE_MIN_MS),
+      );
+    }
   }
 
   /** Bubbles rise from the floor band anywhere in the corridor view; not scrolled. */

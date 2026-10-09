@@ -87,6 +87,24 @@ const REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
     'boneRubble',
     'doorFrame',
   ],
+  'enchanted-forest-ruins': [
+    'brokenPillar',
+    'hangingRoots',
+    'glowBloom',
+    'ruinedStatue',
+    'fernPatch',
+    'flowerBed',
+    'doorFrame',
+  ],
+  'molten-core': [
+    'obsidianPillar',
+    'lavaFall',
+    'lavaChannel',
+    'anvil',
+    'slagHeap',
+    'toolRack',
+    'doorFrame',
+  ],
 };
 /** Animated light props: prop name -> minimum idle frames of the flame loop. */
 const FLAME_PROPS: Readonly<Record<string, number>> = {
@@ -94,6 +112,9 @@ const FLAME_PROPS: Readonly<Record<string, number>> = {
   lantern: 4,
   glowShroom: 2,
   candelabra: 4,
+  glowBloom: 2,
+  lavaFall: 4,
+  lavaChannel: 2,
 };
 const ENEMY_MAX_SIZE: Readonly<Record<EnemyTier, number>> = { minion: 16, elite: 24, boss: 48 };
 const ENEMY_ANIMATIONS: Readonly<Record<string, number>> = { idle: 2, walk: 2, attack: 3 };

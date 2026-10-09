@@ -43,8 +43,8 @@ const row = (id: string): EnemyRow => {
 };
 
 void describe('the shipped Stage 3 and Stage 4 environments', () => {
-  void it('validateStages(STAGES, SHIPPED_ART) and validateArtSet(SHIPPED_ART) are empty with four stages', () => {
-    assert.equal(STAGES.length, 4);
+  void it('validateStages(STAGES, SHIPPED_ART) and validateArtSet(SHIPPED_ART) are empty with six stages (E3)', () => {
+    assert.equal(STAGES.length, 6);
     assert.deepEqual(validateStages(STAGES, SHIPPED_ART), []);
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
     assert.deepEqual(Object.keys(SHIPPED_ART.stageSprites).sort(), STAGES.map((s) => s.id).sort());
@@ -128,8 +128,8 @@ void describe('the shipped Stage 3 and Stage 4 environments', () => {
 });
 
 void describe('the ten new enemies', () => {
-  void it('there is one template per enemy row (twenty), at the documented tier sizes and animation sets', () => {
-    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 20);
+  void it('there is one template per enemy row (thirty), at the documented tier sizes and animation sets', () => {
+    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 30);
     assert.deepEqual(validateEnemyArt(SHIPPED_ART), []);
     const size = { minion: 16, elite: 24, boss: 48 } as const;
     for (const id of NEW_ENEMIES) {
@@ -179,84 +179,7 @@ void describe('the ten new enemies', () => {
     }
   });
 
-  /** Opaque idle-frame-0 pixels as anchor-relative keys, so differently sized frames still align. */
-  const opaque = (t: SpriteTemplate): Set<string> => {
-    const out = new Set<string>();
-    t.animations['idle']![0]!.forEach((line, y) => {
-      [...line].forEach((ch, x) => {
-        if (ch !== '.') out.add(`${x - t.anchor.x},${y - t.anchor.y}`);
-      });
-    });
-    return out;
-  };
-  /** Shared opaque pixels (aligned at the anchor) divided by the smaller pixel count. */
-  const overlap = (a: SpriteTemplate, b: SpriteTemplate): number => {
-    const pa = opaque(a);
-    const pb = opaque(b);
-    let shared = 0;
-    for (const k of pa) if (pb.has(k)) shared += 1;
-    return shared / Math.min(pa.size, pb.size);
-  };
-  const LIMIT = 0.85;
-
-  void it('no new enemy shares its idle frame with an older enemy (exact duplicates)', () => {
-    const idle = (id: string): string => SHIPPED_ART.enemies[id]!.animations['idle']![0]!.join('/');
-    const seen = new Map<string, string>();
-    for (const r of ENEMIES) {
-      const key = idle(r.id);
-      assert.ok(!seen.has(key), `${r.id} duplicates ${seen.get(key)}`);
-      seen.set(key, r.id);
-    }
-  });
-
-  void it('named look-alikes stay under 0.85 overlap (current values in comments)', () => {
-    const e = SHIPPED_ART.enemies;
-    // Tomb Scarab vs Ore Beetle: 0.819 at review time.
-    assert.ok(overlap(e['tomb-scarab']!, e['ore-beetle']!) < LIMIT, 'tomb-scarab vs ore-beetle');
-    // Wailing Ghost vs Cave Bat: 0.800 at review time.
-    assert.ok(overlap(e['wailing-ghost']!, e['cave-bat']!) < LIMIT, 'wailing-ghost vs cave-bat');
-    // Bone Soldier vs the skeleton summon (16x20, so aligned at the anchor): 0.713 at review time.
-    const skeleton = SHIPPED_ART.summons['skeleton'];
-    assert.ok(skeleton !== undefined);
-    assert.ok(overlap(e['bone-soldier']!, skeleton) < LIMIT, 'bone-soldier vs skeleton summon');
-  });
-
-  // Ratchet, not a pass: these ten pairs ALREADY exceed 0.85 (values measured at review time, reported
-  // to the reviewer as art findings). Each may not get worse, and any pair not listed must stay under
-  // 0.85, so a future clone is caught. Remove an entry when the art is reworked.
-  const KNOWN_OVER: Readonly<Record<string, number>> = {
-    'green-slime vs cellar-rat': 0.964,
-    'green-slime vs cave-bat': 0.928,
-    'green-slime vs web-spider': 0.925,
-    'green-slime vs goblin-scout': 0.874,
-    'green-slime vs ore-beetle': 0.954,
-    'spore-shroom vs goblin-scout': 0.882,
-    'toxic-toad vs cellar-rat': 0.859,
-    'toxic-toad vs cave-bat': 0.88,
-    'toxic-toad vs ore-beetle': 0.869,
-    'wailing-ghost vs web-spider': 0.858,
-  };
-
-  void it('every new Stage 3/4 minion stays under 0.85 overlap with every older same-size minion, except the pinned known pairs which may not worsen', () => {
-    const newIds = new Set(NEW_ENEMIES);
-    const fails: string[] = [];
-    const seenKnown = new Set<string>();
-    for (const n of ENEMIES.filter((r) => newIds.has(r.id) && r.tier === 'minion')) {
-      for (const o of ENEMIES.filter((r) => !newIds.has(r.id) && r.tier === 'minion')) {
-        const a = SHIPPED_ART.enemies[n.id]!;
-        const b = SHIPPED_ART.enemies[o.id]!;
-        if (a.w !== b.w || a.h !== b.h) continue;
-        const v = overlap(a, b);
-        const key = `${n.id} vs ${o.id}`;
-        const cap = Object.hasOwn(KNOWN_OVER, key) ? KNOWN_OVER[key]! : LIMIT;
-        if (cap !== LIMIT) seenKnown.add(key);
-        if (v >= LIMIT && cap === LIMIT) fails.push(`${key}: ${v.toFixed(3)}`);
-        else if (v > cap + 0.0005) fails.push(`${key}: ${v.toFixed(3)} worsened from ${cap}`);
-      }
-    }
-    assert.deepEqual(fails, []);
-    assert.deepEqual([...seenKnown].sort(), Object.keys(KNOWN_OVER).sort(), 'stale pin');
-  });
+  // The overlap, IoU, same-stage, exact-duplicate, and KNOWN_OVER checks moved to lookAlikes.test.ts.
 });
 
 void describe('rasterization over the stage palette (drift 13.6, extended to Stages 3 and 4)', () => {
@@ -332,8 +255,16 @@ void describe('rasterization over the stage palette (drift 13.6, extended to Sta
     }
   });
 
-  void it('ENEMY_PHASE_PALETTES keys are exactly the four boss ids, one phase each, at most four master characters', () => {
+  void it('ENEMY_PHASE_PALETTES keys are exactly the six boss ids, one phase each, at most four master characters', () => {
     const bosses = ENEMIES.filter((r) => r.tier === 'boss').map((r) => r.id);
+    assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), [
+      'elder-dryad',
+      'goblin-foreman',
+      'molten-colossus',
+      'ooze-queen',
+      'rat-king',
+      'tomb-lich',
+    ]);
     assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), bosses.sort());
     for (const list of Object.values(SHIPPED_ART.enemyPhasePalettes)) {
       assert.equal(list.length, 1);

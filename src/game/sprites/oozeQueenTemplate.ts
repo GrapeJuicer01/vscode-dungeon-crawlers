@@ -7,26 +7,28 @@
 // with a wide open mouth and glowing eyes; `attack` is a low forward lunge with a stretched
 // arm of slime.
 
-import { dots, draft, ellipse, enemyTemplate, finish, put } from './enemyBuilder';
+import { dots, draft, ellipse, enemyTemplate, finish, put, stroke } from './enemyBuilder';
 import type { Draft } from './enemyBuilder';
 import type { SpriteTemplate } from './spriteTypes';
 
 const S = 48;
 
 interface QueenPose {
-  /** Half height of the upper body (14 is normal). */
+  /** Half height of the head and chest (12 is normal). */
   readonly h?: number;
-  /** Half width of the skirt (20 is normal). */
+  /** Half width of the gown base (18 is normal). */
   readonly w?: number;
   /** Horizontal shift of the upper body (negative = forward / left). */
   readonly tilt?: number;
-  /** Half width of the upper body (15 is normal). */
+  /** Half width of the head and chest (11 is normal). */
   readonly rx?: number;
   readonly mouth?: 0 | 1 | 2;
   /** How far the bubbles have risen (0 to 3). */
   readonly bub?: number;
-  /** Stretched arm of slime pointing forward. */
-  readonly arm?: boolean;
+  /** Raised slime arms: 0 down at the sides, 1 half raised, 2 fully raised (a wave). */
+  readonly arms?: 0 | 1 | 2;
+  /** Stretched arm of slime pointing forward (the lunge). */
+  readonly reach?: boolean;
   /** Eyes glow (telegraph): the pupils are replaced by bright cores. */
   readonly glare?: boolean;
   /** Sunk into a puddle: body height after the crown (intro). */
@@ -55,24 +57,63 @@ function crown(d: Draft, x: number, y: number): void {
 
 function queenFrame(p: QueenPose): string[] {
   const d = draft(S, S);
-  const h = p.h ?? 14;
-  const w = p.w ?? 20;
+  const h = p.h ?? 12;
+  const w = p.w ?? 15;
   const tilt = p.tilt ?? 0;
   const sink = p.sink ?? 0;
+  const arms = p.arms ?? 0;
   const cx = 25;
-  const topCy = 17 + h + sink;
-  ellipse(d, cx + tilt, topCy, p.rx ?? 15, h, 'L');
-  ellipse(d, cx, 38 + Math.floor(sink / 2), w, 8, 'L');
-  if (p.arm) {
-    ellipse(d, 9 + tilt, 36, 5, 3, 'L');
-    ellipse(d, 4, 35, 3, 2, 'L');
+  const topCy = 15 + h + sink;
+  // head and chest, then a gown that widens into a puddle
+  ellipse(d, cx + tilt, topCy, p.rx ?? 11, h, 'L');
+  stroke(
+    d,
+    [
+      [cx + tilt, topCy + h - 4],
+      [cx, 40],
+    ],
+    'L',
+    14,
+  );
+  ellipse(d, cx, 38 + Math.floor(sink / 2), w - 4, 7, 'L');
+  ellipse(d, cx, 44, w + 2, 3, 'L');
+  // raised arms with round hands (the wave), or a reaching arm in the lunge
+  if (arms > 0) {
+    const up = arms === 2 ? 9 : 20;
+    for (const sgn of [-1, 1]) {
+      const sx = cx + tilt + sgn * 9;
+      const hx = cx + sgn * (arms === 2 ? 21 : 18);
+      stroke(
+        d,
+        [
+          [sx, topCy + 4 + sink],
+          [(sx + hx) / 2 + sgn * 2, (topCy + up) / 2 + 4],
+          [hx, up + sink],
+        ],
+        'L',
+        4,
+      );
+      ellipse(d, hx, up - 1 + sink, 3, 3, 'L');
+    }
+  }
+  if (p.reach) {
+    stroke(
+      d,
+      [
+        [cx + tilt - 8, topCy + 8],
+        [8 + tilt, 34],
+      ],
+      'L',
+      4,
+    );
+    ellipse(d, 5, 34, 3, 3, 'L');
   }
   d.g.rect(0, 47, S, 1, '.');
   // shade on the lower and right parts
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       if (d.g.get(x, y) !== 'L') continue;
-      if (y >= 43 || (x - cx > 8 && y > topCy - h + 8) || (x - cx > 12 && y > topCy - h + 4)) {
+      if (y >= 43 || (x - cx > 6 && y > topCy - h + 8) || (x - cx > 10 && y > topCy - h + 4)) {
         d.g.set(x, y, 'N');
       }
     }
@@ -80,7 +121,7 @@ function queenFrame(p: QueenPose): string[] {
   const ex = cx + tilt;
   const ey = topCy - 4;
   // eyes
-  for (const dx of [-12, -3]) {
+  for (const dx of [-9, -2]) {
     put(d, ['.ww.', 'wwww', 'wwww', 'wwww', '.ww.'], ex + dx, ey);
     if (p.glare) {
       put(d, ['YY', 'YY', 'YY'], ex + dx, ey + 1);
@@ -88,39 +129,39 @@ function queenFrame(p: QueenPose): string[] {
       put(d, ['ee', 'ee', 'ee'], ex + dx, ey + 1);
     }
   }
-  // brow ridge of darker slime and cheeks
-  put(d, ['NNNN'], ex - 12, ey - 1);
-  put(d, ['NNNN'], ex - 3, ey - 1);
+  // brow ridge of darker slime
+  put(d, ['NNNN'], ex - 9, ey - 1);
+  put(d, ['NNNN'], ex - 2, ey - 1);
   // mouth
   const my = ey + 8;
   if (p.mouth === 2) {
-    put(d, ['eeeeeeeeee', 'eeeeeeeeee', 'eRRRRRReee', '.eeRRRee..'], ex - 15, my);
+    put(d, ['eeeeeeeee', 'eeeeeeeee', 'eRRRRRRee', '.eeRRRee.'], ex - 11, my);
     dots(d, [
-      [ex - 15, my, 'w'],
       [ex - 11, my, 'w'],
       [ex - 7, my, 'w'],
+      [ex - 3, my, 'w'],
     ]);
   } else if (p.mouth === 1) {
-    put(d, ['eeeeee', 'eeeeee', '.eeee.'], ex - 14, my);
+    put(d, ['eeeeee', 'eeeeee', '.eeee.'], ex - 10, my);
     dots(d, [
-      [ex - 14, my, 'w'],
       [ex - 10, my, 'w'],
+      [ex - 6, my, 'w'],
     ]);
   } else {
-    put(d, ['eeeeeee'], ex - 14, my);
+    put(d, ['eeeeeee'], ex - 10, my);
     dots(d, [
-      [ex - 15, my - 1, 'e'],
-      [ex - 8, my - 1, 'e'],
+      [ex - 11, my - 1, 'e'],
+      [ex - 4, my - 1, 'e'],
     ]);
   }
-  // bubbles rising inside the body
+  // bubbles rising inside the gown
   const b = p.bub ?? 0;
   const bubs: readonly (readonly [number, number])[] = [
-    [cx + 6, 40 - b * 3],
-    [cx + 12, 33 - b * 2],
-    [cx + 3, 26 - b * 2],
-    [cx + 14, 41 - b * 4],
-    [cx + 17, 38 - b],
+    [cx + 5, 40 - b * 3],
+    [cx + 9, 33 - b * 2],
+    [cx + 2, 27 - b * 2],
+    [cx + 11, 41 - b * 4],
+    [cx + 14, 40 - b],
   ];
   for (const [bx, by] of bubs) {
     if (by < topCy - h + 3) continue;
@@ -132,10 +173,10 @@ function queenFrame(p: QueenPose): string[] {
   }
   // highlight streak on the upper right of the head
   dots(d, [
-    [ex + 8, topCy - h + 4, 'w'],
-    [ex + 9, topCy - h + 5, 'w'],
-    [ex + 9, topCy - h + 6, 'w'],
-    [ex + 10, topCy - h + 7, 'w'],
+    [ex + 6, topCy - h + 4, 'w'],
+    [ex + 7, topCy - h + 5, 'w'],
+    [ex + 7, topCy - h + 6, 'w'],
+    [ex + 8, topCy - h + 7, 'w'],
   ]);
   // crown last, sitting on the top of the head
   crown(d, ex - 8, topCy - h - 6);
@@ -150,28 +191,29 @@ function queenFrame(p: QueenPose): string[] {
   return finish(d);
 }
 
-const IDLE: QueenPose = {};
-
 export const OOZE_QUEEN: SpriteTemplate = enemyTemplate(
   'ooze-queen',
   S,
   S,
   { x: 24, y: 47 },
   {
-    idle: [queenFrame({ ...IDLE, bub: 0 }), queenFrame({ h: 13, w: 21, bub: 1 })],
-    walk: [queenFrame({ h: 13, w: 22, tilt: -1, bub: 2 }), queenFrame({ h: 15, w: 19, bub: 3 })],
+    idle: [queenFrame({ arms: 2, bub: 0 }), queenFrame({ h: 11, w: 19, arms: 1, bub: 1 })],
+    walk: [
+      queenFrame({ h: 11, w: 19, tilt: -1, arms: 1, bub: 2 }),
+      queenFrame({ h: 13, w: 17, arms: 2, bub: 3 }),
+    ],
     attack: [
-      queenFrame({ h: 16, w: 18, tilt: 3, bub: 1 }),
-      queenFrame({ h: 11, w: 22, tilt: -4, mouth: 2, arm: true, bub: 2 }),
-      queenFrame({ h: 13, w: 21, tilt: -2, mouth: 1, bub: 3 }),
+      queenFrame({ h: 13, w: 16, tilt: 3, arms: 2, bub: 1 }),
+      queenFrame({ h: 10, w: 20, tilt: -4, mouth: 2, reach: true, bub: 2 }),
+      queenFrame({ h: 11, w: 19, tilt: -2, mouth: 1, arms: 1, bub: 3 }),
     ],
     telegraph: [
-      queenFrame({ h: 14, w: 23, rx: 18, tilt: 2, mouth: 1, glare: true, bub: 1 }),
-      queenFrame({ h: 12, w: 22, rx: 17, tilt: -3, mouth: 2, glare: true, bub: 3 }),
+      queenFrame({ h: 12, w: 20, rx: 14, tilt: 2, mouth: 1, glare: true, arms: 2, bub: 1 }),
+      queenFrame({ h: 11, w: 20, rx: 13, tilt: -3, mouth: 2, glare: true, arms: 2, bub: 3 }),
     ],
     intro: [
-      queenFrame({ h: 8, w: 21, sink: 9, bub: 0, drip: 0 }),
-      queenFrame({ h: 12, w: 21, sink: 3, mouth: 1, bub: 2 }),
+      queenFrame({ h: 8, w: 19, sink: 9, bub: 0, drip: 0 }),
+      queenFrame({ h: 11, w: 19, sink: 3, mouth: 1, arms: 1, bub: 2 }),
     ],
   },
 );

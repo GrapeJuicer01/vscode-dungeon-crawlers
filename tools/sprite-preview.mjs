@@ -135,6 +135,14 @@ const ENEMY_STAGE = {
   ],
   'toxic-slime-caverns': ['green-slime', 'spore-shroom', 'toxic-toad', 'jelly-cube', 'ooze-queen'],
   'ancient-catacombs': ['bone-soldier', 'wailing-ghost', 'tomb-scarab', 'crypt-mummy', 'tomb-lich'],
+  'enchanted-forest-ruins': [
+    'thorn-sprout',
+    'moss-wolf',
+    'bramble-pixie',
+    'ancient-treant',
+    'elder-dryad',
+  ],
+  'molten-core': ['ember-imp', 'slag-snail', 'magma-crab', 'furnace-guard', 'molten-colossus'],
 };
 const palFor = (stageId, phase) => ({
   ...MASTER_PALETTE,

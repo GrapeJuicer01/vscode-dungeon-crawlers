@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { ENEMIES } from '../../src/game/data/enemies';
+import { STAGES } from '../../src/game/data/stages';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
 import { PROGRESS_KEY } from '../../src/host/progressStore';
 import { readJson, repoPath } from '../support/repo';
@@ -40,9 +42,71 @@ void describe('enemy code in the bundles (E1)', () => {
       assert.ok(webview.includes(row.name), row.name);
     }
     assert.deepEqual(Object.keys(SHIPPED_ART.enemies).sort(), ENEMIES.map((r) => r.id).sort());
-    for (const id of ['goblin-mine-shafts', 'toxic-slime-caverns', 'ancient-catacombs']) {
+    for (const id of [
+      'goblin-mine-shafts',
+      'toxic-slime-caverns',
+      'ancient-catacombs',
+      'enchanted-forest-ruins',
+      'molten-core',
+    ]) {
       assert.ok(webview.includes(id), id);
     }
+    assert.deepEqual(
+      STAGES.map((stage) => stage.id),
+      [
+        'forgotten-cellar',
+        'goblin-mine-shafts',
+        'toxic-slime-caverns',
+        'ancient-catacombs',
+        'enchanted-forest-ruins',
+        'molten-core',
+      ],
+    );
+  });
+
+  void it('E3: all ten new enemy ids and names are in the webview bundle and absent from the host bundle', () => {
+    const ids = [
+      'thorn-sprout',
+      'moss-wolf',
+      'bramble-pixie',
+      'ancient-treant',
+      'elder-dryad',
+      'ember-imp',
+      'slag-snail',
+      'magma-crab',
+      'furnace-guard',
+      'molten-colossus',
+    ];
+    for (const id of ids) {
+      assert.ok(
+        ENEMIES.some((r) => r.id === id),
+        id,
+      );
+      assert.ok(webview.includes(`"${id}"`) || webview.includes(`'${id}'`), id);
+      assert.ok(!host.includes(id), `${id} leaked into the host bundle`);
+    }
+  });
+
+  void it('the production-style webview bundle (minified, in memory, no sourcemap) is measured against the E3 R11 note (300 KB through E5; hard limit 400 KB)', (t) => {
+    // esbuild cannot be bundled into the test file, so the measurement runs in a child process.
+    const script = `
+      import * as esbuild from 'esbuild';
+      const r = await esbuild.build({
+        entryPoints: ['src/webview/main.ts'], bundle: true, minify: true, sourcemap: false,
+        platform: 'browser', format: 'iife', target: 'es2022', legalComments: 'none',
+        write: false, logLevel: 'silent',
+      });
+      process.stdout.write(String(r.outputFiles[0].contents.byteLength));
+    `;
+    const bytes = Number(
+      execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: repoPath('.'),
+        encoding: 'utf8',
+      }),
+    );
+    const kb = bytes / 1024;
+    t.diagnostic(`production webview bundle: ${kb.toFixed(1)} KB (R11 assumption under 300 KB)`);
+    assert.ok(kb > 50 && kb < 400, `${kb} KB`);
   });
 
   void it('dist/webview.js contains no host persistence: no ProgressStore, no globalState, no progress key', () => {

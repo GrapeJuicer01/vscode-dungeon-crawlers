@@ -96,6 +96,8 @@ export const STAGE_TILE_CHARS: Readonly<Record<string, string>> = {
   'goblin-mine-shafts': '12345678',
   'toxic-slime-caverns': '12345678',
   'ancient-catacombs': '12345678',
+  'enchanted-forest-ruins': '12345678',
+  'molten-core': '12345678',
 };
 
 /** Stage id -> the character that fills the background (near-black, luminance under 0.02). */
@@ -104,6 +106,8 @@ export const STAGE_CLEAR_CHAR: Readonly<Record<string, string>> = {
   'goblin-mine-shafts': 'n',
   'toxic-slime-caverns': 'n',
   'ancient-catacombs': 'n',
+  'enchanted-forest-ruins': 'n',
+  'molten-core': 'n',
 };
 
 /** Stage id -> the darkness tint multiplied over the environment (cool gray-blue, never black). */
@@ -112,6 +116,8 @@ export const STAGE_AMBIENT_CHAR: Readonly<Record<string, string>> = {
   'goblin-mine-shafts': 'g',
   'toxic-slime-caverns': 'g',
   'ancient-catacombs': 'g',
+  'enchanted-forest-ruins': 'g',
+  'molten-core': 'g',
 };
 
 /** Stage id -> partial palette over the master (characters 1 to 8, g, T). See palettesE1.ts. */
@@ -125,7 +131,10 @@ export const LIGHT_CHARS: { readonly torch: string; readonly campfire: string } 
 
 /** Particle color ramps, bright to dim by age. */
 export const PARTICLE_PALETTE: Readonly<
-  Record<'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp', readonly string[]>
+  Record<
+    'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly',
+    readonly string[]
+  >
 > = {
   ember: ['Y', 'O', 'R', 'D'],
   spark: ['w', 'Y', 'O'],
@@ -137,6 +146,9 @@ export const PARTICLE_PALETTE: Readonly<
   bubble: ['L', 'N', 'Q'],
   // low fog wisps (stage 4 ambient, E2): dim grays and violet
   wisp: ['G', 'g', 'P'],
+  // fireflies (stage 5 ambient, E3): a slow blink, yellow, dark green, lime, dark green, yellow;
+  // master characters, no new colors. Alternates bright and dim; each step is 1/5 of the life.
+  firefly: ['Y', 'N', 'L', 'N', 'Y'],
 };
 
 /**

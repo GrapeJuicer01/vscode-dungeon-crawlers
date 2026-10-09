@@ -73,7 +73,7 @@ Columns 0-7 are the alcove (campfire at x 64), column 8 is the door frame (16x12
 | Water particles | `q` light, `Q` mid (`8` is the dim end) |
 
 - 4 skin tones and 6 hair colors are **partial palette swaps**: a skin tone overrides only `s`; a hair color overrides only `h`. Index 0 of each equals the master color. Class palettes are partial swaps over `a c d b k m` only (never `o s h e w`), applied after the master and before skin and hair (see the class table in section 6).
-- **Particle ramps** (bright to dim): ember `Y O R D`, spark `w Y O`, drip `q Q 8`, splash `w q Q`.
+- **Particle ramps** (bright to dim): ember `Y O R D`, spark `w Y O`, drip `q Q 8`, splash `w q Q`, mote `a V W`, bubble `L N Q`, wisp `G g P`, and (E3) **firefly `Y N L N Y`**: the one ramp that alternates bright and dim, so a 1x1 firefly blinks slowly (each step is a fifth of its 3.5 to 6.5 s life, never faster than 0.5 s). The Stage 6 embers reuse the `ember` ramp. No new master character was added in E3: the master palette stays at 37 of 48.
 - Each biome has an **8-color tile palette**. Enemies in a stage share 2-3 of those colors plus their own accent.
 - Colorblind-safe variant: never rely on red versus green alone; pair color with a shape cue.
 
@@ -241,13 +241,13 @@ Same contract as above (left-facing, foot anchor, fill plus auto outline in the 
 
 | Stage | id | Tier, size, anchor | Frames | Colors | Silhouette cue |
 |---|---|---|---|---|---|
-| 3 | `green-slime` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 6: `1 L N w e q` | squat dome with a small tip on top, no limbs; `walk` stretches tall then squashes (the engine hops it); `attack` squashes back, lunges flat with a small mouth |
-| 3 | `spore-shroom` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 R D w 7 G e L k` | red spotted umbrella cap on a thin pale stem, two stubby feet; `attack` squeezes the cap and puffs green spores to the front |
-| 3 | `toxic-toad` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 C Z Y R e O` | wide low orange body, big hind haunch, two bulging yellow eyes, red warts; `attack` lunges a pink tongue to the front |
-| 3 | `jelly-cube` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 9: `1 c d Q q e w a Y` | rounded blue block with a glossy rim, a gold coin and a bone suspended inside; `attack` stretches tall, then slams flat and wide |
-| 3 | `ooze-queen` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 9: `1 L N a Y R w e q` | big lime mound with a tall drippy gold crown, large eyes, bubbles rising inside |
+| 3 | `green-slime` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 6: `1 L N w e q` | tall pear-shaped drop with a pointed tip leaning back, two big off-center eyes, a dark base rim, no limbs (reworked in A-E3-0); `walk` leans and squashes (the engine hops it); `attack` squashes back, lunges flat with a small mouth |
+| 3 | `spore-shroom` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 R D w 7 G e L k` | very wide tilted red cap (lifted brim on the left, scalloped gills on the right) with uneven white spots on a thin pale stem with dot eyes, two tiny feet (reworked in A-E3-0); `attack` squeezes the cap and puffs green spores to the front |
+| 3 | `toxic-toad` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 C Z Y R e O` | upright sitting orange toad: two yellow eye globes on thin stalks, a wide mouth line, pale belly, red warts, Z-bent hind leg (reworked in A-E3-0); `attack` lunges a pink tongue to the front |
+| 3 | `jelly-cube` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 9: `1 c d Q q e w a Y` | tall flat-topped pillar of blue jelly leaning back and melting into a wide puddle skirt, a glossy rim, a gold coin and a bone suspended inside (reworked in A-E3-0); `attack` stretches up, then slams flat |
+| 3 | `ooze-queen` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 9: `1 L N a Y R w e q` | lime slime queen with a narrow gown, a tall drippy gold crown, large eyes, bubbles rising inside, and both slime arms raised in a wave (reworked in A-E3-0; the lunge reaches one arm forward) |
 | 4 | `bone-soldier` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 10: `1 7 5 G P Y R D k e` | leaning skeleton, dented iron helmet, amber eyes, round wooden shield in front, rusty red sword behind; thin loose bone legs |
-| 4 | `wailing-ghost` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 5: `1 w q Q e` | tall white sheet with a round head, hollow eyes, a big open mouth, stub arms and a ragged hem trailing back; `attack` raises the arms and wails (pale sound ticks to the front) |
+| 4 | `wailing-ghost` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 5: `1 w q Q e` | tall narrow white teardrop sheet with a round head, hollow eyes, an open mouth and a ragged hem; drawn two pixels right of the frame center so it clears the Bone Soldier (reworked in A-E3-0); `attack` raises an arm and wails (pale sound ticks to the front) |
 | 4 | `tomb-scarab` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 8: `1 a Y O k e 8 q` | flat golden beetle, short orange horn, segmented shell, violet gem, spread dark legs |
 | 4 | `crypt-mummy` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 7 5 2 e Y 8` | bandaged shuffler leaning forward, glowing eyes in a dark gap, arms reaching forward at chest height, one trailing wrap; `attack` pulls the arms back, then lunges them forward |
 | 4 | `tomb-lich` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 11: `1 8 2 7 5 a k L N Y e` | hooded skeleton in a violet robe with gold belt and hem, tall spiked gold crown, green eye glow, staff with a floating green gem |
@@ -262,11 +262,38 @@ Phase palettes (`BOSS_PHASE_PALETTES` in `palettesE1.ts`, exported as `ENEMY_PHA
 
 Contrast note: stage 1 enemies avoid the stone grays of floor and wall with master accents (gray rat with pink, indigo bat, brown spider with red hourglass, wooden crate); stage 2 enemies use goblin green, indigo and rock gray against timber brown.
 
+### Delivered enemies (batch E3, steps A-E3-4 to A-E3-6)
+
+Same contract as above (left-facing, foot anchor, outline in the stage's `1`). Stage 5 enemies are bright greens, warm browns, and glowing blue accents over dark gray-green ruin stone; Stage 6 enemies are warm reds, oranges, and glowing cracks against near-black basalt. The base frame of most E3 enemies is a hand-drawn fill picture (outlined by `fromFill`); the other frames derive from it with the row-level helpers in `enemyFrames.ts` (`shiftRows`, `lift`, `squash`, `patch`). Ids and names match [the E3 plan](../architecture/plans/e3-stages-5-6.md#52-data-enemy-rows-and-stage-props).
+
+| Stage | id | Tier, size, anchor | Frames | Colors | Silhouette cue |
+|---|---|---|---|---|---|
+| 5 | `thorn-sprout` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 L 5 w e W N` | round moss bulb with one big eye, a spiked radial crown of thorny leaves, three thin root legs; `attack` leans forward and flares the leaves |
+| 5 | `moss-wolf` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 G Y 5 L e P w R` | lean gray wolf on four thin legs, two tall pointed ears, a yellow eye, mossy back, tail raised high; `attack` crouches, then lunges the head forward with open jaws |
+| 5 | `bramble-pixie` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 11: `1 N 6 7 e s 5 D W 8 k` | a thin X of glowing wings (cyan upper pair, blue lower pair) around a small leaf-haired pixie with dangling legs, a thorny stick held to the front; hovers three pixels above the ground; `attack` flicks the stick and flares the wings |
+| 5 | `ancient-treant` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 8: `1 L W V 5 6 7 e` | gnarled tree: wide root base, bark trunk with a glowing-eyed face, a Y of branches ending in leaf tufts, two low branch arms held forward at chest height, never overhead; `attack` pulls the arms back, then thrusts them forward |
+| 5 | `elder-dryad` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 10: `1 w W a Y V N e L 5` | tall tree-spirit woman: antler-branch crown with white and gold blossoms, bark-brown face, leafy hair trailing back, a gown of trailing vines, a vine staff topped with a glowing blossom |
+| 6 | `ember-imp` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 w R O Y D e` | small red imp, no wings: two pale horns, yellow eyes, a claw held forward, a long curved tail ending in a tiny flame; the walk is a hop; `attack` swipes the claw with yellow slash ticks |
+| 6 | `slag-snail` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 Y D 4 3 e 2 6 O` | dark red snail with two eyestalks, an orange belly, and a high cooled-basalt spiral shell behind the head that glows at the cracks; `idle` retracts the stalks, `attack` thrusts the head forward with the stalks laid back |
+| 6 | `magma-crab` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 R D Y 4 3 6 2 P` | wide flat basalt-plated crab with a glowing crack, two long arms ending in raised red pincers, eyes on short stalks, thin legs splayed out; `attack` opens the claws, then snaps them shut as the body lunges |
+| 6 | `furnace-guard` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 10: `1 P 7 2 5 e Y 3 6 4` | squat iron guard: horned helmet with a small smoking chimney, rust shoulder plates, a box torso with a glowing grate, a big hammer carried low in front; drawn about four pixels left of the frame center so it clears the Crate Mimic; `attack` rocks back, then swings the hammer up in front |
+| 6 | `molten-colossus` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 8: `1 2 3 4 5 6 7 8` | hulking basalt giant: a small blocky head with glowing eyes and a jagged crest, huge rust-banded shoulders, a furnace door in the chest, orange cracks, two heavy fists raised at the sides, legs set wide apart |
+
+Silhouette separation inside Stage 5: tall spiky bulb, standing wolf with tall ears and a raised tail, a thin X of wings, and a Y-crowned tree. Inside Stage 6: thin horned biped with a flame-tipped tail, low snail with a high shell, wide flat crab with two claws up, and a boxy horned guard with a chimney. All new minions are measured against every older 16x16 enemy with the look-alike tool (see "Look-alike policy" below).
+
+Boss readability: Elder Dryad `telegraph` lifts the staff high while the blossoms open wide and the eyes glow; her `attack` thrusts the staff forward in a long reach with gold sparkles; `intro` rises out of the ground. Molten Colossus `telegraph` gathers both fists in front of the chest while the cracks and grate brighten; his `attack` raises the fists, then slams both to the floor; `intro` climbs out of the ground.
+
+Phase palettes (`BOSS_PHASE_PALETTES_E3` in `palettesE3.ts`, merged into `ENEMY_PHASE_PALETTES` at wiring; phase 2 is index 0): Elder Dryad overrides `L #ff9a3c`, `N #c8501c`, `w #fff6d8`, `a #ffe08a` (warm autumn orange leaves, white-gold blossoms); Molten Colossus overrides `5 #d8883c`, `6 #ffd24a`, `7 #ffffff`, `8 #ff7a1c` (white-hot cracks and furnace glow, heated rust bands). Same silhouettes. No hero ever gets a phase or a hot tint.
+
 ## 8. Stages
 
 **Per-stage palettes (decision E1-2).** Each stage keeps the eight tile characters `1` to `8`, but their colors are a partial palette per stage (`STAGE_PALETTES` in `palettesE1.ts`), laid over the master palette; it may also override `g` (ambient) and `T` (torch or lantern light). Stage 1 is `{}` (the master values). Stage 2, Goblin Mine Shafts: `1 #1a120d`, `2 #3b2a1e`, `3 #5f4430`, `4 #8c6a46`, `5 #b07a3c`, `6 #ffd24a` lantern yellow, `7 #f2e8c8` chalk, `8 #62d0bc` ore glint, `g #7a6a84`, `T #ffc94a`. Meaning is stable across stages (1 deepest shadow, 2 dark rock, 3 mid rock, 4 lit rock, 5 timber, 6 light source, 7 highlight, 8 accent), so shared sprite logic still reads. No new master characters per stage; the master palette stays at 37 colors (cap 48). The `mote` particle ramp (warm dust, stage 2 ambient) reuses master `a V W`.
 
 Stage 3, Toxic Slime Caverns (batch E2): `1 #0b1816`, `2 #1d3836`, `3 #2f5652`, `4 #4b7d73`, `5 #7b7a3a` olive crust, `6 #b4ff3c` acid glow, `7 #dcf5c6`, `8 #3fd0a0` aqua slime, `g #5a8a80`, `T #8fe84a`. Stage 4, Ancient Catacombs: `1 #150f1c`, `2 #2e2438`, `3 #4f4160`, `4 #76668a`, `5 #b8a67c` bone beige, `6 #b8fff0` cold candle flame, `7 #f2ead2` bone white, `8 #a85cf0` violet, `g #6a5a92`, `T #8fe8d8`. Both keep the clear color `n` (master near-black). The master palette stays at 37 colors. Particle ramps added in E2: `bubble` `L N Q` (lime, green, blue-gray; rising toxic bubbles) and `wisp` `G g P` (dim grays and violet; low fog), master characters only.
+
+Stage 5, Enchanted Forest Ruins (batch E3): `1 #0b1511`, `2 #222f29`, `3 #3b4f43`, `4 #62786a`, `5 #5fa24a` moss green, `6 #7fe4ff` glowing blue flora, `7 #e6f3dc`, `8 #3f8cff` deep blue bloom, `g #3f7468` (dark blue-green), `T #7fd0ff` (soft blue bloom light). Stage 6, Molten Core: `1 #0e0a0c` basalt black, `2 #241d22`, `3 #3a3238`, `4 #5d5059`, `5 #a8643c` rust iron, `6 #ff7a1c` glowing orange, `7 #ffe49a` hot yellow-white, `8 #7a2a1c` deep red-brown, `g #6b6058` (gray-brown), `T #ffa040` (warm orange). Both keep the clear color `n`. **Tint rule:** the Stage 6 ambient tint `g` is a dark neutral warm gray-brown whose red channel is at most 1.3 times the larger of green and blue (107 against 96); a strong red wash over a hero would read as "hurt", so the lava glow comes only from lights (`T`), bright pixels, and prop animation. The master palette stays at 37 colors.
+
+**Lava rules (cosmetic only, no hazard).** Lava (`6` and `7`) appears only in the backdrop, in wall-layer props (`lavaFall`, `lavaChannel`) and wall tiles (the lit opening, the door gap). Floor tiles and floor props use only the dark `8` and rust `5`; no floor prop is named `lava...`; no prop or particle is solid except the alcove floor props. The lava lights (`lavaFall`, `lavaChannel`) and `glowBloom` use `flicker: false`.
 
 Each stage needs a tile palette, floor tiles, back-wall tiles, 6+ props, a parallax backdrop, and an ambient effect.
 
@@ -361,8 +388,50 @@ Tiles: `wallTop` 2, `wallMid` 5 (4 masonry variants: plain, cracked, a skull set
 
 Ambient: low `wisp` particles (`G g P`) plus warm dust motes.
 
+### Stage 5 characters and props (delivered, batch E3 step A-E3-2)
+
+Tile palette (`STAGE_TILE_CHARS['enchanted-forest-ruins']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` deepest shadow and outline, `2` dark ruin stone, `3` mid stone, `4` lit stone, `5` moss green, `6` glowing blue flora, `7` pale highlight, `8` deep blue bloom. Stone stays darker and less saturated than the enemies.
+
+Tiles: `wallTop` 2 (hanging vines ending in a blue bud), `wallMid` 5 (4 mossy masonry variants: moss patches, a climbing vine, a worn blue rune, heavy moss with tiny blooms; variant 4 a vine-wrapped window with transparent pixels for the backdrop), `wallBase` 2 (a moss strip along the base; variant 1 has blooms), `floorBack` 3 and `floorFront` 3 (mossy flagstones with grass tufts; variant 1 cracked, variant 2 a blue bloom), `foreground` 2 (grass blades on the lip; variant 1 a bloom). Masonry is 4 px courses of 8 px blocks, periodic in 16. Backdrop 128x128, period 64: ruined arches (upper right broken away) between dark tree trunks with hanging vines and glowing flowers in the distance.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `brokenPillar` | 16x96 | top-left | 1 | wall (a fluted column snapped to a jagged top, wrapped by roots, moss at the base) |
+| `hangingRoots` | 16x40 | top-left | 1 | wall (roots and vines hanging from the ceiling, a few leaves and a bloom) |
+| `glowBloom` | 16x20 | top-left | 2 (slow pulse) | wall, light source (`T` soft blue, flicker false) |
+| `ruinedStatue` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove (mossy robed bust on a pedestal) |
+| `fernPatch` | 16x10 | `(8, 8)` | 1 | floor, decoration |
+| `flowerBed` | 16x8 | `(8, 6)` | 1 | floor, decoration (small glowing flowers) |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (ruined stone arch with a mossy lintel, ivy, blue blooms) |
+
+Ambient: `firefly` particles (ramp `Y N L N Y`).
+
+### Stage 6 characters and props (delivered, batch E3 step A-E3-3)
+
+Tile palette (`STAGE_TILE_CHARS['molten-core']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` basalt black and outline, `2` dark charcoal, `3` mid charcoal, `4` lit basalt, `5` rust iron, `6` glowing orange, `7` hot yellow-white, `8` deep red-brown.
+
+Tiles: `wallTop` 2 (basalt points under the lip), `wallMid` 5 (4 basalt variants: plain, a crack with a dark red glow, a rust iron band with rivets, cooling embers; variant 4 a lit opening framed in dark red with transparent pixels for the backdrop), `wallBase` 2 (a dark red skirting line), `floorBack` 3 and `floorFront` 3 (basalt flagstones, dark red seams only, no glow colors), `foreground` 2. Basalt is 4 px wide columns with a lit left edge and dark seams in 8 px courses, periodic in 16. Backdrop 128x128, period 64: a far lava river under a dithered dark-red horizon glow, black basalt columns.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `obsidianPillar` | 16x112 | top-left | 1 | wall (glossy dark column with long glints and a rust band) |
+| `lavaFall` | 16x96 | top-left | 4 (slow flow loop) | wall, light source (`T` orange, flicker false) |
+| `lavaChannel` | 16x8 | top-left | 2 (shimmer) | wall-base band, light source (flicker false; edge columns repeat so it tiles) |
+| `anvil` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove |
+| `slagHeap` | 16x8 | `(8, 7)` | 1 | floor, decoration (cooled rubble, dark red crack, no bright glow; not named `lava...`) |
+| `toolRack` | 16x24 | top-left | 1 | wall decoration (hung hammer and tongs on a rust beam) |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (blackened iron-banded arch with an orange glow in the gap) |
+
+Ambient: rising `ember` particles (the existing `Y O R D` ramp).
+
 **Campfire**: logs and seats, a 4-frame flame loop in two sizes (small, large from 3 resting heroes), ember sparks. It grows as more heroes rest and is drawn identically across stages with master characters only. Delivered: `logs` (a stone ring, two crossed logs, a flanking decorative log each side; anchor at the pit's front-edge center), `flameSmall`, `flameLarge`.
 
-## Known look-alike backlog
+## Look-alike policy
 
-Ten Stage 3/4 minion pairs are pinned in the `KNOWN_OVER` ratchet in `test/game/stagesE2Art.test.ts` (overlap over the smaller count > 0.85, IoU <= 0.80): green-slime vs cellar-rat, ore-beetle, cave-bat, web-spider, and goblin-scout; spore-shroom vs goblin-scout; toxic-toad vs cave-bat, ore-beetle, and cellar-rat; wailing-ghost vs web-spider. They are to be reworked in a later art pass, after which the pins are removed.
+Silhouette overlap is measured on idle frame 0 (opaque pixels as anchor-relative keys). `overlap` is shared pixels over the smaller count; `IoU` is shared over the union. Policy: every pair of same-size enemies (minion 16x16, elite 24x24, boss 48x48) has overlap under 0.85 and IoU at most 0.80, and two minions of one stage stay under 0.75 overlap. Run `node test/support/lookAlikesReport.mjs <file.ts>:<ExportName>[:<stage>]` on new art before wiring it; it prints the worst pairs and `policy holds` when the art passes.
+
+Lessons from E3: a sprite that is larger than another is judged by how much of the smaller one it covers, so a big solid blob loses to every small enemy; keep new minions near 110 to 160 pixels, spend 15 percent or more of the pixels where the others are empty (the top rows, the side columns, tall ears, horns, tails, wings, a raised claw), and leave holes (gaps between legs, between arms and torso). The `ooze-queen` and `molten-colossus` are separated from the solid `rat-king` the same way (raised arms and fists in the empty top corners).
+
+Reworked in E3 step A-E3-0 (art only, same ids, sizes, anchors, animation sets): `green-slime`, `spore-shroom`, `toxic-toad`, `wailing-ghost` clear all ten former `KNOWN_OVER` pairs; `jelly-cube` and `ooze-queen` clear the legacy pairs against `crate-mimic` and `rat-king`; `green-slime` and `toxic-toad` no longer exceed the same-stage limit (0.748 against 0.75). Two older sprites were left alone on purpose: `crate-mimic`, `rat-king`, and the Stage 1 and 2 minions are E1 art. Legacy pairs that still exceed (all among E1 and E2 enemies, still pinned in `test/support/lookAlikes.ts` `LEGACY_OVER`): crate-mimic vs rock-golem and crypt-mummy; rock-golem vs crypt-mummy; rat-king vs tomb-lich; cellar-rat vs cave-bat, web-spider, and ore-beetle; cave-bat vs web-spider and ore-beetle; web-spider vs ore-beetle; goblin-miner vs goblin-scout. The pins for the pairs reworked here (17 pairs, listed by the report as `stale pins`) must be removed by the tester.
+
+Two sprites sit off their frame center on purpose so that the anchor-relative silhouette clears an older enemy: `furnace-guard` (about four pixels left, away from `crate-mimic`) and `wailing-ghost` (two pixels right, away from `bone-soldier`). The anchor stays at the foot center.

@@ -42,7 +42,11 @@ export type AmbientEffect =
   /** Rising bubbles (E2, Stage 3). */
   | { readonly kind: 'bubbles'; readonly perSecond: number }
   /** Low drifting fog wisps plus a few dust motes (E2, Stage 4). */
-  | { readonly kind: 'fog'; readonly perSecond: number; readonly dustPerSecond: number };
+  | { readonly kind: 'fog'; readonly perSecond: number; readonly dustPerSecond: number }
+  /** Blinking fireflies wandering in the corridor view (E3, Stage 5). */
+  | { readonly kind: 'fireflies'; readonly perSecond: number }
+  /** Rising embers, the existing ember kind used as decoration (E3, Stage 6). */
+  | { readonly kind: 'embers'; readonly perSecond: number };
 
 export interface StageDef {
   /** Kebab-case; matches the StageSprites key. */
@@ -62,6 +66,12 @@ const LANTERN_LIGHT: LightDef = { radius: 52, intensity: 0.85, colorChar: 'T', f
 const SHROOM_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', flicker: false };
 /** Candelabra (Stage 4) flicker like torches. */
 const CANDLE_LIGHT: LightDef = { radius: 52, intensity: 0.8, colorChar: 'T', flicker: true };
+
+/** Glow blooms (Stage 5): a soft blue-teal pulse, no flicker. */
+const BLOOM_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', flicker: false };
+/** Lava falls and channels (Stage 6): decoration light only, slow, no flicker (decision E3-11). */
+const LAVA_FALL_LIGHT: LightDef = { radius: 52, intensity: 0.7, colorChar: 'T', flicker: false };
+const LAVA_CHANNEL_LIGHT: LightDef = { radius: 44, intensity: 0.6, colorChar: 'T', flicker: false };
 
 function wall(
   prop: string,
@@ -205,5 +215,67 @@ export const STAGES: readonly StageDef[] = [
       floor('boneRubble', 'corridor', 300, 150),
     ],
     ambient: { kind: 'fog', perSecond: 4, dustPerSecond: 3 },
+  },
+  /**
+   * Stage 5, "Enchanted Forest Ruins". The ruined statue is the only solid prop (alcove, foot y
+   * 134, 12 x 5 footprint). Glow blooms light the stage with the stage-recolored `T`; they pulse
+   * and never flicker. Fireflies are the ambient.
+   */
+  {
+    id: 'enchanted-forest-ruins',
+    index: 5,
+    name: 'Enchanted Forest Ruins',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('brokenPillar', 'alcove', 0, 16),
+      wall('hangingRoots', 'alcove', 52, 16),
+      wall('glowBloom', 'alcove', 28, 40, BLOOM_LIGHT),
+      wall('glowBloom', 'alcove', 92, 40, BLOOM_LIGHT),
+      wall('hangingRoots', 'alcove', 108, 16),
+      floor('ruinedStatue', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('fernPatch', 'alcove', 60, 150),
+      floor('flowerBed', 'alcove', 88, 148),
+      wall('glowBloom', 'corridor', 60, 40, BLOOM_LIGHT),
+      wall('glowBloom', 'corridor', 252, 40, BLOOM_LIGHT),
+      wall('brokenPillar', 'corridor', 150, 16),
+      wall('brokenPillar', 'corridor', 330, 16),
+      wall('hangingRoots', 'corridor', 190, 16),
+      wall('hangingRoots', 'corridor', 110, 16),
+      floor('fernPatch', 'corridor', 100, 152),
+      floor('flowerBed', 'corridor', 200, 148),
+      floor('fernPatch', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'fireflies', perSecond: 5 },
+  },
+  /**
+   * Stage 6, "Molten Core". Lava is scenery only: wall-layer falls and a wall-base channel, never
+   * a floor prop (lava rules, E3 plan section 5.1). The anvil is the only solid prop (alcove, foot
+   * y 134). Lights are slow and steady; embers are the ambient.
+   */
+  {
+    id: 'molten-core',
+    index: 6,
+    name: 'Molten Core',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('obsidianPillar', 'alcove', 0, 16),
+      wall('lavaFall', 'alcove', 28, 16, LAVA_FALL_LIGHT),
+      wall('lavaFall', 'alcove', 92, 16, LAVA_FALL_LIGHT),
+      wall('lavaChannel', 'alcove', 52, 120, LAVA_CHANNEL_LIGHT),
+      wall('toolRack', 'alcove', 108, 52),
+      floor('anvil', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('slagHeap', 'alcove', 60, 152),
+      floor('slagHeap', 'alcove', 88, 148),
+      wall('lavaFall', 'corridor', 60, 16, LAVA_FALL_LIGHT),
+      wall('lavaFall', 'corridor', 252, 16, LAVA_FALL_LIGHT),
+      wall('obsidianPillar', 'corridor', 150, 16),
+      wall('obsidianPillar', 'corridor', 330, 16),
+      wall('lavaChannel', 'corridor', 190, 120, LAVA_CHANNEL_LIGHT),
+      wall('toolRack', 'corridor', 110, 52),
+      floor('slagHeap', 'corridor', 100, 152),
+      floor('slagHeap', 'corridor', 200, 148),
+      floor('slagHeap', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'embers', perSecond: 6 },
   },
 ];

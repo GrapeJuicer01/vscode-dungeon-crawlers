@@ -1,7 +1,7 @@
 // The compact enemy table and its scaling formulas (enemy side, E1 plan section 3.3,
 // data-model.md section 6). Each enemy is one small row; health, speed, and attack timing come from
 // the tier base and the formulas below, so the 50 enemies of the finished game are never 50
-// hand-written objects. E1 delivered ten rows (stages 1 and 2), E2 ten more (stages 3 and 4); the validator runs in the
+// hand-written objects. E1 delivered ten rows (stages 1 and 2), E2 ten more (stages 3 and 4), E3 ten more (stages 5 and 6); the validator runs in the
 // incremental mode of roadmap A3: five rows and exactly one boss per delivered stage. E5 pins the
 // full contract (ten stages, 50 unique ids) and removes the incremental mode.
 //
@@ -41,8 +41,9 @@ export const PACE_MAX = 1.6;
 
 /**
  * Stage 1: Forgotten Cellar. Stage 2: Goblin Mine Shafts. Stage 3: Toxic Slime Caverns. Stage 4:
- * Ancient Catacombs (E2). Numbers are first guesses (decision
- * E1-11) tuned by eye in the manual benchmark.
+ * Ancient Catacombs (E2). Stage 5: Enchanted Forest Ruins. Stage 6: Molten Core (E3; the two late
+ * bosses use a vigor below 1.0 so the fights do not drag, decision E3-7). Numbers are first
+ * guesses (decision E1-11) tuned by eye in the manual benchmark.
  */
 export const ENEMIES = [
   {
@@ -242,6 +243,106 @@ export const ENEMIES = [
     tier: 'boss',
     gait: 'walk',
     vigor: 1.0,
+    pace: 0.6,
+    drop: 'chest',
+  },
+  {
+    id: 'thorn-sprout',
+    name: 'Thorn Sprout',
+    stage: 5,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.0,
+    pace: 0.9,
+    drop: 'coin',
+  },
+  {
+    id: 'moss-wolf',
+    name: 'Moss Wolf',
+    stage: 5,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 0.9,
+    pace: 1.3,
+    drop: 'coin',
+  },
+  {
+    id: 'bramble-pixie',
+    name: 'Bramble Pixie',
+    stage: 5,
+    tier: 'minion',
+    gait: 'float',
+    vigor: 0.8,
+    pace: 1.1,
+    drop: 'ore',
+  },
+  {
+    id: 'ancient-treant',
+    name: 'Ancient Treant',
+    stage: 5,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 1.3,
+    pace: 0.5,
+    drop: 'gem',
+  },
+  {
+    id: 'elder-dryad',
+    name: 'Elder Dryad',
+    stage: 5,
+    tier: 'boss',
+    gait: 'walk',
+    vigor: 0.9,
+    pace: 0.6,
+    drop: 'chest',
+  },
+  {
+    id: 'ember-imp',
+    name: 'Ember Imp',
+    stage: 6,
+    tier: 'minion',
+    gait: 'hop',
+    vigor: 1.0,
+    pace: 1.2,
+    drop: 'coin',
+  },
+  {
+    id: 'slag-snail',
+    name: 'Slag Snail',
+    stage: 6,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.3,
+    pace: 0.5,
+    drop: 'ore',
+  },
+  {
+    id: 'magma-crab',
+    name: 'Magma Crab',
+    stage: 6,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 1.1,
+    pace: 1.0,
+    drop: 'ore',
+  },
+  {
+    id: 'furnace-guard',
+    name: 'Furnace Guard',
+    stage: 6,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 1.2,
+    pace: 0.5,
+    drop: 'gem',
+  },
+  {
+    id: 'molten-colossus',
+    name: 'Molten Colossus',
+    stage: 6,
+    tier: 'boss',
+    gait: 'walk',
+    vigor: 0.8,
     pace: 0.6,
     drop: 'chest',
   },

@@ -149,12 +149,13 @@ Each batch delivers two stages: per stage 4 regular enemies plus exactly 1 boss,
 
 #### E3. Stage 5 Enchanted Forest Ruins, Stage 6 Molten Core
 
-- **Scope**: two stages; environmental hazards (lava) are visual only for heroes.
-- **Files**: as E2.
-- **Art (batch E3)**: Stage 5 and Stage 6 environments (fireflies; embers and lava glow), four enemies and a boss per stage.
+- **Plan**: [E3 plan](../architecture/plans/e3-stages-5-6.md) (E2 assumptions audited, the atomic art-then-data switch, interfaces, task list, test notes, look-alike policy, art steps A-E3-0 to A-E3-6, decisions E3-1 to E3-11).
+- **Scope**: two stages of rows (10 enemies, 30 of 50 delivered), per-stage palette overrides, two cosmetic ambients (`fireflies`, `embers`) as new `AmbientEffect` kinds plus one new particle kind (`firefly`; embers reuse `ember`). Lava glow is lights, palette, and art only; lava and other decoration are visual only for heroes, with no hazard semantics. No new enemy mechanic. Boss `vigor` below 1.0 for the two late bosses. Progression wraps after Stage 6 with no code change.
+- **Files**: `enemies.ts` (rows), `stages.ts` (rows, `AmbientEffect`), `tuning.ts`, `Ambience.ts`, `Particles.ts`, `Renderer.ts` (colour map), `spriteValidator.ts` (`REQUIRED_PROPS`, `FLAME_PROPS`), regenerated `docs/design/enemies-and-stages.md`; `Combat`, `Enemy`, `Boss`, `Progression`, `StageDirector` unchanged. Pixel-artist: per-stage template files, `palettesE3.ts`, art docs.
+- **Art (batch E3)**: optional A-E3-0 (rework four E2 look-alikes), then six steps (A-E3-1 stage palettes, char tables, `firefly` ramp; A-E3-2 Stage 5 environment; A-E3-3 Stage 6 environment; A-E3-4 Stage 5 enemies; A-E3-5 Stage 6 enemies; A-E3-6 Elder Dryad, Molten Colossus, then barrel wiring). Zero new master characters by default (at most 3).
 - **Depends on**: E2.
-- **Done when**: G1-G7; validator passes for stages 1-6 (30 enemies); lava and other hazards cannot affect hero state; 60fps holds with 8 heroes and 30 enemies (first point where 30 distinct enemy types exist).
-- Status: todo
+- **Done when**: G1-G7; validator passes for stages 1-6 (30 enemies); progression wraps after Stage 6; lava and other decoration cannot affect hero state (tested); look-alike policy holds for all new enemies; 60fps holds with 8 heroes and a full wave of 12 enemies (first point where 30 distinct enemy types exist).
+- Status: done
 
 #### E4. Stage 7 Frozen Citadel, Stage 8 Shadow Realm
 
@@ -244,7 +245,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 7 | M5 heroes | H3 Druid, Monk, Artificer, Berserker | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 11 | M6 enemies | E4 stages 7-8 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 12 | M6 enemies | E5 stages 9-10 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 13 | M7 UI | U1 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |

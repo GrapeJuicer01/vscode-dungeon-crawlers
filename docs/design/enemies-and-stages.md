@@ -1,6 +1,6 @@
 # Enemies and stages
 
-Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (four stages, twenty enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
+Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (six stages, thirty enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
 Related: [game design](game-design.md), [classes](classes.md), [art style guide](art-style-guide.md), [sprite spec](sprite-spec.md), [E1 plan](../architecture/plans/e1-enemies.md), [E2 plan](../architecture/plans/e2-stages-3-4.md), [ADR 0002 no hero health](../architecture/adr/0002-no-hero-health.md), [ADR 0012 host-owned versioned progress](../architecture/adr/0012-host-owned-versioned-progress.md), [ADR 0013 enemy health and the hero reaction board](../architecture/adr/0013-enemy-health-and-hero-reaction-board.md), [data model](../architecture/data-model.md), [glossary](../glossary.md).
 
 ## The rule that does not bend
@@ -15,13 +15,15 @@ Heroes are invulnerable. Only enemies have health, and only enemies have a healt
 | 2 | Goblin Mine Shafts | timber brown, ore glints, lantern yellow | drifting dust motes |
 | 3 | Toxic Slime Caverns | murky teal rock, acid-green glow, slime accents | rising bubbles |
 | 4 | Ancient Catacombs | bone beige, dusty purple, candle glow | low drifting fog and a few dust motes |
+| 5 | Enchanted Forest Ruins | moss green over ruin gray, glowing blue flowers | blinking fireflies |
+| 6 | Molten Core | basalt black, rust iron, orange glow | rising embers |
 
-After Stage 4 (the last delivered stage) the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
+After Stage 6 (the last delivered stage) the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). The Stage 6 lava, its embers, and the Stage 5 fireflies are scenery only: they are drawn in the background or as small particles, sit nowhere near the floor the party walks on, and nothing in the game reads them (no burn, slow, or glow can touch a hero). The two late bosses have a `vigor` below 1.0 (Elder Dryad 0.9, Molten Colossus 0.8) so their fights do not drag: with a party of eight the Elder Dryad starts with 1238 health and the Molten Colossus with 1485. A saved cycle count from before Stage 5 and 6 existed simply continues; a cycle is now a pass through six stages. Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
 
 ## Enemies
 
 <!-- BEGIN GENERATED: enemies -->
-Delivered enemies: 20 of 50.
+Delivered enemies: 30 of 50.
 
 | Stage | Id | Name | Tier | Gait | Health | Pace (px/s) | Drop |
 |---|---|---|---|---|---|---|---|
@@ -45,6 +47,16 @@ Delivered enemies: 20 of 50.
 | 4. Ancient Catacombs | `tomb-scarab` | Tomb Scarab | minion | walk | 27 | 23.4 | ore |
 | 4. Ancient Catacombs | `crypt-mummy` | Crypt Mummy | elite | walk | 71 | 12 | gem |
 | 4. Ancient Catacombs | `tomb-lich` | Tomb Lich | boss | walk | 295 | 8.4 | chest |
+| 5. Enchanted Forest Ruins | `thorn-sprout` | Thorn Sprout | minion | walk | 33 | 23.4 | coin |
+| 5. Enchanted Forest Ruins | `moss-wolf` | Moss Wolf | minion | walk | 30 | 33.8 | coin |
+| 5. Enchanted Forest Ruins | `bramble-pixie` | Bramble Pixie | minion | float | 27 | 28.6 | ore |
+| 5. Enchanted Forest Ruins | `ancient-treant` | Ancient Treant | elite | walk | 104 | 10 | gem |
+| 5. Enchanted Forest Ruins | `elder-dryad` | Elder Dryad | boss | walk | 359 | 8.4 | chest |
+| 6. Molten Core | `ember-imp` | Ember Imp | minion | hop | 45 | 31.2 | coin |
+| 6. Molten Core | `slag-snail` | Slag Snail | minion | walk | 58 | 13 | ore |
+| 6. Molten Core | `magma-crab` | Magma Crab | minion | walk | 49 | 26 | ore |
+| 6. Molten Core | `furnace-guard` | Furnace Guard | elite | walk | 129 | 10 | gem |
+| 6. Molten Core | `molten-colossus` | Molten Colossus | boss | walk | 430 | 8.4 | chest |
 <!-- END GENERATED: enemies -->
 
 Every stage has four regular enemies (three minions and one elite) and one boss. Health comes from a small formula, not a hand-written number per enemy: the tier base, times the row's `vigor`, times 1.35 for each stage after the first, plus 25 percent per completed cycle (up to eight), and, for bosses only, plus 35 percent per fighting hero beyond the first (the party counts up to eight). The Health column is the cycle-0, party-of-one value. Pace is walking speed. The table is checked at startup: every delivered stage must have exactly five enemies with exactly one boss, ids must be unique, and every enemy must name an existing stage. An invalid table disables combat for the page load and the party marches in an empty corridor.

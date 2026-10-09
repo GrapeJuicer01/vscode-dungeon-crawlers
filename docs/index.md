@@ -35,6 +35,7 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [h3-classes](architecture/plans/h3-classes.md) | H3 Druid (beast), Monk, Artificer (turret), Berserker (checked against H2 as built; twelve-class `classFor` spread, summon capacity, kind-aware pool, Berserker rules, art list, decisions H3-1 to H3-10) |
 | [e1-enemies](architecture/plans/e1-enemies.md) | E1 Stage 1 and 2 enemies, bosses, combat, drops, stage progression, persisted progress (checked against H3 as built, with an as-built drift section 13 added after E1 was implemented; the enemy-side and hero-side seam, enemy table and scaling, `progress` and `saveProgress` messages, migration runner, settings, art list in six steps, decisions E1-1 to E1-19) |
 | [e2-stages-3-4](architecture/plans/e2-stages-3-4.md) | E2 Stage 3 Toxic Slime Caverns and Stage 4 Ancient Catacombs (checked against E1 as built; audit of two-stage assumptions, atomic art-then-data switch, bubble and fog ambients, 4-stage wrap, art list in six steps, decisions E2-1 to E2-10) |
+| [e3-stages-5-6](architecture/plans/e3-stages-5-6.md) | E3 Stage 5 Enchanted Forest Ruins and Stage 6 Molten Core (checked against E2 as built; atomic switch with boss phase palettes, firefly and ember ambients, lava-is-decoration rules, look-alike policy and the ten known-over pairs, 6-stage wrap, boss vigor estimates, art list A-E3-0 to A-E3-6, decisions E3-1 to E3-11; section 14 as built) |
 
 ### ADRs
 

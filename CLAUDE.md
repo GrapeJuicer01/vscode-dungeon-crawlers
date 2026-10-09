@@ -75,14 +75,17 @@ src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplat
                             aggregator), enemyBuilder (authoring helpers), enemiesStage1, enemiesStage2,
                             ratKingTemplate, goblinForemanTemplate, stage2Templates; E2: palettesE2 (boss phase
                             palettes), stage3Templates, stage4Templates, enemiesStage3, enemiesStage4,
-                            oozeQueenTemplate, tombLichTemplate; engine (developer):
-                            spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
+                            oozeQueenTemplate, tombLichTemplate; E3: palettesE3 (boss phase palettes),
+                            stage5Templates, stage6Templates, enemiesStage5, enemiesStage6, elderDryadTemplate,
+                            moltenColossusTemplate, enemyFrames (row helpers shared by the enemiesStage3 to 5 and
+                            boss files); engine (developer): spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
 scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
                             the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
 test/                       node:test suites (*.test.ts) + run.mjs (esbuild-compiles to out/test); game/ engine suites
                             incl. the hero-invariant test (M4);
                             support/ helpers and fakes (fakeVscode, fakeDom, color; monitor fakes from M3; engine fakes
-                            M4);
+                            M4; lookAlikes.ts, the silhouette look-alike policy and ratchet, with lookAlikesReport.ts
+                            and lookAlikesReport.mjs, the artist feedback command, E3);
                             fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3)
 test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
                             --disable-extensions); support/ in-host harness and providerSpy
@@ -114,7 +117,7 @@ dist/, out/                 build and test output (git-ignored; only dist/*.js s
 | Agent | Writes | Never writes |
 |---|---|---|
 | architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
-| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts`, the E2 files `palettesE2.ts`, `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts`, the E2 files `palettesE2.ts`, `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts`, the E3 files `palettesE3.ts`, `stage5Templates.ts`, `stage6Templates.ts`, `enemiesStage5.ts`, `enemiesStage6.ts`, `elderDryadTemplate.ts`, `moltenColossusTemplate.ts`, `enemyFrames.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
 | developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
 | tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
 | reviewer | nothing (read-only) | everything |

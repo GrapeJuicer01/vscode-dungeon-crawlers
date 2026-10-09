@@ -177,13 +177,18 @@ void describe('the boot gate (awaitProgress)', () => {
     assert.ok(spy.updates() > 0);
   });
 
-  void it('a stored stage above the delivered count wraps instead of failing (E2: four stages; 10 -> 2, 5 -> 1, 6 -> 2; 3 and 4 stay)', () => {
+  void it('a stored stage above the delivered count wraps instead of failing (E3: six stages, ((i - 1) % 6) + 1; 7 -> 1, 8 -> 2, 10 -> 4; 3 to 6 stay)', () => {
     for (const [stored, expected] of [
-      [10, 2],
-      [5, 1],
-      [6, 2],
+      [7, 1],
+      [8, 2],
+      [10, 4],
+      // 11 and 12 are outside the stored schema (MAX_STAGE_INDEX 10): rejected, so default Stage 1.
+      [11, 1],
+      [12, 1],
       [3, 3],
       [4, 4],
+      [5, 5],
+      [6, 6],
     ] as const) {
       const spy = spyCombat();
       const rig = gameRig();

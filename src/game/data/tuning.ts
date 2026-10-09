@@ -189,3 +189,18 @@ export const FOG_DRIFT_MIN = 3;
 export const FOG_DRIFT_MAX = 9;
 export const FOG_LIFE_MIN_MS = 4500;
 export const FOG_LIFE_MAX_MS = 7500;
+
+// Stage 5 fireflies (E3). Cosmetic only; first guesses, tuned by eye.
+export const FIREFLY_MIN_Y = 60;
+export const FIREFLY_MAX_Y = 140;
+export const FIREFLY_DRIFT = 6;
+export const FIREFLY_LIFE_MIN_MS = 3500;
+export const FIREFLY_LIFE_MAX_MS = 6500;
+
+// Stage 6 ambient embers (E3). Separate from the campfire EMBER_* constants.
+export const STAGE_EMBER_MIN_Y = 112;
+export const STAGE_EMBER_MAX_Y = 156;
+export const STAGE_EMBER_RISE_MIN = 14;
+export const STAGE_EMBER_RISE_MAX = 30;
+export const STAGE_EMBER_LIFE_MIN_MS = 1800;
+export const STAGE_EMBER_LIFE_MAX_MS = 3200;

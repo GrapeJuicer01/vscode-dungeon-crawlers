@@ -4,7 +4,8 @@ import type { Rng } from './rng';
 import type { Surface } from './ports';
 import { DRIP_GRAVITY_PX_PER_S2 } from './data/tuning';
 
-export type ParticleKind = 'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp';
+export type ParticleKind =
+  'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly';
 /** Kind -> CSS colour ramp, bright to dim by age. */
 export type ParticleColors = Readonly<Record<ParticleKind, readonly string[]>>;
 
@@ -16,6 +17,7 @@ const KIND_NAMES: readonly ParticleKind[] = [
   'mote',
   'bubble',
   'wisp',
+  'firefly',
 ];
 const KIND_EMBER = 0;
 const KIND_DRIP = 2;
@@ -23,6 +25,7 @@ const KIND_SPLASH = 3;
 const KIND_MOTE = 4;
 const KIND_BUBBLE = 5;
 const KIND_WISP = 6;
+const KIND_FIREFLY = 7;
 
 function kindIndex(kind: ParticleKind): number {
   return KIND_NAMES.indexOf(kind);
@@ -131,6 +134,10 @@ export class Particles {
       } else if (kind === KIND_WISP) {
         // Fog wisps drift slowly sideways with a small vertical wander (Stage 4 ambient).
         this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 6 * dt;
+      } else if (kind === KIND_FIREFLY) {
+        // Fireflies wander slowly in both axes (Stage 5 ambient); the blink is the colour ramp.
+        this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 48 * dt;
+        this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 48 * dt;
       } else if (kind === KIND_EMBER) {
         // Slow sideways wander so embers do not rise in straight lines.
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 60 * dt;

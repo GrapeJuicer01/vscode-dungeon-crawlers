@@ -18,7 +18,7 @@ type MutableArt = Omit<ArtSet, 'skinTones' | 'hairColors' | 'particlePalette'> &
   -readonly [K in 'skinTones' | 'hairColors']: Palette[];
 } & {
   particlePalette: Record<
-    'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp',
+    'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly',
     string[]
   >;
 };

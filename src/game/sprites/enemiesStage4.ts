@@ -21,6 +21,7 @@ import {
   put,
   stroke,
 } from './enemyBuilder';
+import { checked, lift, patch, shiftRows } from './enemyFrames';
 import type { SpriteTemplate } from './spriteTypes';
 
 type Pt = readonly [number, number];
@@ -129,103 +130,48 @@ export const BONE_SOLDIER: SpriteTemplate = enemyTemplate('bone-soldier', W, W, 
 });
 
 // ---------------------------------------------------------------- Wailing Ghost (16x16)
-// A tall tattered sheet: round head, hollow eyes, a big open wailing mouth, little stub arms raised
-// on both sides and a ragged hem trailing back. Pale blue-white. Colors: 1 w q Q e = 5.
+// A tall, narrow teardrop sheet: round head, hollow eyes, an open wailing mouth, short stub arms
+// and a ragged hem that trails back. Narrower than the Web Spider and taller than the Cave Bat so
+// it reads as a floating sheet. Hand-drawn base frame; the other frames come from row-level
+// helpers. Pale blue-white. Colors: 1 w q Q e = 5.
 
-interface GhostPose {
-  readonly bob?: number;
-  readonly hem: 0 | 1 | 2;
-  readonly arms: 'low' | 'up';
-  readonly mouth: 0 | 1 | 2;
-  readonly lean?: number;
-  readonly wail?: boolean;
+const GHOST_BASE: readonly string[] = [
+  '.......1111.....',
+  '......1wwww1....',
+  '.....1wwwwwq1...',
+  '.....1wewweqq1..',
+  '.....1wewweqq1..',
+  '.....1wweeeqq1..',
+  '.....1wweeeqq1..',
+  '....1wwwwwwwqq1.',
+  '....1wwwwwwwqq1.',
+  '.....1wwwwwqq1..',
+  '.....1wwwwwqq1..',
+  '.....1wwwwwwqq1.',
+  '......1wwwwwqq1.',
+  '.......1wwwwqq1.',
+  '......1w1ww1qq1.',
+  '.......1.11.11..',
+];
+
+/** One raised stub arm toward the front (outlined) over the base. */
+function ghostArmsUp(rows: readonly string[]): string[] {
+  return patch(rows, 2, 4, ['..1', '.1w', '1ww', '1w1', '.1.']);
 }
 
-function ghostFrame(p: GhostPose): string[] {
-  const d = draft(W, W);
-  const bob = p.bob ?? 0;
-  const lean = p.lean ?? 0;
-  // body: a slim teardrop sheet, rounded head, narrowing to a tail that curls back to the right
-  put(
-    d,
-    [
-      '.wwww.....',
-      'wwwwww....',
-      'wwwwwwww..',
-      'wwwwwwww..',
-      'wwwwwwww..',
-      'wwwwwwww..',
-      'wwwwwwww..',
-      '.wwwwwww..',
-      '.wwwwwww..',
-      '..wwwwww..',
-      '..wwwwwww.',
-      '...wwwwwww',
-      '....wwwwww',
-    ],
-    4 + lean - 1,
-    1 + bob,
-  );
-  // shade on the right side
-  for (let y = 0; y < W; y++)
-    for (let x = 0; x < W; x++) if (d.g.get(x, y) === 'w' && x >= 9 + lean) d.g.set(x, y, 'q');
-  // ragged hem tails
-  const hemRows: string[] = ['.......www.w', '......www..w', '.......ww.ww'];
-  put(d, [hemRows[p.hem] ?? hemRows[0] ?? ''], 3 + lean, 14 + bob);
-  // trailing tail wisp to the right
-  dots(d, [
-    [14 + lean, 12 + bob, 'Q'],
-    [15 + lean, 12 + bob, 'Q'],
-  ]);
-  // stub arms
-  if (p.arms === 'up') {
-    put(d, ['ww', 'w.'], 1 + lean, 5 + bob);
-    put(d, ['ww', '.w'], 11 + lean, 4 + bob);
-    dots(d, [
-      [1 + lean, 4 + bob, 'w'],
-      [12 + lean, 3 + bob, 'q'],
-    ]);
-  } else {
-    put(d, ['ww', 'ww'], 1 + lean, 8 + bob);
-    put(d, ['ww', 'ww'], 11 + lean, 8 + bob);
-  }
-  // face: hollow eyes and a wailing mouth
-  dots(d, [
-    [3 + lean, 3 + bob, 'e'],
-    [3 + lean, 4 + bob, 'e'],
-    [6 + lean, 3 + bob, 'e'],
-    [6 + lean, 4 + bob, 'e'],
-  ]);
-  const mouths: string[][] = [
-    ['ee', 'ee'],
-    ['eee', 'eee', '.e.'],
-    ['eeee', 'eeee', 'eeee', '.ee.'],
-  ];
-  const m = mouths[p.mouth] ?? [];
-  put(d, m, 3 + lean, 6 + bob);
-  d.g.rect(0, 15, W, 1, '.');
-  const out = finish(d);
-  if (!p.wail) return out;
-  const g = draft(W, W);
-  g.g.blit(out, 0, 0);
-  g.loose.push([0, 6, 'q'], [0, 8, 'q'], [0, 10, 'Q'], [1, 3, 'Q'], [0, 4, 'q'], [0, 12, 'Q']);
-  g.g.plot(g.loose);
-  return g.g.rows();
+/** Wail: a wide mouth and sound ripples at the front (left). */
+function ghostWail(rows: readonly string[]): string[] {
+  const m = patch(rows, 7, 5, ['eeeee', 'eeeee', '.eee.']);
+  return patch(m, 0, 3, ['Q..', '.Q.', 'Q..', '.Q.']);
 }
 
 export const WAILING_GHOST: SpriteTemplate = enemyTemplate('wailing-ghost', W, W, ANCHOR, {
-  idle: [
-    ghostFrame({ hem: 0, arms: 'low', mouth: 0 }),
-    ghostFrame({ hem: 1, arms: 'low', mouth: 0, bob: -1 }),
-  ],
-  walk: [
-    ghostFrame({ hem: 1, arms: 'low', mouth: 1, lean: -1, bob: -1 }),
-    ghostFrame({ hem: 2, arms: 'up', mouth: 1 }),
-  ],
+  idle: [checked(GHOST_BASE, W, W), lift(GHOST_BASE, 1)],
+  walk: [shiftRows(GHOST_BASE, 0, 13, -1), lift(shiftRows(GHOST_BASE, 0, 13, 1), 1)],
   attack: [
-    ghostFrame({ hem: 0, arms: 'up', mouth: 1, bob: 1 }),
-    ghostFrame({ hem: 2, arms: 'up', mouth: 2, bob: -1, wail: true }),
-    ghostFrame({ hem: 1, arms: 'low', mouth: 1 }),
+    lift(ghostArmsUp(GHOST_BASE), 0),
+    ghostWail(ghostArmsUp(lift(GHOST_BASE, 1))),
+    checked(GHOST_BASE, W, W),
   ],
 });
 

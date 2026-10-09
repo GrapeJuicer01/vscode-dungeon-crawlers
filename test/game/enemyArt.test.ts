@@ -62,9 +62,9 @@ void describe('the shipped E1 art passes every validator', () => {
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
   });
 
-  void it('has exactly twenty enemy templates (E1 and E2), one per enemy row, with the documented animation sets and sizes', () => {
+  void it('has exactly thirty enemy templates (E1 to E3), one per enemy row, with the documented animation sets and sizes', () => {
     assert.deepEqual(Object.keys(SHIPPED_ART.enemies).sort(), ENEMIES.map((r) => r.id).sort());
-    assert.equal(ENEMIES.length, 20);
+    assert.equal(ENEMIES.length, 30);
     const limit = { minion: 20, elite: 28, boss: 64 } as const;
     for (const row of ENEMIES) {
       const t = SHIPPED_ART.enemies[row.id]!;
@@ -135,9 +135,11 @@ void describe('the shipped E1 art passes every validator', () => {
     assert.deepEqual(Object.keys(mine).sort(), ['1', '2', '3', '4', '5', '6', '7', '8', 'T', 'g']);
   });
 
-  void it('phase palettes exist for exactly the four bosses, each overriding at most four master characters', () => {
+  void it('phase palettes exist for exactly the six bosses, each overriding at most four master characters', () => {
     assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), [
+      'elder-dryad',
       'goblin-foreman',
+      'molten-colossus',
       'ooze-queen',
       'rat-king',
       'tomb-lich',

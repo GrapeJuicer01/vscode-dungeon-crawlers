@@ -27,6 +27,7 @@ Status: M4 sections are synced to the as-built code (commit b320b00; drift in [M
 | Enemies, drops | `src/game/data/enemies.ts`, `drops.ts` | developer | E1-E5 |
 | Enemy, boss, drop, bar, and Stage 2 art; stage palettes and boss phase palettes | `palettesE1.ts`, `enemyBuilder.ts` (builder helpers), `enemyTemplates.ts` (aggregator and bar frames), `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `dropTemplates.ts`, `stage2Templates.ts` (all in `src/game/sprites/`) | pixel-artist | E1 (A-E1-1 to A-E1-6) |
 | Stage 3 and 4 art, enemies, bosses, and boss phase palettes (the two stage palettes sit in `palettesE1.ts` `STAGE_PALETTES`, the particle ramps in `palettes.ts`) | `palettesE2.ts` (`BOSS_PHASE_PALETTES_E2`), `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts` (all in `src/game/sprites/`) | pixel-artist | E2 (A-E2-1 to A-E2-6) |
+| Stage 5 and 6 art, enemies, bosses, and boss phase palettes (the two stage palettes sit in `palettesE1.ts` `STAGE_PALETTES`, the firefly ramp in `palettes.ts`); shared row helpers for enemy frames | `palettesE3.ts` (`BOSS_PHASE_PALETTES_E3`), `stage5Templates.ts`, `stage6Templates.ts`, `enemiesStage5.ts`, `enemiesStage6.ts`, `elderDryadTemplate.ts`, `moltenColossusTemplate.ts`, `enemyFrames.ts` (`checked`, `fromFill`, `lift`, `patch`, `shiftRows`, `squash`; also used by `enemiesStage3.ts` to `enemiesStage5.ts`) (all in `src/game/sprites/`) | pixel-artist | E3 |
 | Progress schema, migrations, store, game settings reader | `src/shared/progress.ts`, `src/host/progressMigrations.ts`, `progressStore.ts`, `gameConfig.ts` | developer | E1 |
 | Achievements | `src/game/data/achievements.ts` | developer | M7 |
 
@@ -46,7 +47,7 @@ export const STAGE_TILE_CHARS: Readonly<Record<string, string>>; // stage id -> 
 export const STAGE_CLEAR_CHAR: Readonly<Record<string, string>>; // stage id -> character for background fill
 export const STAGE_AMBIENT_CHAR: Readonly<Record<string, string>>; // stage id -> darkness tint multiplied over the environment
 export const LIGHT_CHARS: { readonly torch: string; readonly campfire: string }; // light colors
-export const PARTICLE_PALETTE: Readonly<Record<'ember' | 'spark' | 'drip' | 'splash', readonly string[]>>; // bright to dim
+export const PARTICLE_PALETTE: Readonly<Record<'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly', readonly string[]>>; // bright to dim; firefly (E3) alternates bright and dark: Y N L N Y
 
 // src/game/sprites/spriteTemplates.ts
 export interface SpriteTemplate {
@@ -73,7 +74,7 @@ export const CAMPFIRE: CampfireSprites;
 export const STAGE_SPRITES: Readonly<Record<string, StageSprites>>; // key = stage id
 ```
 
-The engine does not import these files directly. `src/game/sprites/artSet.ts` (developer-owned glue) gathers them into `SHIPPED_ART: ArtSet`, whose fields are `palette`, `skinTones`, `hairColors`, `baseHero`, `campfire`, `stageSprites`, `particlePalette`, `lightChars`, `stageAmbientChar`, `stageClearChar`, and `stageTileChars` (the last is `STAGE_TILE_CHARS`; the validator checks each stage's templates against it). `HeroLook` is `{ skin, hair, accent }`, where `accent` is a CSS `#rrggbb` overriding the `a` character or `null`. The `ArtSet` is validated by `validateArtSet` in tests, not at boot.
+The engine does not import these files directly. `src/game/sprites/artSet.ts` (developer-owned glue) gathers them into `SHIPPED_ART: ArtSet`, whose fields are `palette`, `skinTones`, `hairColors`, `baseHero`, `campfire`, `stageSprites`, `particlePalette` (a ramp for every `ParticleKind`, so a new kind such as E3's `firefly` must have an entry or the type checker and `validateArtSet` reject the set), `lightChars`, `stageAmbientChar`, `stageClearChar`, and `stageTileChars` (the last is `STAGE_TILE_CHARS`; the validator checks each stage's templates against it). `HeroLook` is `{ skin, hair, accent }`, where `accent` is a CSS `#rrggbb` overriding the `a` character or `null`. The `ArtSet` is validated by `validateArtSet` in tests, not at boot.
 
 H1 adds (planned, [H1 plan section 3.5](plans/h1-classes.md#35-sprites-and-art-set)): `CLASS_PALETTES` in `palettes.ts`; `CLASS_LAYERS` (class id to `HeroLayerSet`) and `EFFECT_SPRITES` (effect id to `SpriteTemplate`, animation `idle`, center anchor) in the template files; `ArtSet` gains `classLayers`, `classPalettes`, and `effects`; `HeroLook` gains `classId`; the base hero gains a 3-frame `ability` and `ability` joins the required hero animations (eleven, 26 frames per layer). Palette order for a hero bitmap is master, class, skin, hair, accent.
 
@@ -100,7 +101,9 @@ export type AmbientEffect =
   | { readonly kind: 'drip'; readonly perSecond: number }     // Stage 1
   | { readonly kind: 'dust'; readonly perSecond: number }     // E1, Stage 2 (mote particles)
   | { readonly kind: 'bubbles'; readonly perSecond: number }  // E2, Stage 3 (bubble particles)
-  | { readonly kind: 'fog'; readonly perSecond: number; readonly dustPerSecond: number }; // E2, Stage 4 (wisp particles plus motes); union grows per batch
+  | { readonly kind: 'fog'; readonly perSecond: number; readonly dustPerSecond: number }  // E2, Stage 4 (wisp particles plus motes)
+  | { readonly kind: 'fireflies'; readonly perSecond: number }                            // E3, Stage 5 (firefly particles)
+  | { readonly kind: 'embers'; readonly perSecond: number };                              // E3, Stage 6 (the existing ember kind); union grows per batch
 export interface StageDef {
   readonly id: string;                           // kebab-case, matches StageSprites key
   readonly index: number;                        // 1-based, contiguous
@@ -124,7 +127,20 @@ export interface StageDef {
 
 The nav grid is built from alcove solids plus the campfire pit box (x 56, y 144, 16x8). A `puddle` prop in any zone becomes a drip point for the `drip` ambient effect.
 
-From E1, `enemies.ts` adds its own validator (5 per stage, one boss per stage, unique ids, incremental mode per roadmap A3; the 50-id contract is pinned in E5) and cross-checks that every enemy's stage exists in `STAGES` ([section 8](#8-enemies-drops-and-the-enemy-validator-e1)). E1 also adds Stage 2 and the `dust` ambient effect to the stage table. E2 grows the enemy table to 20 of 50 (four stages, five rows each) with no validator change; the incremental mode simply checks 20 rows for four stages.
+From E1, `enemies.ts` adds its own validator (5 per stage, one boss per stage, unique ids, incremental mode per roadmap A3; the 50-id contract is pinned in E5) and cross-checks that every enemy's stage exists in `STAGES` ([section 8](#8-enemies-drops-and-the-enemy-validator-e1)). E1 also adds Stage 2 and the `dust` ambient effect to the stage table. E2 grows the enemy table to 20 of 50 (four stages, five rows each) with no validator change; the incremental mode simply checks 20 rows for four stages. E3 grows it to 30 of 50 (six stages) the same way.
+
+**Delivered stages (as built through E3).** All six share the room geometry and have one door frame; every solid prop is an alcove floor prop at foot y 134 with a 12x5 footprint, so none blocks a seat or formation slot.
+
+| Stage | id | Ambient (`perSecond`) | Lights | Solid prop |
+|---|---|---|---|---|
+| 1 | `forgotten-cellar` | `drip` 1.5 | torch x4, flicker | `barrel`, `crate` |
+| 2 | `goblin-mine-shafts` | `dust` 6 | lantern x4, flicker | `minecart` |
+| 3 | `toxic-slime-caverns` | `bubbles` 7 | glowShroom x4, steady | `toxicBarrel` |
+| 4 | `ancient-catacombs` | `fog` 4 plus `dustPerSecond` 3 | candelabra x4, flicker | `sarcophagus` |
+| 5 | `enchanted-forest-ruins` | `fireflies` 5 | glowBloom x4, radius 48, intensity 0.8, `flicker: false` | `ruinedStatue` |
+| 6 | `molten-core` | `embers` 6 | lavaFall x4 (radius 52, intensity 0.7) and lavaChannel x2 (radius 44, intensity 0.6), all `flicker: false` (six lights, limit eight) | `anvil` |
+
+Stage 5 and 6 lights are wall props only (no floor placement carries a light), and no floor-layer prop name contains `lava`: lava is scenery on the wall and wall-base band, never on the walking floor. The Stage 6 ambient tint `g` is `#6b6058`, red at about 1.11 times its blue-green maximum (limit 1.3), so the stage never washes a hero red. The firefly and ember particles and the stage lights are read by nothing but drawing code.
 
 ## 5. Animation timings and tuning (M4)
 
@@ -143,6 +159,7 @@ From E1, `enemies.ts` adds its own validator (5 per stage, one boss per stage, u
 | Enemies and combat (E1) | `ENEMY_CAPACITY` 12, `ENEMY_SPAWN_X` 340, `ENEMY_LANE_COUNT` 4 / `ENEMY_LANE_FOOT_Y` 156 / `ENEMY_LANE_STEP_PX` 5, `ENEMY_GAP_PX` 14, `ENEMY_STAND_MAX_X` 300, `BOSS_STAND_MAX_X` 288, `BOSS_GAP_PX` 28, `ENEMY_RELEASE_X` 340, `WAVE_GAP_MS` 1200, `WITHDRAW_AFTER_MS` 2000, `MINION_WEIGHT` 3, `ELITE_WEIGHT` 1, `ENEMY_FLASH_MS` 100, `ENEMY_BAR_SHOW_MS` 2500, `ENEMY_DISSOLVE_FRAME_MS` 100, `ENEMY_DISSOLVE_FRAMES` 4, `ENEMY_TELEGRAPH_MS` 500, `ENEMY_INTRO_MS` 1200, `ENEMY_ATTACK_STRIKE_FRAME` 1, `BOSS_PHASE2_FRACTION` 0.5, `BOSS_PHASE2_INTERVAL_FACTOR` 0.7, `BOSS_SLAM_TARGETS` 3, `MAX_SERIAL_DELTA` 2, `COMBAT_FAULT_LIMIT` 3, `PASS_FAULT_LIMIT` 3, `HIT_SPARKS` 2 |
 | Stage flow (E1) | `STAGE_CLEAR_HOLD_MS` 1200, `STAGE_FADE_MS` 400, `PROGRESS_WAIT_MS` 1500, `MOTE_MIN_Y` 40, `MOTE_MAX_Y` 150, `MOTE_LIFE_MIN_MS` 2500, `MOTE_LIFE_MAX_MS` 4500 |
 | Ambients (E2) | `BUBBLE_MIN_Y` 118, `BUBBLE_MAX_Y` 156, `BUBBLE_RISE_MIN` 12, `BUBBLE_RISE_MAX` 26 (px/s), `BUBBLE_LIFE_MIN_MS` 1400, `BUBBLE_LIFE_MAX_MS` 2600, `FOG_MIN_Y` 132, `FOG_MAX_Y` 158, `FOG_DRIFT_MIN` 3, `FOG_DRIFT_MAX` 9 (px/s), `FOG_LIFE_MIN_MS` 4500, `FOG_LIFE_MAX_MS` 7500 |
+| Ambients (E3) | `FIREFLY_MIN_Y` 60, `FIREFLY_MAX_Y` 140, `FIREFLY_DRIFT` 6 (px/s, plus or minus, both axes), `FIREFLY_LIFE_MIN_MS` 3500, `FIREFLY_LIFE_MAX_MS` 6500, `STAGE_EMBER_MIN_Y` 112, `STAGE_EMBER_MAX_Y` 156, `STAGE_EMBER_RISE_MIN` 14, `STAGE_EMBER_RISE_MAX` 30 (px/s), `STAGE_EMBER_LIFE_MIN_MS` 1800, `STAGE_EMBER_LIFE_MAX_MS` 3200 (the `STAGE_EMBER_*` set is separate from the campfire `EMBER_*` constants) |
 | Hero reactions (E1, cosmetic) | `HERO_FLASH_MS` 100, `HERO_FLASH_GAP_MS` 500, `HERO_KNOCK_PX` 1, `HERO_KNOCK_STRONG_PX` 2, `HERO_KNOCK_MS` 160 |
 
 Enemy numbers (health, speed, attack timing, strike power) are not in `tuning.ts`; they are in `enemies.ts`, and the drop constants (`DROP_CAPACITY` 16, `DROP_REST_MS` 900, `DROP_FADE_MS` 300, `DROP_ARC_MS` 360, `DROP_ARC_HEIGHT_PX` 14, `BOSS_COIN_BURST` 5) are in `drops.ts` ([section 8](#8-enemies-drops-and-the-enemy-validator-e1)). The `pixelAgents.killsPerStage` and `maxEnemies` settings override the corresponding defaults at run time (`Combat.configure`).
@@ -200,7 +217,7 @@ Designed in the [E1 plan](plans/e1-enemies.md) and [ADR 0012](adr/0012-host-owne
 | `killsInStage` | 0 to 1,000,000,000 | regular kills toward this stage's boss |
 | `totalKills` | 0 to 1,000,000,000 | all regular kills; the host's monotonic key |
 | `bossesDefeated` | 0 to 1,000,000,000 | bosses defeated, ever |
-| `cycle` | 0 to 1,000,000,000 | completed passes through the delivered stages (E5 turns it into New Game+); since E2 a pass is four stages (Stage 4's boss wraps to Stage 1 with `cycle + 1`); no migration, schema stays v1 and `PROTOCOL_VERSION` stays 2 |
+| `cycle` | 0 to 1,000,000,000 | completed passes through the delivered stages (E5 turns it into New Game+); since E3 a pass is six stages (Stage 6's boss wraps to Stage 1 with `cycle + 1`; it was four stages in E2, so a stored cycle now counts longer passes); no migration, schema stays v1 and `PROTOCOL_VERSION` stays 2 |
 
 - **Migration runner.** `migrateProgress(raw)` in `src/host/progressMigrations.ts`: `MIGRATIONS[i]` upgrades version `i+1` to `i+2` (an empty list in E1); never throws; outcomes `fresh` (absent), `stored`, `migrated`, `invalid` (default, one fixed log line), and `future` (a newer `schemaVersion`: default in memory, the stored value is **never overwritten**, saves are ignored). M7 (achievements) adds schema version 2 as the first real step.
 - **Writes.** `ProgressStore.save` validates with the same exact-key validator, drops a save whose `totalKills` is lower than the stored one (or than a higher value already pending), coalesces to one `globalState.update` per 2 s with the latest value, flushes on dispose, and swallows and logs (fixed string) any failure. A fresh install writes nothing until the first save.
@@ -211,12 +228,23 @@ Designed in the [E1 plan](plans/e1-enemies.md) and [ADR 0012](adr/0012-host-owne
 
 ## 8. Enemies, drops, and the enemy validator (E1)
 
-Designed in the [E1 plan section 3.3](plans/e1-enemies.md#33-data-tables); built in E1 (ten rows, stages 1 and 2); E2 adds ten rows (stages 3 and 4: Green Slime, Spore Shroom, Toxic Toad, Jelly Cube, Ooze Queen; Bone Soldier, Wailing Ghost, Tomb Scarab, Crypt Mummy, Tomb Lich), 20 of 50 delivered. Stage 3 health at cycle 0, party 1: 18, 22, 16, 57, boss 219; Stage 4: 25, 20, 27, 71, boss 295.
+Designed in the [E1 plan section 3.3](plans/e1-enemies.md#33-data-tables); built in E1 (ten rows, stages 1 and 2); E2 adds ten rows (stages 3 and 4: Green Slime, Spore Shroom, Toxic Toad, Jelly Cube, Ooze Queen; Bone Soldier, Wailing Ghost, Tomb Scarab, Crypt Mummy, Tomb Lich), 20 of 50 delivered. E3 adds ten more (stages 5 and 6), **30 of 50 delivered**. Health at cycle 0, party 1 (minions, elite, boss), from `healthOf`:
+
+| Stage | Minions | Elite | Boss (party 1 / party 8) |
+|---|---|---|---|
+| 1 | 10, 8, 11 | 24 | 120 / 414 |
+| 2 | 14, 11, 18 | 39 | 162 / 559 |
+| 3 | 18, 22, 16 | 57 | 219 / 755 |
+| 4 | 25, 20, 27 | 71 | 295 / 1019 |
+| 5 | 33, 30, 27 | 104 | 359 / 1238 |
+| 6 | 45, 58, 49 | 129 | 430 / 1485 |
+
+The party-8 boss column is the unrounded party-1 value times 3.45 (35 percent per fighter beyond the first, capped at eight; computed by hand from the formula, the Stage 5 and 6 values match the plan's estimates). The two late bosses carry `vigor` 0.9 (Elder Dryad) and 0.8 (Molten Colossus), below 1.0 on purpose, so their fights do not drag ([E3 plan R7](plans/e3-stages-5-6.md#9-risks-assumptions-defaults)); the lever is the row's `vigor` only.
 
 - `src/game/data/enemies.ts` holds `ENEMIES: readonly EnemyRow[]` (a compact row: `id name stage tier gait vigor pace drop`) and every enemy number: tier health bases, the per-stage growth (`healthOf`), tier speeds and attack intervals, strike and ability power. Enemy numbers live only here (enemy side of the vocabulary scan, [ADR 0013](adr/0013-enemy-health-and-hero-reaction-board.md)); `tuning.ts` holds neutral engine constants (capacities, fade times, reaction times, the boot gate).
 - `src/game/data/drops.ts` holds `DROP_KINDS` (`coin gem ore chest`) and drop chances. Drops are decoration with no value.
 - `validateEnemies(rows, stages)` runs once at `Game` construction and in tests (incremental mode per [roadmap A3](../engineering/roadmap.md#7-assumptions-and-defaults)): for every stage in `STAGES`, exactly 5 rows and exactly 1 boss; ids kebab-case and globally unique; every row's stage exists; total equals `5 * stages.length`; ranges for `vigor` and `pace`; a known `drop`. A failure disables combat only (reported once); stages and heroes keep running. E5 pins the full contract (10 stages, 50 enemies).
-- Art: `ArtSet` gains `enemies` (id to a single `enemies/<id>` template), `enemyPhasePalettes`, `drops` (keyed by `DropSpriteId`), `enemyBar`, and `stagePalettes` (per-stage partial overrides of the stage characters `1` to `8`, so a stage adds no master characters). Checked in tests by `validateEnemyArt(art)` and `validateDropArt(art)` (both take only the `ArtSet` and read `ENEMIES` and `DROP_KINDS` themselves) and by the stage checks inside `validateArtSet`, which merges `stagePalettes[stageId]` over the master palette per stage. There is no separate `validateStageArt`. Per-stage required props live in the module-private `REQUIRED_PROPS` record in `spriteValidator.ts` (the cellar's eight, Stage 2's `support pickaxe oreVein lantern minecart rubble doorFrame`, Stage 3's `pipe slimeDrape glowShroom toxicBarrel slimePool mushrooms doorFrame`, Stage 4's `skullNiche candelabra crackedPillar sarcophagus urn boneRubble doorFrame`), with `FLAME_PROPS` requiring a flame loop on `torch` (2 frames), `lantern` (4), `glowShroom` (2), and `candelabra` (4). Enemy size limits are 16, 24, and 48 px per tier; at most 12 colors per enemy, 8 per drop; a boss phase palette overrides at most 4 master characters.
+- Art: `ArtSet` gains `enemies` (id to a single `enemies/<id>` template), `enemyPhasePalettes`, `drops` (keyed by `DropSpriteId`), `enemyBar`, and `stagePalettes` (per-stage partial overrides of the stage characters `1` to `8`, so a stage adds no master characters). Checked in tests by `validateEnemyArt(art)` and `validateDropArt(art)` (both take only the `ArtSet` and read `ENEMIES` and `DROP_KINDS` themselves) and by the stage checks inside `validateArtSet`, which merges `stagePalettes[stageId]` over the master palette per stage. There is no separate `validateStageArt`. Per-stage required props live in the module-private `REQUIRED_PROPS` record in `spriteValidator.ts` (the cellar's eight, Stage 2's `support pickaxe oreVein lantern minecart rubble doorFrame`, Stage 3's `pipe slimeDrape glowShroom toxicBarrel slimePool mushrooms doorFrame`, Stage 4's `skullNiche candelabra crackedPillar sarcophagus urn boneRubble doorFrame`, Stage 5's `brokenPillar hangingRoots glowBloom ruinedStatue fernPatch flowerBed doorFrame`, Stage 6's `obsidianPillar lavaFall lavaChannel anvil slagHeap toolRack doorFrame`), with `FLAME_PROPS` requiring a flame loop on `torch` (2 frames), `lantern` (4), `glowShroom` (2), `candelabra` (4), `glowBloom` (2), `lavaFall` (4), and `lavaChannel` (2). Enemy size limits are 16, 24, and 48 px per tier; at most 12 colors per enemy, 8 per drop; a boss phase palette overrides at most 4 master characters.
 - Where the numbers live: `data/enemies.ts` has `TIER_HEALTH`, `HEALTH_GROWTH`, `CYCLE_HEALTH_GROWTH`, `CYCLE_CAP`, `PARTY_BOSS_GROWTH`, `PARTY_CAP`, `healthOf`, `TIER_SPEED_PX_PER_S`, `TIER_ATTACK_MS`, `ATTACK_JITTER`, `STRIKE_POWER`, `ABILITY_POWER`, `ABILITY_TARGETS`, `TIER_SHADOW_PX`, and the `VIGOR_*` and `PACE_*` bounds; `data/drops.ts` has `DROP_KINDS`, `DROP_CHANCE`, `BOSS_COIN_BURST`, `DROP_CAPACITY`, `DROP_REST_MS`, `DROP_FADE_MS`, `DROP_ARC_MS`, and `DROP_ARC_HEIGHT_PX`; `tuning.ts` has `ENEMY_DISSOLVE_FRAMES` and the neutral engine constants ([section 5](#5-animation-timings-and-tuning-m4)). The drop constants sit on the enemy side so that drop words stay out of the hero-side vocabulary scan.
 - Enemy palettes: enemies (and their flash and dissolve) are rasterized over `stagePalette(stage of the ENEMIES row)`, with a boss phase palette laid over that, and `validateEnemyArt` checks each template against the same merged palette. Fixed after the sync found Stage 2 enemies drawing over the bare master palette ([E1 plan section 13.6](plans/e1-enemies.md#13-as-built-drift-checked-against-the-e1-working-tree)).
-- `docs:tables` (E1) renders the enemy table into `docs/design/enemies-and-stages.md` (`Delivered enemies: 20 of 50.` since E2).
+- `docs:tables` (E1) renders the enemy table into `docs/design/enemies-and-stages.md` (`Delivered enemies: 30 of 50.` since E3).

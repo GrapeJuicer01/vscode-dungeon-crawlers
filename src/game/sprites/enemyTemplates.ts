@@ -14,7 +14,11 @@ import { ENEMIES_STAGE3 } from './enemiesStage3';
 import { ENEMIES_STAGE4 } from './enemiesStage4';
 import { ENEMIES_STAGE5 } from './enemiesStage5';
 import { ENEMIES_STAGE6 } from './enemiesStage6';
+import { ENEMIES_STAGE7 } from './enemiesStage7';
+import { ENEMIES_STAGE8 } from './enemiesStage8';
+import { ECLIPSE_WARDEN } from './eclipseWardenTemplate';
 import { ELDER_DRYAD } from './elderDryadTemplate';
+import { GLACIER_MAMMOTH } from './glacierMammothTemplate';
 import { GOBLIN_FOREMAN } from './goblinForemanTemplate';
 import { MOLTEN_COLOSSUS } from './moltenColossusTemplate';
 import { OOZE_QUEEN } from './oozeQueenTemplate';
@@ -22,6 +26,7 @@ import type { Palette } from './palettes';
 import { BOSS_PHASE_PALETTES } from './palettesE1';
 import { BOSS_PHASE_PALETTES_E2 } from './palettesE2';
 import { BOSS_PHASE_PALETTES_E3 } from './palettesE3';
+import { BOSS_PHASE_PALETTES_E4 } from './palettesE4';
 import { RAT_KING } from './ratKingTemplate';
 import type { SpriteTemplate } from './spriteTypes';
 import { TOMB_LICH } from './tombLichTemplate';
@@ -50,7 +55,7 @@ export const ENEMY_BAR: {
   backChar: 'P',
 };
 
-/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Stages 1 and 2 (E1), 3 and 4 (E2), 5 and 6 (E3). */
+/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Stages 1 and 2 (E1), 3 and 4 (E2), 5 and 6 (E3), 7 and 8 (E4). */
 export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   ...ENEMIES_STAGE1,
   ...ENEMIES_STAGE2,
@@ -58,12 +63,16 @@ export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   ...ENEMIES_STAGE4,
   ...ENEMIES_STAGE5,
   ...ENEMIES_STAGE6,
+  ...ENEMIES_STAGE7,
+  ...ENEMIES_STAGE8,
   'rat-king': RAT_KING,
   'goblin-foreman': GOBLIN_FOREMAN,
   'ooze-queen': OOZE_QUEEN,
   'tomb-lich': TOMB_LICH,
   'elder-dryad': ELDER_DRYAD,
   'molten-colossus': MOLTEN_COLOSSUS,
+  'glacier-mammoth': GLACIER_MAMMOTH,
+  'eclipse-warden': ECLIPSE_WARDEN,
 };
 
 /**
@@ -74,4 +83,5 @@ export const ENEMY_PHASE_PALETTES: Readonly<Record<string, readonly Palette[]>> 
   ...BOSS_PHASE_PALETTES,
   ...BOSS_PHASE_PALETTES_E2,
   ...BOSS_PHASE_PALETTES_E3,
+  ...BOSS_PHASE_PALETTES_E4,
 };

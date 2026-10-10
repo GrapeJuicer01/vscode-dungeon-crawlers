@@ -27,17 +27,29 @@ const DECORATION = new Set([
   'src/game/sprites/enemiesStage6.ts',
   'src/game/sprites/elderDryadTemplate.ts',
   'src/game/sprites/moltenColossusTemplate.ts',
+  // E4 (plan section 7, note 7a): Stage 7 and 8 art. Absent files are simply not scanned.
+  'src/game/sprites/stage7Templates.ts',
+  'src/game/sprites/stage8Templates.ts',
+  'src/game/sprites/enemiesStage7.ts',
+  'src/game/sprites/enemiesStage8.ts',
+  'src/game/sprites/glacierMammothTemplate.ts',
+  'src/game/sprites/eclipseWardenTemplate.ts',
+  'src/game/sprites/palettesE4.ts',
   'src/game/sprites/enemyTemplates.ts',
   'src/game/sprites/spriteTemplates.ts',
   'src/game/data/enemies.ts',
 ]);
 
-/** Identifiers of the E3 decoration: lava, fireflies, stage embers, and the Stage 5/6 prop names. */
+/**
+ * Identifiers of the E3 and E4 decoration: lava, fireflies, stage embers, snow, murk, and the Stage
+ * 5 to 8 prop names. The bare words frozen, shadow, mirror, and shard are deliberately absent: they
+ * collide with Entity.frozen, the drawn flat shadow, and the host-state mirror in Game.ts.
+ */
 const DECORATION_WORDS =
-  /lava|firefl|\bembers\b|STAGE_EMBER|glowBloom|ruinedStatue|obsidianPillar|\banvil\b|slagHeap|toolRack|hangingRoots|brokenPillar|fernPatch|flowerBed/i;
+  /lava|firefl|\bembers\b|STAGE_EMBER|glowBloom|ruinedStatue|obsidianPillar|\banvil\b|slagHeap|toolRack|hangingRoots|brokenPillar|fernPatch|flowerBed|\bsnow\b|snowfall|\bmurk\b|SNOW_|MURK_|frozen-citadel|shadow-realm|icePillar|icicleCluster|frostBanner|iceLamp|iceSheet|iceThrone|snowDrift|duskPillar|floatingShard|mirrorFrame|wispTorch|duskAltar|shardPatch/i;
 
 void describe('lava, embers, and fireflies are never game state (invariants 1 and 2)', () => {
-  void it('the hero side and the combat side name none of the E3 decoration identifiers', () => {
+  void it('the hero side and the combat side name none of the E3 and E4 decoration identifiers', () => {
     const scanned = gameFiles.filter((f) => !DECORATION.has(f));
     assert.ok(scanned.length > 20, `${scanned.length} files scanned`);
     for (const f of scanned) {
@@ -55,9 +67,29 @@ void describe('lava, embers, and fireflies are never game state (invariants 1 an
     assert.doesNotMatch(stripped, /lava|firefl|ember/i);
   });
 
+  void it('the enemy table names snow, murk, frost, ice, and glacier scenery only inside the ten E4 rows', () => {
+    const E4_NAMES = [
+      'rime-penguin|Rime Penguin',
+      'frost-hare|Frost Hare',
+      'snow-sentry|Snow Sentry',
+      'snow-yeti|Snow Yeti',
+      'glacier-mammoth|Glacier Mammoth',
+      'lantern-wraith|Lantern Wraith',
+      'shard-cluster|Shard Cluster',
+      'mirror-mimic|Mirror Mimic',
+      'gloom-stag|Gloom Stag',
+      'eclipse-warden|Eclipse Warden',
+    ].join('|');
+    const original = code('src/game/data/enemies.ts');
+    assert.match(original, /rime-penguin/, 'the strip has something to remove');
+    const stripped = original.replace(new RegExp(E4_NAMES, 'g'), '');
+    assert.doesNotMatch(stripped, /\b(snow|murk|frost|ice|glacier)\b/i);
+  });
+
   void it('nothing outside src/game and the webview boot reads ambient or particle kinds (host, monitor, shared, webview)', () => {
     for (const f of srcFiles().filter((x) => !x.startsWith('src/game/'))) {
       assert.doesNotMatch(code(f), /\b(fireflies|firefly|lava\w*|AmbientEffect)\b/, f);
+      assert.doesNotMatch(code(f), /\b(snow|snowfall|murk)\b|frozen-citadel|shadow-realm/i, f);
     }
   });
 
@@ -81,6 +113,8 @@ void describe('lava, embers, and fireflies are never game state (invariants 1 an
       'ember',
       'firefly',
       'mote',
+      'murk',
+      'snow',
       'wisp',
     ]);
   });
@@ -103,9 +137,9 @@ void describe('lava, embers, and fireflies are never game state (invariants 1 an
     }
   });
 
-  void it('the src tree has no file named for lava, ember, or firefly state', () => {
+  void it('the src tree has no file named for lava, ember, firefly, snow, or murk state', () => {
     assert.deepEqual(
-      listFiles('src').filter((f) => /lava|firefl|embers/i.test(f)),
+      listFiles('src').filter((f) => /lava|firefl|embers|snow|murk/i.test(f)),
       [],
     );
   });

@@ -48,6 +48,8 @@ void describe('enemy code in the bundles (E1)', () => {
       'ancient-catacombs',
       'enchanted-forest-ruins',
       'molten-core',
+      'frozen-citadel',
+      'shadow-realm',
     ]) {
       assert.ok(webview.includes(id), id);
     }
@@ -60,6 +62,8 @@ void describe('enemy code in the bundles (E1)', () => {
         'ancient-catacombs',
         'enchanted-forest-ruins',
         'molten-core',
+        'frozen-citadel',
+        'shadow-realm',
       ],
     );
   });
@@ -87,7 +91,34 @@ void describe('enemy code in the bundles (E1)', () => {
     }
   });
 
-  void it('the production-style webview bundle (minified, in memory, no sourcemap) is measured against the E3 R11 note (300 KB through E5; hard limit 400 KB)', (t) => {
+  void it('E4: all ten new enemy ids and names, and the two stage ids, are in the webview bundle and absent from the host bundle', () => {
+    const ids = [
+      'rime-penguin',
+      'frost-hare',
+      'snow-sentry',
+      'snow-yeti',
+      'glacier-mammoth',
+      'lantern-wraith',
+      'shard-cluster',
+      'mirror-mimic',
+      'gloom-stag',
+      'eclipse-warden',
+    ];
+    assert.equal(ENEMIES.length, 40);
+    for (const id of ids) {
+      const found = ENEMIES.find((r) => r.id === id);
+      assert.ok(found, id);
+      assert.ok(webview.includes(`"${id}"`) || webview.includes(`'${id}'`), id);
+      assert.ok(webview.includes(found.name), found.name);
+      assert.ok(!host.includes(id), `${id} leaked into the host bundle`);
+    }
+    for (const id of ['frozen-citadel', 'shadow-realm']) {
+      assert.ok(webview.includes(id), id);
+      assert.ok(!host.includes(id), `${id} leaked into the host bundle`);
+    }
+  });
+
+  void it('the production-style webview bundle (minified, in memory, no sourcemap) is measured against the R11 note (300 KB through E5; hard limit 400 KB); E4 size is printed', (t) => {
     // esbuild cannot be bundled into the test file, so the measurement runs in a child process.
     const script = `
       import * as esbuild from 'esbuild';

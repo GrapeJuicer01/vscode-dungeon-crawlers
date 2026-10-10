@@ -208,3 +208,28 @@ Notes:
 - Two enemies are drawn off their frame center to clear an older silhouette (`furnace-guard` about four pixels left, `wailing-ghost` two pixels right); the anchor is unchanged. `bramble-pixie` hovers: its lowest pixels are three rows above the bottom outline row.
 - A-E3-0 reworked six shipped E2 templates in place (`green-slime`, `spore-shroom`, `toxic-toad`, `jelly-cube`, `ooze-queen`, `wailing-ghost`) with the same ids, sizes, anchors, and animation sets, so no data change follows.
 - The preview tool knows the new stage ids (`node tools/sprite-preview.mjs enemies enchanted-forest-ruins out.png`); `SPRITE_ENTRY=<file.ts>` previews unwired art.
+
+## 13. Batch E4 art (Stages 7 and 8)
+
+Delivered in steps A-E4-0 to A-E4-6 ([E4 plan section 11](../architecture/plans/e4-stages-7-8.md#11-art-needs-batch-e4)). Atomic wiring as in E2 and E3: the new files exist on their own until the final step edits the barrels (`enemyTemplates.ts`, `spriteTemplates.ts`).
+
+| Export | File | Content |
+|---|---|---|
+| `STAGE_PALETTES['frozen-citadel']`, `['shadow-realm']` | `palettesE1.ts` | overrides of `1`-`8`, `g`, `T` only |
+| `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR` entries for both ids | `palettes.ts` | `12345678`, `n`, `g` |
+| `PARTICLE_PALETTE.snow`, `.murk` | `palettes.ts` | `['w', 'q', 'Q']` and `['g', 'b', 'P']`; the type is widened to ten kinds; master characters only |
+| `FROZEN_CITADEL` | `stage7Templates.ts` | `StageSprites`; props `icePillar icicleCluster frostBanner iceLamp(2) iceSheet(2) iceThrone snowDrift doorFrame`, ids `frozen-citadel/<name>` |
+| `SHADOW_REALM` | `stage8Templates.ts` | `StageSprites`; props `duskPillar floatingShard(2) mirrorFrame wispTorch(4) duskAltar shardPatch doorFrame`, ids `shadow-realm/<name>` |
+| `ENEMIES_STAGE7` | `enemiesStage7.ts` | `rime-penguin frost-hare snow-sentry snow-yeti` |
+| `ENEMIES_STAGE8` | `enemiesStage8.ts` | `lantern-wraith shard-cluster mirror-mimic gloom-stag` |
+| `GLACIER_MAMMOTH`, `ECLIPSE_WARDEN` | `glacierMammothTemplate.ts`, `eclipseWardenTemplate.ts` | boss templates (11 frames each); the files also export the builder functions `mammothFrame`, `wardenFrame` and the geometry constants `MAMMOTH_GEOM`, `WARDEN_GEOM` (used for the look-alike sweep) |
+| `BOSS_PHASE_PALETTES_E4` | `palettesE4.ts` | phase 2 palettes for `glacier-mammoth` and `eclipse-warden` (four overrides each); merged into `ENEMY_PHASE_PALETTES` by `enemyTemplates.ts` |
+
+Notes:
+
+- Stage props follow the same rules as Stages 1 to 6 (characters `1`-`8` only, at most 8 colors, `idle` only). Light props: `iceLamp` 2 frames, `iceSheet` 2 frames, `floatingShard` 2 frames, `wispTorch` 4 frames; the developer adds them to `FLAME_PROPS` (`iceLamp: 2`, `iceSheet: 2`, `floatingShard: 2`, `wispTorch: 4`) with the required-prop lists, and their lights use `flicker: false`. Solid alcove props are `iceThrone` and `duskAltar` (foot anchor `(8, 14)`, drawn at foot y 134). The floor-layer props are exactly `iceThrone snowDrift duskAltar shardPatch`.
+- **Frame timing is not a template field.** The format has no per-frame time: `Stage.ts` gives every non-torch, non-lantern prop `PROP_FRAME_MS` (500 ms) and torches and lanterns `TORCH_FRAME_MS` (130 ms). So `iceSheet` and `floatingShard` loop at 500 ms per frame and `iceLamp` and `wispTorch` at 500 ms (all at least the plan's 500 and 300 ms floors); no template field exists to state or assert, a test can read the constants.
+- Pixel change between consecutive idle frames (limit: the largest shipped enemy idle pair, `ooze-queen` 466): `iceLamp` 6, `iceSheet` 8, `floatingShard` 50, `wispTorch` 10 to 13; enemies 22 to 94, `glacier-mammoth` 362, `eclipse-warden` 240.
+- Enemy frames come from `enemyBuilder.ts` primitives plus `enemyFrames.ts` helpers or from a builder pose parameter (the bosses). The base idle frame's silhouette was tuned with the look-alike tool; do not change an idle frame 0 outline without re-running `node test/support/lookAlikesReport.mjs <file.ts>:<Export>:<stage>[:<id>]`.
+- Three enemies are drawn off their frame center on purpose so the anchor-relative silhouette clears older enemies: `rime-penguin` two pixels left, `frost-hare` one pixel right, `lantern-wraith` about two pixels left. The anchor stays at the foot center. `lantern-wraith`, `shard-cluster` and the `eclipse-warden` boss are `float` enemies: the sprites are drawn complete and the engine adds the hover as a cosmetic draw offset (the warden's tendril tips reach row 46, next to the foot row 47).
+- The preview tool knows both new ids (`SPRITE_ENTRY=<file.ts> node tools/sprite-preview.mjs enemies shadow-realm out.png`, and `stage` mode); until the barrels are wired use a small entry file that re-exports the wired tables plus the new ones.

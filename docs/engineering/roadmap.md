@@ -159,12 +159,13 @@ Each batch delivers two stages: per stage 4 regular enemies plus exactly 1 boss,
 
 #### E4. Stage 7 Frozen Citadel, Stage 8 Shadow Realm
 
-- **Scope**: two stages; status-like enemy effects (freeze, shadow) on heroes are cosmetic tints and icons only, never slows to hero lifecycle.
-- **Files**: as E2.
-- **Art (batch E4)**: Stage 7 and Stage 8 environments (falling snow; shadow wisps), four enemies and a boss per stage; cosmetic frost and shadow overlay effects that are not hurt tints (no red, no low-health look).
+- **Plan**: [E4 plan](../architecture/plans/e4-stages-7-8.md) (E3 assumptions audited, atomic art-then-data switch, interfaces, task list, test notes, look-alike policy and the 11 legacy pairs, art steps A-E4-0 to A-E4-6, decisions E4-1 to E4-12).
+- **Scope**: two stages of rows (10 enemies, 40 of 50 delivered), per-stage palette overrides, two cosmetic ambients (`snow`, `murk`) as new `AmbientEffect` kinds plus two new particle kinds (`snow`, `murk`). Ice, snow, mirrors, and shadow are scenery and enemy art only: **no hero-side tint, icon, overlay, or status effect** (supersedes the earlier "freeze and shadow overlays on heroes" wording, decision E4-2). No new enemy mechanic. Boss `vigor` 0.6 and 0.5 for the two late bosses. Progression wraps after Stage 8 with no code change.
+- **Files**: `enemies.ts` (rows), `stages.ts` (rows, `AmbientEffect`), `tuning.ts`, `Ambience.ts`, `Particles.ts`, `Renderer.ts` (colour map), `spriteValidator.ts` (`REQUIRED_PROPS`, `FLAME_PROPS`), regenerated `docs/design/enemies-and-stages.md`; `Combat`, `Enemy`, `Boss`, `Progression`, `StageDirector` unchanged. Pixel-artist: per-stage template files, `palettesE4.ts`, art docs.
+- **Art (batch E4)**: A-E4-0 (legacy look-alike estimate, report only by default), then six steps (A-E4-1 stage palettes, char tables, `snow` and `murk` ramps; A-E4-2 Stage 7 environment; A-E4-3 Stage 8 environment; A-E4-4 Stage 7 enemies; A-E4-5 Stage 8 enemies; A-E4-6 Glacier Mammoth, Eclipse Warden, then barrel wiring). Zero new master characters by default (cap 40).
 - **Depends on**: E3.
-- **Done when**: G1-G7; validator passes for stages 1-8 (40 enemies); freeze and similar effects do not delay or alter `working`/`idle` transitions (test: event applied during an effect takes effect on the next update).
-- Status: todo
+- **Done when**: G1-G7; validator passes for stages 1-8 (40 enemies); progression wraps after Stage 8; ice, snow, murk, and other decoration cannot affect hero state (tested), and a host event applied during a stage transition or ambient takes effect on the next update; look-alike policy holds for all new enemies; Stage 8 legibility rules hold; 60fps holds with 8 heroes and a full wave of 12 enemies in Stages 7 and 8.
+- Status: done
 
 #### E5. Stage 9 Dragon's Lair, Stage 10 Void Spire
 
@@ -246,7 +247,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 8 | M6 enemies | E1 stages 1-2 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 11 | M6 enemies | E4 stages 7-8 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 11 | M6 enemies | E4 stages 7-8 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 12 | M6 enemies | E5 stages 9-10 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 13 | M7 UI | U1 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 14 | M8 audio | none | Ar, Dv, (Ar), Te, Rv, Dv commit | todo |

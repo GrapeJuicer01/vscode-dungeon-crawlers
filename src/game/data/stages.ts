@@ -46,7 +46,11 @@ export type AmbientEffect =
   /** Blinking fireflies wandering in the corridor view (E3, Stage 5). */
   | { readonly kind: 'fireflies'; readonly perSecond: number }
   /** Rising embers, the existing ember kind used as decoration (E3, Stage 6). */
-  | { readonly kind: 'embers'; readonly perSecond: number };
+  | { readonly kind: 'embers'; readonly perSecond: number }
+  /** Slow falling snow in the corridor view (E4, Stage 7). */
+  | { readonly kind: 'snow'; readonly perSecond: number }
+  /** Dim indigo murk motes drifting upward and sideways (E4, Stage 8). */
+  | { readonly kind: 'murk'; readonly perSecond: number };
 
 export interface StageDef {
   /** Kebab-case; matches the StageSprites key. */
@@ -72,6 +76,16 @@ const BLOOM_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', flic
 /** Lava falls and channels (Stage 6): decoration light only, slow, no flicker (decision E3-11). */
 const LAVA_FALL_LIGHT: LightDef = { radius: 52, intensity: 0.7, colorChar: 'T', flicker: false };
 const LAVA_CHANNEL_LIGHT: LightDef = { radius: 44, intensity: 0.6, colorChar: 'T', flicker: false };
+
+/**
+ * Ice lamps and ice sheets (Stage 7) and wisp torches and floating shards (Stage 8): decoration
+ * light only, slow and steady, no flicker (decision E4-2; light radius and intensity per the E4
+ * plan section 5.2).
+ */
+const ICE_LAMP_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', flicker: false };
+const ICE_SHEET_LIGHT: LightDef = { radius: 44, intensity: 0.5, colorChar: 'T', flicker: false };
+const WISP_TORCH_LIGHT: LightDef = { radius: 48, intensity: 0.7, colorChar: 'T', flicker: false };
+const SHARD_LIGHT: LightDef = { radius: 40, intensity: 0.5, colorChar: 'T', flicker: false };
 
 function wall(
   prop: string,
@@ -277,5 +291,71 @@ export const STAGES: readonly StageDef[] = [
       floor('slagHeap', 'corridor', 300, 150),
     ],
     ambient: { kind: 'embers', perSecond: 6 },
+  },
+  /**
+   * Stage 7, "Frozen Citadel". Ice and snow are scenery only: wall-layer columns, icicles, banners,
+   * lamps, and a wall-base sheet; the floor layer holds just the throne and snow drifts. Nothing
+   * reads a prop for movement. The throne is the only solid prop (alcove, foot y 134). Snowfall is
+   * the ambient (E4 plan section 5.1).
+   */
+  {
+    id: 'frozen-citadel',
+    index: 7,
+    name: 'Frozen Citadel',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('icePillar', 'alcove', 0, 16),
+      wall('icicleCluster', 'alcove', 52, 16),
+      wall('iceLamp', 'alcove', 28, 40, ICE_LAMP_LIGHT),
+      wall('iceLamp', 'alcove', 92, 40, ICE_LAMP_LIGHT),
+      wall('iceSheet', 'alcove', 52, 120, ICE_SHEET_LIGHT),
+      wall('frostBanner', 'alcove', 108, 52),
+      floor('iceThrone', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('snowDrift', 'alcove', 60, 152),
+      floor('snowDrift', 'alcove', 88, 148),
+      wall('iceLamp', 'corridor', 60, 40, ICE_LAMP_LIGHT),
+      wall('iceLamp', 'corridor', 252, 40, ICE_LAMP_LIGHT),
+      wall('icePillar', 'corridor', 150, 16),
+      wall('icePillar', 'corridor', 330, 16),
+      wall('icicleCluster', 'corridor', 110, 16),
+      wall('frostBanner', 'corridor', 200, 52),
+      wall('iceSheet', 'corridor', 190, 120, ICE_SHEET_LIGHT),
+      floor('snowDrift', 'corridor', 100, 152),
+      floor('snowDrift', 'corridor', 200, 148),
+      floor('snowDrift', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'snow', perSecond: 9 },
+  },
+  /**
+   * Stage 8, "Shadow Realm". Dusk crystal and dark mirrors are scenery only. The altar is the only
+   * solid prop (alcove, foot y 134). Wisp torches and floating shards light the stage softly;
+   * murk motes are the ambient (E4 plan section 5.1).
+   */
+  {
+    id: 'shadow-realm',
+    index: 8,
+    name: 'Shadow Realm',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('duskPillar', 'alcove', 0, 16),
+      wall('wispTorch', 'alcove', 28, 40, WISP_TORCH_LIGHT),
+      wall('wispTorch', 'alcove', 92, 40, WISP_TORCH_LIGHT),
+      wall('floatingShard', 'alcove', 52, 76, SHARD_LIGHT),
+      wall('mirrorFrame', 'alcove', 108, 52),
+      floor('duskAltar', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('shardPatch', 'alcove', 60, 152),
+      floor('shardPatch', 'alcove', 88, 148),
+      wall('wispTorch', 'corridor', 60, 40, WISP_TORCH_LIGHT),
+      wall('wispTorch', 'corridor', 252, 40, WISP_TORCH_LIGHT),
+      wall('duskPillar', 'corridor', 150, 16),
+      wall('duskPillar', 'corridor', 330, 16),
+      wall('floatingShard', 'corridor', 190, 72, SHARD_LIGHT),
+      wall('mirrorFrame', 'corridor', 110, 52),
+      wall('mirrorFrame', 'corridor', 300, 52),
+      floor('shardPatch', 'corridor', 100, 152),
+      floor('shardPatch', 'corridor', 200, 148),
+      floor('shardPatch', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'murk', perSecond: 4 },
   },
 ];

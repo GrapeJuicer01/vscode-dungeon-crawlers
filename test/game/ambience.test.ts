@@ -15,6 +15,14 @@ import {
   FIREFLY_LIFE_MIN_MS,
   FIREFLY_MAX_Y,
   FIREFLY_MIN_Y,
+  MURK_DRIFT,
+  MURK_LIFE_MIN_MS,
+  MURK_MAX_Y,
+  MURK_MIN_Y,
+  SNOW_DRIFT,
+  SNOW_LIFE_MIN_MS,
+  SNOW_MAX_Y,
+  SNOW_MIN_Y,
   STAGE_EMBER_MAX_Y,
   STAGE_EMBER_MIN_Y,
   FOG_MAX_Y,
@@ -42,6 +50,8 @@ const COLORS: ParticleColors = {
   bubble: ['#b1'],
   wisp: ['#w1'],
   firefly: ['#f1'],
+  snow: ['#n1'],
+  murk: ['#k1'],
 };
 
 interface Rig {
@@ -243,6 +253,8 @@ void describe('the debt cap and a full pool', () => {
     assert.deepEqual(STAGES[3]?.ambient, { kind: 'fog', perSecond: 4, dustPerSecond: 3 });
     assert.deepEqual(STAGES[4]?.ambient, { kind: 'fireflies', perSecond: 5 });
     assert.deepEqual(STAGES[5]?.ambient, { kind: 'embers', perSecond: 6 });
+    assert.deepEqual(STAGES[6]?.ambient, { kind: 'snow', perSecond: 9 });
+    assert.deepEqual(STAGES[7]?.ambient, { kind: 'murk', perSecond: 4 });
   });
 
   void it('steady-state ambient load is far below the pool, so ambients cannot starve combat sparks', () => {
@@ -273,6 +285,8 @@ void describe('Particles: the new kinds', () => {
     ['bubble', 2, 2],
     ['wisp', 6, 2],
     ['firefly', 1, 1],
+    ['snow', 1, 1],
+    ['murk', 2, 2],
   ];
 
   void it('every kind is drawn as exactly one fillRect with its documented size, in its own ramp', () => {
@@ -297,10 +311,10 @@ void describe('Particles: the new kinds', () => {
     const surface = new RecordingSurface();
     surface.record = true;
     pool.draw(surface, COLORS);
-    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 8);
+    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 10);
   });
 
-  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp firefly', () => {
+  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp firefly snow murk', () => {
     const src = readFileSync(repoPath('src/game/Particles.ts'), 'utf8');
     const list = /const KIND_NAMES[^=]*=\s*\[([^\]]*)\]/.exec(src)?.[1] ?? '';
     const names = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
@@ -313,11 +327,15 @@ void describe('Particles: the new kinds', () => {
       'bubble',
       'wisp',
       'firefly',
+      'snow',
+      'murk',
     ]);
     assert.match(src, /KIND_EMBER = 0;/);
     assert.match(src, /KIND_DRIP = 2;/);
     assert.match(src, /KIND_SPLASH = 3;/);
     assert.match(src, /KIND_MOTE = 4;/);
+    assert.match(src, /KIND_SNOW = 8;/);
+    assert.match(src, /KIND_MURK = 9;/);
   });
 
   void it('a full pool refuses a bubble or a wisp without throwing', () => {
@@ -478,6 +496,161 @@ void describe('Ambience embers (Stage 6, E3)', () => {
         peak = Math.max(peak, r.particles.count);
       }
       assert.ok(peak < PARTICLE_CAPACITY / 4, `${effect.kind}: peak ${peak}`);
+    }
+  });
+});
+
+void describe('Ambience snow and murk (Stages 7 and 8, E4)', () => {
+  void it('10 simulated seconds at 9 per second emit 90 snow flakes (+- 1), only snow, each one 1x1 fillRect, inside the corridor view and the snow band', () => {
+    const r = rig({ kind: 'snow', perSecond: 9 });
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 90) <= 1, `${out.length} flakes`);
+    assert.equal(r.particles.count, out.length, 'one fillRect per live particle');
+    for (const p of out) {
+      assert.equal(p.color, '#n1', 'only the snow ramp');
+      assert.deepEqual([p.w, p.h], [1, 1]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= SNOW_MIN_Y - 1 && p.y <= SNOW_MAX_Y, `y ${p.y}`);
+    }
+  });
+
+  void it('10 simulated seconds at 4 per second emit 40 murk motes (+- 1), only murk, each one 2x2 fillRect, inside the corridor view and the murk band', () => {
+    const r = rig({ kind: 'murk', perSecond: 4 });
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 40) <= 1, `${out.length} motes`);
+    for (const p of out) {
+      assert.equal(p.color, '#k1', 'only the murk ramp');
+      assert.deepEqual([p.w, p.h], [2, 2]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= MURK_MIN_Y - 1 && p.y <= MURK_MAX_Y, `y ${p.y}`);
+    }
+  });
+
+  void it('the same seed gives the same field and the emission is spread across x', () => {
+    for (const effect of [
+      { kind: 'snow', perSecond: 9 },
+      { kind: 'murk', perSecond: 4 },
+    ] as const) {
+      const a = rig(effect);
+      const b = rig(effect);
+      emitOnly(a, 10_000);
+      emitOnly(b, 10_000);
+      assert.deepEqual(drawn(a), drawn(b), effect.kind);
+      assert.ok(new Set(drawn(a).map((p) => p.x)).size > 20, effect.kind);
+    }
+  });
+
+  void it('snow falls: y increases for every live flake, and the sway stays slight', () => {
+    const r = rig({ kind: 'snow', perSecond: 9 });
+    const camera = new Camera();
+    r.ambience.update(1000, r.world, camera);
+    const before = drawn(r);
+    assert.ok(before.length >= 8);
+    r.particles.update(500);
+    const after = drawn(r);
+    assert.equal(after.length, before.length);
+    for (let i = 0; i < before.length; i++) {
+      assert.ok(after[i]!.y > before[i]!.y, `flake ${i} fell`);
+      // Emission drift is at most SNOW_DRIFT; the per-step jitter adds only a few px/s.
+      assert.ok(Math.abs(after[i]!.x - before[i]!.x) <= SNOW_DRIFT * 0.5 + 6, `flake ${i} swayed`);
+    }
+  });
+
+  void it('murk rises on average: mean y decreases, and every mote stays in its band plus drift over its life', () => {
+    const r = rig({ kind: 'murk', perSecond: 4 });
+    const camera = new Camera();
+    r.ambience.update(1000, r.world, camera);
+    const before = drawn(r);
+    assert.ok(before.length >= 3);
+    r.particles.update(500);
+    const after = drawn(r);
+    assert.equal(after.length, before.length);
+    const mean = (xs: { y: number }[]): number => xs.reduce((a, p) => a + p.y, 0) / xs.length;
+    assert.ok(mean(after) < mean(before), 'the motes rose');
+    for (const p of after) {
+      assert.ok(p.x >= CORRIDOR_X - MURK_DRIFT && p.x <= INTERNAL_WIDTH + MURK_DRIFT, `x ${p.x}`);
+    }
+  });
+
+  void it('neither ambient is scrolled by the camera', () => {
+    for (const effect of [
+      { kind: 'snow', perSecond: 9 },
+      { kind: 'murk', perSecond: 4 },
+    ] as const) {
+      const still = rig(effect);
+      const moved = rig(effect);
+      const cam = new Camera();
+      for (let t = 0; t < 4000; t += STEP_MS) {
+        still.ambience.update(STEP_MS, still.world, cam);
+        moved.ambience.update(STEP_MS, moved.world, cam);
+      }
+      assert.deepEqual(drawn(still), drawn(moved), effect.kind);
+    }
+  });
+
+  void it('the steady-state live count is about rate times life and far below the pool', () => {
+    for (const [effect, lo, hi] of [
+      [{ kind: 'snow', perSecond: 9 }, 25, 65],
+      [{ kind: 'murk', perSecond: 4 }, 10, 35],
+    ] as const) {
+      const r = rig(effect);
+      const camera = new Camera();
+      let peak = 0;
+      for (let t = 0; t < 30_000; t += STEP_MS) {
+        r.ambience.update(STEP_MS, r.world, camera);
+        r.particles.update(STEP_MS);
+        peak = Math.max(peak, r.particles.count);
+      }
+      assert.ok(
+        r.particles.count >= lo && r.particles.count <= hi,
+        `${effect.kind}: ${r.particles.count} live`,
+      );
+      assert.ok(peak < PARTICLE_CAPACITY / 4, `${effect.kind}: peak ${peak}`);
+    }
+  });
+
+  void it('a hidden-tab step and a mid-run stage switch carry no runaway debt (each kind has its own)', () => {
+    const camera = new Camera();
+    const r = rig({ kind: 'snow', perSecond: 9 });
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 9, `${r.particles.count} after a hidden-tab step`);
+    r.particles.clear();
+    r.effect = { kind: 'murk', perSecond: 4 };
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 4, `${r.particles.count} after the switch to murk`);
+    r.particles.clear();
+    r.effect = { kind: 'snow', perSecond: 9 };
+    r.ambience.update(STEP_MS, r.world, camera);
+    assert.ok(r.particles.count <= 1, `${r.particles.count} after one step back`);
+  });
+
+  void it('emitting into a full pool never throws and never grows the pool', () => {
+    for (const effect of [
+      { kind: 'snow', perSecond: 9 },
+      { kind: 'murk', perSecond: 4 },
+    ] as const) {
+      const r = rig(effect, 8);
+      for (let i = 0; i < 8; i++) r.particles.emit('spark', 0, 0, 0, 0, 60_000);
+      assert.doesNotThrow(() => emitOnly(r, 10_000));
+      assert.equal(r.particles.count, 8);
+    }
+  });
+
+  void it('each shipped ramp has at least 3 steps, no step shorter than 0.5 s at the minimum life, and no hit or ember colour', () => {
+    for (const [kind, life] of [
+      ['snow', SNOW_LIFE_MIN_MS],
+      ['murk', MURK_LIFE_MIN_MS],
+    ] as const) {
+      const ramp = PARTICLE_PALETTE[kind];
+      assert.ok(ramp.length >= 3, `${kind}: ${ramp.length} steps`);
+      assert.ok(life / ramp.length >= 500, `${kind}: ${life / ramp.length} ms per step`);
+      assert.ok(life / 3 > 1000, `${kind}: plan floor`);
+      for (const ch of ramp) {
+        assert.ok(!'YORD'.includes(ch), `${kind}: ramp uses hit/ember character ${ch}`);
+        assert.ok(ch in MASTER_PALETTE, `${kind}: ${ch} is a master character`);
+      }
     }
   });
 });

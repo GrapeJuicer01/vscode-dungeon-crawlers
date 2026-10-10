@@ -1,6 +1,6 @@
 # Enemies and stages
 
-Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (six stages, thirty enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
+Purpose: the enemies, bosses, and stages of Pixel Agents as delivered so far (eight stages, forty enemies), how the party fights them, how stage progress works and is saved, and what an enemy attack does to a hero (only a brief cosmetic flash). The enemy table below is generated from `src/game/data/enemies.ts` by `npm run docs:tables`; do not edit it by hand.
 Related: [game design](game-design.md), [classes](classes.md), [art style guide](art-style-guide.md), [sprite spec](sprite-spec.md), [E1 plan](../architecture/plans/e1-enemies.md), [E2 plan](../architecture/plans/e2-stages-3-4.md), [ADR 0002 no hero health](../architecture/adr/0002-no-hero-health.md), [ADR 0012 host-owned versioned progress](../architecture/adr/0012-host-owned-versioned-progress.md), [ADR 0013 enemy health and the hero reaction board](../architecture/adr/0013-enemy-health-and-hero-reaction-board.md), [data model](../architecture/data-model.md), [glossary](../glossary.md).
 
 ## The rule that does not bend
@@ -17,13 +17,15 @@ Heroes are invulnerable. Only enemies have health, and only enemies have a healt
 | 4 | Ancient Catacombs | bone beige, dusty purple, candle glow | low drifting fog and a few dust motes |
 | 5 | Enchanted Forest Ruins | moss green over ruin gray, glowing blue flowers | blinking fireflies |
 | 6 | Molten Core | basalt black, rust iron, orange glow | rising embers |
+| 7 | Frozen Citadel | pale ice blue, frosted stone, cold crystal glow | slow falling snow |
+| 8 | Shadow Realm | dark indigo dusk, violet crystal, pale wisp glow | dim drifting murk |
 
-After Stage 6 (the last delivered stage) the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). The Stage 6 lava, its embers, and the Stage 5 fireflies are scenery only: they are drawn in the background or as small particles, sit nowhere near the floor the party walks on, and nothing in the game reads them (no burn, slow, or glow can touch a hero). The two late bosses have a `vigor` below 1.0 (Elder Dryad 0.9, Molten Colossus 0.8) so their fights do not drag: with a party of eight the Elder Dryad starts with 1238 health and the Molten Colossus with 1485. A saved cycle count from before Stage 5 and 6 existed simply continues; a cycle is now a pass through six stages. Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
+After Stage 8 (the last delivered stage) the game wraps to Stage 1 and counts one more cycle (the later New Game+ builds on that). The Stage 6 lava, its embers, the Stage 5 fireflies, the Stage 7 ice and snow, and the Stage 8 mirrors, shards, and murk are scenery only: they are drawn in the background or as small particles, sit nowhere near the floor the party walks on, and nothing in the game reads them (no burn, chill, slow, or glow can touch a hero, and nothing icy or dark is ever drawn on a hero). The four late bosses have a `vigor` below 1.0 (Elder Dryad 0.9, Molten Colossus 0.8, Glacier Mammoth 0.6, Eclipse Warden 0.5, the lowest the validator allows) so their fights do not drag: with a party of eight the Elder Dryad starts with 1238 health, the Molten Colossus with 1485, the Glacier Mammoth with 1504, and the Eclipse Warden with 1692. A saved cycle count from before Stage 7 and 8 existed simply continues; a cycle is now a pass through eight stages. Stages share one room layout, so heroes keep their seats and formation across a stage change; only the dressing, palette, and enemies differ.
 
 ## Enemies
 
 <!-- BEGIN GENERATED: enemies -->
-Delivered enemies: 30 of 50.
+Delivered enemies: 40 of 50.
 
 | Stage | Id | Name | Tier | Gait | Health | Pace (px/s) | Drop |
 |---|---|---|---|---|---|---|---|
@@ -57,6 +59,16 @@ Delivered enemies: 30 of 50.
 | 6. Molten Core | `magma-crab` | Magma Crab | minion | walk | 49 | 26 | ore |
 | 6. Molten Core | `furnace-guard` | Furnace Guard | elite | walk | 129 | 10 | gem |
 | 6. Molten Core | `molten-colossus` | Molten Colossus | boss | walk | 430 | 8.4 | chest |
+| 7. Frozen Citadel | `rime-penguin` | Rime Penguin | minion | walk | 48 | 20.8 | coin |
+| 7. Frozen Citadel | `frost-hare` | Frost Hare | minion | hop | 42 | 36.4 | coin |
+| 7. Frozen Citadel | `snow-sentry` | Snow Sentry | minion | walk | 54 | 18.2 | ore |
+| 7. Frozen Citadel | `snow-yeti` | Snow Yeti | elite | walk | 145 | 12 | gem |
+| 7. Frozen Citadel | `glacier-mammoth` | Glacier Mammoth | boss | walk | 436 | 7 | chest |
+| 8. Shadow Realm | `lantern-wraith` | Lantern Wraith | minion | float | 49 | 26 | coin |
+| 8. Shadow Realm | `shard-cluster` | Shard Cluster | minion | float | 41 | 33.8 | ore |
+| 8. Shadow Realm | `mirror-mimic` | Mirror Mimic | minion | walk | 57 | 20.8 | coin |
+| 8. Shadow Realm | `gloom-stag` | Gloom Stag | elite | walk | 157 | 16 | gem |
+| 8. Shadow Realm | `eclipse-warden` | Eclipse Warden | boss | float | 490 | 8.4 | chest |
 <!-- END GENERATED: enemies -->
 
 Every stage has four regular enemies (three minions and one elite) and one boss. Health comes from a small formula, not a hand-written number per enemy: the tier base, times the row's `vigor`, times 1.35 for each stage after the first, plus 25 percent per completed cycle (up to eight), and, for bosses only, plus 35 percent per fighting hero beyond the first (the party counts up to eight). The Health column is the cycle-0, party-of-one value. Pace is walking speed. The table is checked at startup: every delivered stage must have exactly five enemies with exactly one boss, ids must be unique, and every enemy must name an existing stage. An invalid table disables combat for the page load and the party marches in an empty corridor.

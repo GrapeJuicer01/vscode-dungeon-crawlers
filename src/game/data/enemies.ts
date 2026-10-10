@@ -1,7 +1,7 @@
 // The compact enemy table and its scaling formulas (enemy side, E1 plan section 3.3,
 // data-model.md section 6). Each enemy is one small row; health, speed, and attack timing come from
 // the tier base and the formulas below, so the 50 enemies of the finished game are never 50
-// hand-written objects. E1 delivered ten rows (stages 1 and 2), E2 ten more (stages 3 and 4), E3 ten more (stages 5 and 6); the validator runs in the
+// hand-written objects. E1 delivered ten rows (stages 1 and 2), E2 ten more (stages 3 and 4), E3 ten more (stages 5 and 6), E4 ten more (stages 7 and 8); the validator runs in the
 // incremental mode of roadmap A3: five rows and exactly one boss per delivered stage. E5 pins the
 // full contract (ten stages, 50 unique ids) and removes the incremental mode.
 //
@@ -42,7 +42,8 @@ export const PACE_MAX = 1.6;
 /**
  * Stage 1: Forgotten Cellar. Stage 2: Goblin Mine Shafts. Stage 3: Toxic Slime Caverns. Stage 4:
  * Ancient Catacombs (E2). Stage 5: Enchanted Forest Ruins. Stage 6: Molten Core (E3; the two late
- * bosses use a vigor below 1.0 so the fights do not drag, decision E3-7). Numbers are first
+ * bosses use a vigor below 1.0 so the fights do not drag, decision E3-7). Stage 7: Frozen Citadel.
+ * Stage 8: Shadow Realm (E4; the bosses use 0.6 and 0.5, the validator floor, decision E4-7). Numbers are first
  * guesses (decision E1-11) tuned by eye in the manual benchmark.
  */
 export const ENEMIES = [
@@ -343,6 +344,106 @@ export const ENEMIES = [
     tier: 'boss',
     gait: 'walk',
     vigor: 0.8,
+    pace: 0.6,
+    drop: 'chest',
+  },
+  {
+    id: 'rime-penguin',
+    name: 'Rime Penguin',
+    stage: 7,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 0.8,
+    pace: 0.8,
+    drop: 'coin',
+  },
+  {
+    id: 'frost-hare',
+    name: 'Frost Hare',
+    stage: 7,
+    tier: 'minion',
+    gait: 'hop',
+    vigor: 0.7,
+    pace: 1.4,
+    drop: 'coin',
+  },
+  {
+    id: 'snow-sentry',
+    name: 'Snow Sentry',
+    stage: 7,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 0.9,
+    pace: 0.7,
+    drop: 'ore',
+  },
+  {
+    id: 'snow-yeti',
+    name: 'Snow Yeti',
+    stage: 7,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 1.0,
+    pace: 0.6,
+    drop: 'gem',
+  },
+  {
+    id: 'glacier-mammoth',
+    name: 'Glacier Mammoth',
+    stage: 7,
+    tier: 'boss',
+    gait: 'walk',
+    vigor: 0.6,
+    pace: 0.5,
+    drop: 'chest',
+  },
+  {
+    id: 'lantern-wraith',
+    name: 'Lantern Wraith',
+    stage: 8,
+    tier: 'minion',
+    gait: 'float',
+    vigor: 0.6,
+    pace: 1.0,
+    drop: 'coin',
+  },
+  {
+    id: 'shard-cluster',
+    name: 'Shard Cluster',
+    stage: 8,
+    tier: 'minion',
+    gait: 'float',
+    vigor: 0.5,
+    pace: 1.3,
+    drop: 'ore',
+  },
+  {
+    id: 'mirror-mimic',
+    name: 'Mirror Mimic',
+    stage: 8,
+    tier: 'minion',
+    gait: 'walk',
+    vigor: 0.7,
+    pace: 0.8,
+    drop: 'coin',
+  },
+  {
+    id: 'gloom-stag',
+    name: 'Gloom Stag',
+    stage: 8,
+    tier: 'elite',
+    gait: 'walk',
+    vigor: 0.8,
+    pace: 0.8,
+    drop: 'gem',
+  },
+  {
+    id: 'eclipse-warden',
+    name: 'Eclipse Warden',
+    stage: 8,
+    tier: 'boss',
+    gait: 'float',
+    vigor: 0.5,
     pace: 0.6,
     drop: 'chest',
   },

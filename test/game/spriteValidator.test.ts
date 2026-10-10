@@ -18,7 +18,16 @@ type MutableArt = Omit<ArtSet, 'skinTones' | 'hairColors' | 'particlePalette'> &
   -readonly [K in 'skinTones' | 'hairColors']: Palette[];
 } & {
   particlePalette: Record<
-    'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly',
+    | 'ember'
+    | 'spark'
+    | 'drip'
+    | 'splash'
+    | 'mote'
+    | 'bubble'
+    | 'wisp'
+    | 'firefly'
+    | 'snow'
+    | 'murk',
     string[]
   >;
 };
@@ -287,6 +296,23 @@ void describe('validateArtSet rejects crafted faults', () => {
     const text = validateArtSet(art).join('\n');
     assert.match(text, /flame needs at least 3 frames/);
     assert.match(text, /particle ramp ember is too short/);
+  });
+
+  void it('the E4 snow and murk ramps are validated like every other kind: too short or an unknown character is reported (a missing key is a compile error, not a runtime check)', () => {
+    for (const kind of ['snow', 'murk'] as const) {
+      const short = cloneArt();
+      short.particlePalette[kind] = ['w'];
+      assert.match(
+        validateArtSet(short).join('\n'),
+        new RegExp(`particle ramp ${kind} is too short`),
+      );
+      const unknown = cloneArt();
+      unknown.particlePalette[kind] = ['w', '?', 'q'];
+      assert.ok(
+        validateArtSet(unknown).some((e) => e.includes(kind)),
+        `${kind}: an unknown ramp character is reported`,
+      );
+    }
   });
 
   void it('error text contains template ids and indexes only, never pixel rows', () => {

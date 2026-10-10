@@ -197,6 +197,24 @@ export const FIREFLY_DRIFT = 6;
 export const FIREFLY_LIFE_MIN_MS = 3500;
 export const FIREFLY_LIFE_MAX_MS = 6500;
 
+// Stage 7 snow (E4). Cosmetic only; first guesses, tuned by eye. Fall speeds are positive = down.
+export const SNOW_MIN_Y = 4;
+export const SNOW_MAX_Y = 60;
+export const SNOW_DRIFT = 5;
+export const SNOW_FALL_MIN = 8;
+export const SNOW_FALL_MAX = 16;
+export const SNOW_LIFE_MIN_MS = 3500;
+export const SNOW_LIFE_MAX_MS = 6000;
+
+// Stage 8 murk (E4). Cosmetic only; motes rise slowly while drifting sideways.
+export const MURK_MIN_Y = 90;
+export const MURK_MAX_Y = 156;
+export const MURK_DRIFT = 4;
+export const MURK_RISE_MIN = 3;
+export const MURK_RISE_MAX = 8;
+export const MURK_LIFE_MIN_MS = 4000;
+export const MURK_LIFE_MAX_MS = 7000;
+
 // Stage 6 ambient embers (E3). Separate from the campfire EMBER_* constants.
 export const STAGE_EMBER_MIN_Y = 112;
 export const STAGE_EMBER_MAX_Y = 156;

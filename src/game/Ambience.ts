@@ -25,6 +25,20 @@ import {
   MOTE_LIFE_MIN_MS,
   MOTE_MAX_Y,
   MOTE_MIN_Y,
+  MURK_DRIFT,
+  MURK_LIFE_MAX_MS,
+  MURK_LIFE_MIN_MS,
+  MURK_MAX_Y,
+  MURK_MIN_Y,
+  MURK_RISE_MAX,
+  MURK_RISE_MIN,
+  SNOW_DRIFT,
+  SNOW_FALL_MAX,
+  SNOW_FALL_MIN,
+  SNOW_LIFE_MAX_MS,
+  SNOW_LIFE_MIN_MS,
+  SNOW_MAX_Y,
+  SNOW_MIN_Y,
   STAGE_EMBER_LIFE_MAX_MS,
   STAGE_EMBER_LIFE_MIN_MS,
   STAGE_EMBER_MAX_Y,
@@ -47,6 +61,9 @@ export class Ambience {
   // Separate debts for the E3 ambients too.
   #fireflyDebt = 0;
   #emberDebt = 0;
+  // And for the E4 ambients.
+  #snowDebt = 0;
+  #murkDebt = 0;
 
   update(dtMs: number, world: World, camera: Camera): void {
     const effect = world.stage.def.ambient;
@@ -69,6 +86,12 @@ export class Ambience {
       case 'embers':
         this.#embers(dtMs, effect.perSecond, world);
         return;
+      case 'snow':
+        this.#snow(dtMs, effect.perSecond, world);
+        return;
+      case 'murk':
+        this.#murk(dtMs, effect.perSecond, world);
+        return;
       default:
         assertNever(effect);
     }
@@ -77,6 +100,38 @@ export class Ambience {
   /** Adds elapsed emissions to a debt, capped at one second's worth (guards a stage switch). */
   static #accrue(debt: number, dtMs: number, perSecond: number): number {
     return Math.min(debt + (perSecond * dtMs) / 1000, Math.max(1, perSecond));
+  }
+
+  /** Snow falls slowly from the upper band across the corridor view; not scrolled. */
+  #snow(dtMs: number, perSecond: number, world: World): void {
+    this.#snowDebt = Ambience.#accrue(this.#snowDebt, dtMs, perSecond);
+    while (this.#snowDebt >= 1) {
+      this.#snowDebt -= 1;
+      world.particles.emit(
+        'snow',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        SNOW_MIN_Y + world.rng() * (SNOW_MAX_Y - SNOW_MIN_Y),
+        (world.rng() - 0.5) * 2 * SNOW_DRIFT,
+        SNOW_FALL_MIN + world.rng() * (SNOW_FALL_MAX - SNOW_FALL_MIN),
+        SNOW_LIFE_MIN_MS + world.rng() * (SNOW_LIFE_MAX_MS - SNOW_LIFE_MIN_MS),
+      );
+    }
+  }
+
+  /** Dim murk motes rise slowly from the lower band of the corridor view; not scrolled. */
+  #murk(dtMs: number, perSecond: number, world: World): void {
+    this.#murkDebt = Ambience.#accrue(this.#murkDebt, dtMs, perSecond);
+    while (this.#murkDebt >= 1) {
+      this.#murkDebt -= 1;
+      world.particles.emit(
+        'murk',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        MURK_MIN_Y + world.rng() * (MURK_MAX_Y - MURK_MIN_Y),
+        (world.rng() - 0.5) * 2 * MURK_DRIFT,
+        -(MURK_RISE_MIN + world.rng() * (MURK_RISE_MAX - MURK_RISE_MIN)),
+        MURK_LIFE_MIN_MS + world.rng() * (MURK_LIFE_MAX_MS - MURK_LIFE_MIN_MS),
+      );
+    }
   }
 
   /** Fireflies hover and wander in the corridor view; not scrolled. */

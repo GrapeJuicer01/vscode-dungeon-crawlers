@@ -54,18 +54,15 @@ function rgb(hex: string): [number, number, number] {
 }
 
 void describe('the shipped Stage 5 and Stage 6 environments', () => {
-  void it('validateStages and validateArtSet are empty and the six stage ids are in order', () => {
-    assert.deepEqual(
-      STAGES.map((s) => s.id),
-      [
-        'forgotten-cellar',
-        'goblin-mine-shafts',
-        'toxic-slime-caverns',
-        'ancient-catacombs',
-        FOREST,
-        MOLTEN,
-      ],
-    );
+  void it('validateStages and validateArtSet are empty and the first six stage ids are in order', () => {
+    assert.deepEqual(STAGES.map((s) => s.id).slice(0, 6), [
+      'forgotten-cellar',
+      'goblin-mine-shafts',
+      'toxic-slime-caverns',
+      'ancient-catacombs',
+      FOREST,
+      MOLTEN,
+    ]);
     assert.deepEqual(validateStages(STAGES, SHIPPED_ART), []);
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
     assert.equal(stageDef(FOREST).index, 5);
@@ -289,8 +286,8 @@ void describe('the Stage 6 tint rule (E3 plan 5.1 rule 4)', () => {
 });
 
 void describe('the ten new enemies', () => {
-  void it('one template per enemy row (thirty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
-    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 30);
+  void it('one template per enemy row (forty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
+    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 40);
     assert.deepEqual(validateEnemyArt(SHIPPED_ART), []);
     const size = { minion: 16, elite: 24, boss: 48 } as const;
     for (const id of E3_ENEMIES) {

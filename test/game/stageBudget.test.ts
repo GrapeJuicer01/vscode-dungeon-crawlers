@@ -1,6 +1,6 @@
 // E2 plan test notes 5 and 9: the E1 draw ceilings (200 bitmap draws, 520 fills) and the node CPU
 // benchmark, run once per stage. The engineered worst case fills every pool at once in that
-// stage's world with that stage's enemies and all seven particle kinds; the real-game runs use
+// stage's world with that stage's enemies and all ten particle kinds; the real-game runs use
 // hard combat from the stage's stored progress. Real numbers are printed as diagnostics.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -41,6 +41,8 @@ const KINDS: ParticleKind[] = [
   'bubble',
   'wisp',
   'firefly',
+  'snow',
+  'murk',
 ];
 
 function worstFrame(stage: number): { bitmaps: number; fills: number } {
@@ -219,6 +221,55 @@ void describe('the E3 ambients reach the screen through the renderer colour map'
     const ember = SHIPPED_ART.palette[SHIPPED_ART.particlePalette.ember[3]!];
     assert.equal(draws1x1(6, ember), true, 'embers were drawn');
     assert.equal(draws1x1(6, lime), false);
+  });
+});
+
+void describe('the E4 ambients reach the screen through the renderer colour map', () => {
+  const css = (kind: 'snow' | 'murk'): string[] =>
+    SHIPPED_ART.particlePalette[kind].map((ch) => SHIPPED_ART.palette[ch] ?? '#ffffff');
+
+  /** Colours of every fillRect of a given size in 15 simulated seconds on one stage (no enemies). */
+  function colorsOfSize(stage: number, side: number): Set<string> {
+    const rig = gameRig({ record: true });
+    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: stage });
+    rig.game.applyConfig({ enemiesEnabled: false, killsPerStage: 5, maxEnemies: 6 });
+    feed(rig, agent('solo', 'working'));
+    const out = new Set<string>();
+    for (let i = 0; i < 60 * 15; i++) {
+      rig.surface.reset();
+      rig.game.frame(STEP_MS, rig.surface);
+      for (const c of rig.surface.calls) {
+        if (c.method === 'fillRect' && c.args[3] === side && c.args[4] === side)
+          out.add(String(c.args[0]));
+      }
+    }
+    return out;
+  }
+
+  void it('Stage 7 draws 1x1 rects in every step of the snow ramp', () => {
+    const drawn = colorsOfSize(7, 1);
+    for (const c of css('snow')) assert.ok(drawn.has(c), `snow step ${c} was drawn`);
+  });
+
+  void it('Stage 8 draws 2x2 rects, all of them in the murk ramp, and every murk step appears', () => {
+    const drawn = colorsOfSize(8, 2);
+    assert.ok(drawn.size > 0, 'murk motes were drawn');
+    for (const c of drawn) assert.ok(css('murk').includes(c), `unexpected 2x2 colour ${c}`);
+    for (const c of css('murk')) assert.ok(drawn.has(c), `murk step ${c} was drawn`);
+  });
+
+  void it('no stage before Stage 8 draws a 2x2 rect in a murk-only colour', () => {
+    const others = new Set<string>(
+      (['bubble', 'ember', 'spark', 'drip', 'splash', 'mote', 'wisp', 'firefly', 'snow'] as const)
+        .flatMap((k) => SHIPPED_ART.particlePalette[k])
+        .map((ch) => SHIPPED_ART.palette[ch] ?? '#ffffff'),
+    );
+    const murkOnly = css('murk').filter((c) => !others.has(c));
+    assert.ok(murkOnly.length >= 1, 'the murk ramp has at least one step of its own');
+    for (const stage of [1, 2, 3, 4, 5, 6, 7]) {
+      const drawn = colorsOfSize(stage, 2);
+      for (const c of murkOnly) assert.ok(!drawn.has(c), `stage ${stage} drew ${c}`);
+    }
   });
 });
 

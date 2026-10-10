@@ -1,5 +1,5 @@
 // THE HERO-INVARIANT TEST, E2 extension (Core invariants 1 and 2; E2 plan test note 6). The E1
-// combat-isolation suites run once per stage: for each of the six stages (E3) a hero's lifecycle follows
+// combat-isolation suites run once per stage: for each of the eight stages (E4) a hero's lifecycle follows
 // the host's agent-state events and nothing else, whatever the stage's enemies, bosses, ambient, or
 // stage swaps do. Never narrowed; heroInvariantCombat.test.ts keeps the stage 1 and 2 runs.
 import assert from 'node:assert/strict';
@@ -29,6 +29,8 @@ const BOSS_BY_STAGE = [
   'tomb-lich',
   'elder-dryad',
   'molten-colossus',
+  'glacier-mammoth',
+  'eclipse-warden',
 ] as const;
 const LAST_STAGE = STAGES.length;
 const HARD = { enemiesEnabled: true, killsPerStage: 5, maxEnemies: 12 };
@@ -131,7 +133,7 @@ void describe('per stage: hero state is identical with enemies on and off (host 
         assert.deepEqual(off.errors, []);
         assert.ok(enemyPeak > 0, 'enemies were on screen in the combat run');
         // The stages the enemies came from run in order from this stage: only a boss defeat
-        // (never a hero event) moves on, and after Stage 6 (the last) it wraps to Stage 1.
+        // (never a hero event) moves on, and after Stage 8 (the last) it wraps to Stage 1.
         assert.equal(stagesSeen[0], stage, `stage ${stage} enemies fought first`);
         stagesSeen.forEach((st, i) => {
           if (i > 0) assert.equal(st, (stagesSeen[i - 1]! % STAGES.length) + 1, stagesSeen.join());
@@ -182,7 +184,7 @@ void describe('per stage: a boss fight and the stage swap that follows touch no 
   }
 });
 
-void describe('a 1 to 2 to 3 to 4 to 5 to 6 to 1 sequence (boss defeats, holds, fades, wrap, cycle + 1)', () => {
+void describe('a 1 to 2 to 3 to 4 to 5 to 6 to 7 to 8 to 1 sequence (boss defeats, holds, fades, wrap, cycle + 1)', () => {
   const trace = (
     muteBoard: boolean,
   ): { rows: string[]; stages: number[]; cycles: number[]; flashes: number } => {
@@ -241,8 +243,8 @@ void describe('a 1 to 2 to 3 to 4 to 5 to 6 to 1 sequence (boss defeats, holds, 
     const live = trace(false);
     const muted = trace(true);
     const order = live.stages.filter((s, i) => i === 0 || s !== live.stages[i - 1]);
-    assert.equal(LAST_STAGE, 6);
-    assert.deepEqual(order.slice(0, 7), [1, 2, 3, 4, 5, 6, 1]);
+    assert.equal(LAST_STAGE, 8);
+    assert.deepEqual(order.slice(0, 9), [1, 2, 3, 4, 5, 6, 7, 8, 1]);
     assert.equal(live.cycles[live.cycles.length - 1], 1);
     assert.ok(live.cycles.slice(0, live.stages.indexOf(LAST_STAGE) + 1).every((c) => c === 0));
     assert.ok(live.flashes > 20 && muted.flashes > 20, `enemy attacks landed (${live.flashes})`);
@@ -285,19 +287,19 @@ void describe('per stage: fighters only (the reaction board and summons)', () =>
   }
 });
 
-void describe('faults on the new stages never touch a hero (invariant 4)', () => {
+void describe('faults on the later stages never touch a hero (invariant 4)', () => {
   const faults: { name: string; stages: readonly number[]; arm: () => void }[] = [
     {
-      name: 'Ambience.update (bubbles, fog, fireflies, embers)',
-      stages: [3, 4, 5, 6],
+      name: 'Ambience.update (bubbles, fog, fireflies, embers, snow, murk)',
+      stages: [3, 4, 5, 6, 7, 8],
       arm: () =>
         patch(Ambience.prototype, 'update', () => {
           throw new Error('ambience boom');
         }),
     },
     {
-      name: 'Enemy.draw of a Stage 3 to 6 enemy',
-      stages: [3, 4, 5, 6],
+      name: 'Enemy.draw of a Stage 3 to 8 enemy',
+      stages: [3, 4, 5, 6, 7, 8],
       arm: () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method -- wrapped and applied with `this`
         const original = Enemy.prototype.draw;
@@ -338,7 +340,7 @@ void describe('faults on the new stages never touch a hero (invariant 4)', () =>
     }
   }
 
-  for (const stage of [3, 5, 6]) {
+  for (const stage of [3, 5, 6, 7, 8]) {
     void it(`a throwing ambient does not stop combat or progress on stage ${stage}: kills still count`, () => {
       patch(Ambience.prototype, 'update', () => {
         throw new Error('ambience boom');

@@ -1,6 +1,7 @@
 // Entry for the artist feedback command (see lookAlikesReport.mjs). Prints the look-alike matrix for
 // the wired enemy art plus any extra template maps named on the command line, without wiring them.
-// Args: `<module path>:<ExportName>[:<stage>]` ...; the export is a Record<id, SpriteTemplate>.
+// Args: `<module path>:<ExportName>[:<stage>[:<id>]]` ...; the export is a Record<id, SpriteTemplate>
+// or one SpriteTemplate (a boss).
 import { ENEMIES } from '../../src/game/data/enemies';
 import { ENEMY_SPRITES } from '../../src/game/sprites/enemyTemplates';
 import type { SpriteTemplate } from '../../src/game/sprites/spriteTypes';

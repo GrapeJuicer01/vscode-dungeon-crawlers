@@ -577,11 +577,11 @@ void describe('the boss (E1 plan 3.4.4 step 4 and 13.1)', () => {
     assert.equal(surface.bitmapDraws, 0, 'every drop faded away');
   });
 
-  void it('a boss defeat in the last delivered stage wraps: Stage 6 clear returns to Stage 1 with cycle + 1 (E3)', () => {
-    const rig = makeCombat({ fighters: 8, stage: 6, config: { killsPerStage: 2 } });
+  void it('a boss defeat in the last delivered stage wraps: Stage 8 clear returns to Stage 1 with cycle + 1 (E4)', () => {
+    const rig = makeCombat({ fighters: 8, stage: 8, config: { killsPerStage: 2 } });
     rig.progression.load({
       schemaVersion: 1,
-      stageIndex: 6,
+      stageIndex: 8,
       killsInStage: 0,
       totalKills: 10,
       bossesDefeated: 1,
@@ -594,8 +594,8 @@ void describe('the boss (E1 plan 3.4.4 step 4 and 13.1)', () => {
     assert.equal(snap.killsInStage, 0);
   });
 
-  void it('boss defeats in Stages 1 to 5 advance one stage each with no new cycle (E3: the wrap moved to Stage 6)', () => {
-    for (const from of [1, 2, 3, 4, 5]) {
+  void it('boss defeats in Stages 1 to 7 advance one stage each with no new cycle (E4: the wrap moved to Stage 8)', () => {
+    for (const from of [1, 2, 3, 4, 5, 6, 7]) {
       const rig = makeCombat({ fighters: 8, stage: from, config: { killsPerStage: 2 } });
       rig.progression.load({
         schemaVersion: 1,

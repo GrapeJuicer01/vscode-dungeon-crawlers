@@ -263,3 +263,120 @@ void describe('E3 look-alike policy: every new enemy satisfies the full policy, 
     }
   });
 });
+
+void describe('E4 look-alike policy: every new enemy satisfies the full policy, with no pin', () => {
+  const E4_IDS = [
+    'rime-penguin',
+    'frost-hare',
+    'snow-sentry',
+    'snow-yeti',
+    'glacier-mammoth',
+    'lantern-wraith',
+    'shard-cluster',
+    'mirror-mimic',
+    'gloom-stag',
+    'eclipse-warden',
+  ];
+
+  void it('the matrix covers 24 minions, 8 elites, and 8 bosses; BASELINE_IDS is still the 20 E1/E2 ids', () => {
+    assert.equal(byTier('minion').length, 24);
+    assert.equal(byTier('elite').length, 8);
+    assert.equal(byTier('boss').length, 8);
+    assert.equal(BASELINE_IDS.length, 20);
+    for (const id of E4_IDS) assert.ok(!BASELINE_IDS.includes(id), id);
+  });
+
+  void it('the ten E4 enemies are all measured, and no pair involving one is pinned', () => {
+    for (const id of E4_IDS) {
+      assert.ok(
+        entries.some((e) => e.id === id),
+        id,
+      );
+      assert.ok(
+        !Object.keys(ALL_PINS).some((key) => key.split(' vs ').includes(id)),
+        `${id} must not be pinned`,
+      );
+    }
+    assert.equal(Object.keys(LEGACY_OVER).length, 11, 'the 11 legacy pins are unchanged by E4');
+  });
+
+  void it('every pair that involves an E4 enemy is under 0.85 overlap and at most 0.80 IoU', () => {
+    const involved = pairs.filter((p) => E4_IDS.includes(p.a) || E4_IDS.includes(p.b));
+    // 23 other minions per new minion (less the shared pairs), 7 other elites, 7 other bosses.
+    assert.ok(involved.length >= 140, `${involved.length} pairs`);
+    for (const p of involved) {
+      assert.ok(p.overlap < OVERLAP_LIMIT, `${p.a} vs ${p.b} overlap ${p.overlap}`);
+      assert.ok(p.iou <= IOU_LIMIT, `${p.a} vs ${p.b} iou ${p.iou}`);
+    }
+  });
+
+  void it('same-stage minions of Stage 7 and Stage 8 are under 0.75 overlap (Frost Hare vs Snow Sentry is the tight one)', () => {
+    for (const stage of [7, 8]) {
+      const same = pairs.filter(
+        (p) => p.stageA === stage && p.stageB === stage && minionIds.has(p.a) && minionIds.has(p.b),
+      );
+      assert.equal(same.length, 3, `stage ${stage}: three minions, three pairs`);
+      for (const p of same)
+        assert.ok(p.overlap < SAME_STAGE_LIMIT, `${p.a} vs ${p.b} ${p.overlap}`);
+    }
+    assert.ok(get('frost-hare', 'snow-sentry').overlap < SAME_STAGE_LIMIT);
+  });
+
+  void it('the four tight-margin pairs stay under the limits (rime-penguin vs ember-imp and vs lantern-wraith, crate-mimic vs gloom-stag, frost-hare vs snow-sentry)', () => {
+    for (const [a, b] of [
+      ['rime-penguin', 'ember-imp'],
+      ['rime-penguin', 'lantern-wraith'],
+      ['crate-mimic', 'gloom-stag'],
+      ['frost-hare', 'snow-sentry'],
+    ] as const) {
+      const m = get(a, b);
+      assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
+      assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
+    }
+  });
+
+  void it('the named E4 pairs stay under the limits', () => {
+    const named: [string, string][] = [
+      ...['wailing-ghost', 'goblin-scout', 'bone-soldier', 'spore-shroom'].map(
+        (o): [string, string] => ['rime-penguin', o],
+      ),
+      ...['moss-wolf', 'toxic-toad', 'cellar-rat', 'cave-bat'].map((o): [string, string] => [
+        'frost-hare',
+        o,
+      ]),
+      ...['green-slime', 'spore-shroom', 'thorn-sprout'].map((o): [string, string] => [
+        'snow-sentry',
+        o,
+      ]),
+      ...['wailing-ghost', 'bramble-pixie', 'cave-bat'].map((o): [string, string] => [
+        'lantern-wraith',
+        o,
+      ]),
+      ...['bramble-pixie', 'cave-bat'].map((o): [string, string] => ['shard-cluster', o]),
+      ...['rock-golem', 'crypt-mummy', 'furnace-guard', 'crate-mimic', 'ancient-treant'].map(
+        (o): [string, string] => ['snow-yeti', o],
+      ),
+      ...['ancient-treant', 'jelly-cube', 'crypt-mummy'].map((o): [string, string] => [
+        'gloom-stag',
+        o,
+      ]),
+      ...[
+        'rat-king',
+        'goblin-foreman',
+        'ooze-queen',
+        'tomb-lich',
+        'elder-dryad',
+        'molten-colossus',
+      ].flatMap((old): [string, string][] => [
+        ['glacier-mammoth', old],
+        ['eclipse-warden', old],
+      ]),
+      ['glacier-mammoth', 'eclipse-warden'],
+    ];
+    for (const [a, b] of named) {
+      const m = get(a, b);
+      assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
+      assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
+    }
+  });
+});

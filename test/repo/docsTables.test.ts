@@ -334,13 +334,13 @@ void describe('docs/design/enemies-and-stages.md', () => {
 });
 
 void describe('renderEnemyTable (E1 plan note 12)', () => {
-  void it('is deterministic, says "Delivered enemies: 30 of 50.", and has one row per enemy', () => {
+  void it('is deterministic, says "Delivered enemies: 40 of 50.", and has one row per enemy', () => {
     const total: number = ENEMIES.length;
     const a = renderEnemyTable(ENEMIES, STAGES);
     assert.equal(a, renderEnemyTable(ENEMIES, STAGES));
     const lines = a.split('\n');
-    assert.equal(lines[0], 'Delivered enemies: 30 of 50.');
-    assert.equal(total, 30);
+    assert.equal(lines[0], 'Delivered enemies: 40 of 50.');
+    assert.equal(total, 40);
     assert.equal(lines.filter((l) => l.startsWith('| ')).length, total + 1, 'header + rows');
     assert.match(a, /\n\|---\|---\|---\|---\|---\|---\|---\|---\|\n/, 'compact delimiter row');
   });
@@ -349,7 +349,7 @@ void describe('renderEnemyTable (E1 plan note 12)', () => {
     const rows = renderEnemyTable(ENEMIES, STAGES)
       .split('\n')
       .filter((l) => l.startsWith('| ') && !l.startsWith('| Stage'));
-    assert.equal(rows.length, 30);
+    assert.equal(rows.length, 40);
     for (const row of ENEMIES) {
       const line = rows.find((l) => l.includes(`\`${row.id}\``));
       assert.ok(line !== undefined, row.id);

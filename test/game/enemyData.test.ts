@@ -1,7 +1,7 @@
 // The enemy table, its startup validator, the scaling formulas, and the drop table (E1 plan test
 // note 1; roadmap A3 incremental mode: five rows and exactly one boss per delivered stage). The
 // "exactly 50 ids over 10 stages" contract is an E5 requirement, so here the shipped table is
-// checked for what E3 delivers (30 rows, 6 stages) and the validator for every crafted fault.
+// checked for what E4 delivers (40 rows, 8 stages) and the validator for every crafted fault.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
@@ -40,10 +40,10 @@ type Mutable = { -readonly [K in keyof EnemyRow]: EnemyRow[K] };
 const edit = (id: string, patch: Partial<Mutable>): readonly EnemyRow[] =>
   rows.map((r) => (r.id === id ? { ...r, ...patch } : r));
 
-void describe('the shipped enemy table (E1 to E3: stages 1 to 6)', () => {
-  void it('has thirty rows: six stages of five, each with four regular rows and exactly one boss', () => {
-    assert.equal(rows.length, 30);
-    assert.equal(STAGES.length, 6);
+void describe('the shipped enemy table (E1 to E4: stages 1 to 8)', () => {
+  void it('has forty rows: eight stages of five, each with four regular rows and exactly one boss', () => {
+    assert.equal(rows.length, 40);
+    assert.equal(STAGES.length, 8);
     for (const stage of STAGES) {
       const mine = rows.filter((r) => r.stage === stage.index);
       assert.equal(mine.length, 5, `stage ${stage.index}`);
@@ -54,8 +54,8 @@ void describe('the shipped enemy table (E1 to E3: stages 1 to 6)', () => {
     }
   });
 
-  void it('has thirty unique kebab-case ids, exposed as ENEMY_IDS in table order', () => {
-    assert.equal(new Set(rows.map((r) => r.id)).size, 30);
+  void it('has forty unique kebab-case ids, exposed as ENEMY_IDS in table order', () => {
+    assert.equal(new Set(rows.map((r) => r.id)).size, 40);
     assert.deepEqual(
       ENEMY_IDS,
       rows.map((r) => r.id),
@@ -99,6 +99,16 @@ void describe('the shipped enemy table (E1 to E3: stages 1 to 6)', () => {
         [6, 'magma-crab', 'Magma Crab', 'minion', 'walk', 1.1, 1.0, 'ore'],
         [6, 'furnace-guard', 'Furnace Guard', 'elite', 'walk', 1.2, 0.5, 'gem'],
         [6, 'molten-colossus', 'Molten Colossus', 'boss', 'walk', 0.8, 0.6, 'chest'],
+        [7, 'rime-penguin', 'Rime Penguin', 'minion', 'walk', 0.8, 0.8, 'coin'],
+        [7, 'frost-hare', 'Frost Hare', 'minion', 'hop', 0.7, 1.4, 'coin'],
+        [7, 'snow-sentry', 'Snow Sentry', 'minion', 'walk', 0.9, 0.7, 'ore'],
+        [7, 'snow-yeti', 'Snow Yeti', 'elite', 'walk', 1.0, 0.6, 'gem'],
+        [7, 'glacier-mammoth', 'Glacier Mammoth', 'boss', 'walk', 0.6, 0.5, 'chest'],
+        [8, 'lantern-wraith', 'Lantern Wraith', 'minion', 'float', 0.6, 1.0, 'coin'],
+        [8, 'shard-cluster', 'Shard Cluster', 'minion', 'float', 0.5, 1.3, 'ore'],
+        [8, 'mirror-mimic', 'Mirror Mimic', 'minion', 'walk', 0.7, 0.8, 'coin'],
+        [8, 'gloom-stag', 'Gloom Stag', 'elite', 'walk', 0.8, 0.8, 'gem'],
+        [8, 'eclipse-warden', 'Eclipse Warden', 'boss', 'float', 0.5, 0.6, 'chest'],
       ],
     );
   });
@@ -131,10 +141,12 @@ void describe('the shipped enemy table (E1 to E3: stages 1 to 6)', () => {
     assert.deepEqual(validateEnemies(rows, STAGES), []);
   });
 
-  void it('enemiesForStage and bossFor return nothing for an undelivered stage (7 and beyond)', () => {
-    assert.deepEqual(enemiesForStage(7), []);
+  void it('enemiesForStage and bossFor return nothing for an undelivered stage (9 and beyond)', () => {
+    assert.deepEqual(enemiesForStage(9), []);
+    assert.deepEqual(enemiesForStage(10), []);
     assert.deepEqual(enemiesForStage(0), []);
-    assert.equal(bossFor(7), undefined);
+    assert.equal(bossFor(9), undefined);
+    assert.equal(bossFor(10), undefined);
     assert.deepEqual(
       enemiesForStage(1).map((r) => r.id),
       ['cellar-rat', 'cave-bat', 'web-spider', 'crate-mimic'],
@@ -148,7 +160,7 @@ void describe('validateEnemies rejects crafted tables with fixed text', () => {
   void it('six enemies in one stage', () => {
     const errors = validateEnemies([...rows, extra({ id: 'sixth-one' })], STAGES);
     assert.ok(errors.includes('stage 1: expected exactly 5 enemies, found 6'), errors.join());
-    assert.ok(errors.some((e) => /expected 30 enemies for 6 stages/.test(e)));
+    assert.ok(errors.some((e) => /expected 40 enemies for 8 stages/.test(e)));
   });
 
   void it('two bosses in one stage', () => {
@@ -175,7 +187,7 @@ void describe('validateEnemies rejects crafted tables with fixed text', () => {
   });
 
   void it('a row for a stage that does not exist', () => {
-    const errors = validateEnemies(edit('goblin-miner', { stage: 7 }), STAGES);
+    const errors = validateEnemies(edit('goblin-miner', { stage: 9 }), STAGES);
     assert.ok(
       errors.some((e) => /stage does not exist/.test(e)),
       errors.join(),
@@ -230,15 +242,15 @@ void describe('validateEnemies rejects crafted tables with fixed text', () => {
     assert.deepEqual(validateEnemies(edit('cellar-rat', { vigor: 2, pace: 1.6 }), STAGES), []);
   });
 
-  void it('a non-contiguous total: twenty-nine or thirty-one rows', () => {
+  void it('a non-contiguous total: thirty-nine or forty-one rows', () => {
     assert.ok(
-      validateEnemies(rows.slice(0, 29), STAGES).some((e) =>
-        /expected 30 enemies for 6 stages/.test(e),
+      validateEnemies(rows.slice(0, 39), STAGES).some((e) =>
+        /expected 40 enemies for 8 stages/.test(e),
       ),
     );
     assert.ok(
       validateEnemies([...rows, extra({ id: 'extra-one', stage: 2 })], STAGES).some((e) =>
-        /expected 30 enemies for 6 stages/.test(e),
+        /expected 40 enemies for 8 stages/.test(e),
       ),
     );
   });
@@ -338,6 +350,40 @@ void describe('healthOf and the tier formulas', () => {
     );
     assert.equal(at('elder-dryad', 5, 8), 1238);
     assert.equal(at('molten-colossus', 6, 8), 1485);
+  });
+
+  void it('E4 spot values at cycle 0, party 1: stage 7 is 48, 42, 54, 145, 436 and stage 8 is 49, 41, 57, 157, 490; bosses with eight fighters 1504 and 1692', () => {
+    const at = (id: string, stage: number, party = 1): number => healthOf(row(id), stage, 0, party);
+    assert.deepEqual(
+      ['rime-penguin', 'frost-hare', 'snow-sentry', 'snow-yeti', 'glacier-mammoth'].map((id) =>
+        at(id, 7),
+      ),
+      [48, 42, 54, 145, 436],
+    );
+    assert.deepEqual(
+      ['lantern-wraith', 'shard-cluster', 'mirror-mimic', 'gloom-stag', 'eclipse-warden'].map(
+        (id) => at(id, 8),
+      ),
+      [49, 41, 57, 157, 490],
+    );
+    assert.equal(at('glacier-mammoth', 7, 8), 1504);
+    assert.equal(at('eclipse-warden', 8, 8), 1692);
+  });
+
+  void it('E4 enemy rows are stage-local, and both new bosses keep the lowest allowed vigors 0.6 and 0.5 (decision E4-7)', () => {
+    assert.deepEqual(
+      enemiesForStage(7).map((r) => r.id),
+      ['rime-penguin', 'frost-hare', 'snow-sentry', 'snow-yeti'],
+    );
+    assert.deepEqual(
+      enemiesForStage(8).map((r) => r.id),
+      ['lantern-wraith', 'shard-cluster', 'mirror-mimic', 'gloom-stag'],
+    );
+    assert.equal(bossFor(7)?.id, 'glacier-mammoth');
+    assert.equal(bossFor(8)?.id, 'eclipse-warden');
+    assert.equal(bossFor(7)?.vigor, 0.6);
+    assert.equal(bossFor(8)?.vigor, 0.5);
+    assert.ok((bossFor(7)?.vigor ?? 9) < 1 && (bossFor(8)?.vigor ?? 9) < 1);
   });
 
   void it('E3 enemy rows are stage-local, and both new bosses keep a vigor below 1 (decision E3-7)', () => {

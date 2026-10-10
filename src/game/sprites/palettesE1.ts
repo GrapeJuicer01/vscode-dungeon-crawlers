@@ -77,6 +77,36 @@ export const STAGE_PALETTES: Readonly<Record<string, Palette>> = {
     g: '#6b6058', // ambient tint, gray-brown
     T: '#ffa040', // warm orange light
   },
+  // Frozen Citadel (batch E4): cold blue-gray stone, ice blue, pale cyan light, frost white (sparse
+  // highlights only). Floors stay mid-dark; the ambient tint is a cool blue-gray (blue-dominant, so
+  // never red-dominant), and the stage's enemies stay brighter and warmer than the stone.
+  'frozen-citadel': {
+    '1': '#0e1424', // deepest shadow
+    '2': '#27334d', // dark citadel stone
+    '3': '#41567a', // mid stone
+    '4': '#617da2', // lit stone
+    '5': '#86cdf0', // ice blue
+    '6': '#c4f6ff', // pale cyan light
+    '7': '#f2fbff', // frost white
+    '8': '#1fb2b8', // teal accent (away from the Mage's cloth blue)
+    g: '#64759b', // ambient tint, cool blue-gray (kept dark so every class cloth has contrast >= 2.0)
+    T: '#bfe8ff', // pale blue light
+  },
+  // Shadow Realm (batch E4): dark desaturated indigo stone, violet crystal, lilac-white wisp light,
+  // cold cyan accent. The stone is bluer and grayer than the Necromancer's hood violet, never
+  // black; entities are drawn after the light map so heroes are not darkened by the ambient tint.
+  'shadow-realm': {
+    '1': '#0c0b1c', // deepest shadow
+    '2': '#25233f', // dark indigo stone
+    '3': '#3f3d66', // mid indigo stone
+    '4': '#65629a', // lit stone
+    '5': '#9a6cf0', // violet crystal
+    '6': '#e6d4ff', // lilac-white wisp light
+    '7': '#f8f2ff', // pale highlight
+    '8': '#38d0e8', // cold cyan accent
+    g: '#6a62a0', // ambient tint, dark indigo-violet
+    T: '#c8a0ff', // soft violet light
+  },
 };
 
 /**

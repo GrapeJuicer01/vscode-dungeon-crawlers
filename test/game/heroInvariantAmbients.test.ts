@@ -1,5 +1,6 @@
-// THE HERO-INVARIANT TEST, E3 extension (Core invariants 1, 2, and 4; E3 plan test note 7b): with the
-// stage fixed at Stage 5 (fireflies, glow blooms) and at Stage 6 (embers, lava lights), a run with
+// THE HERO-INVARIANT TEST, E3 and E4 extension (Core invariants 1, 2, and 4; E3 plan test note 7b,
+// E4 plan test note 7b): with the stage fixed at Stage 5 (fireflies, glow blooms), Stage 6 (embers,
+// lava lights), Stage 7 (snow, ice lamps), and Stage 8 (murk, wisp torches), a run with
 // the ambients and lights at full density and a run with the ambient emitter silenced produce the
 // same heroSnapshot sequence. Decoration is cosmetic; only host agent-state events move a hero.
 import assert from 'node:assert/strict';
@@ -63,28 +64,33 @@ function drive(rig: GameRig, seed: number, n: number): string[] {
   return rows;
 }
 
-/** Counts the 1x1 fills of one frame (particles are the only 1x1 fills). */
-function fills1x1(rig: GameRig): number {
+/**
+ * Counts the square fills of one frame. Particles are the only 1x1 fills; Stage 8 murk motes are
+ * 2x2 (E4), so that stage counts 2x2 fills (nothing else in Stage 8 emits them: the silenced run
+ * is the control).
+ */
+function fills(rig: GameRig, side: number): number {
   rig.surface.reset();
   rig.game.frame(STEP_MS, rig.surface);
   return rig.surface.calls.filter(
-    (c) => c.method === 'fillRect' && c.args[3] === 1 && c.args[4] === 1,
+    (c) => c.method === 'fillRect' && c.args[3] === side && c.args[4] === side,
   ).length;
 }
 
-void describe('Stage 5 and Stage 6: ambients and lights never change a hero', () => {
-  for (const stage of [5, 6]) {
+void describe('Stages 5 to 8: ambients and lights never change a hero', () => {
+  for (const stage of [5, 6, 7, 8]) {
     for (const n of [1, 8, 32]) {
       void it(`stage ${stage}, ${n} heroes, enemies off: identical heroSnapshot every second with the ambient emitter live and silenced`, () => {
         assert.equal(STAGES[stage - 1]?.index, stage);
         const live = rigAt(stage, false);
         const seed = 500 + stage * 10 + n;
         const a = drive(live, seed, n);
-        const liveParticles = fills1x1(live);
+        const side = stage === 8 ? 2 : 1;
+        const liveParticles = fills(live, side);
         silenceAmbience();
         const quiet = rigAt(stage, false);
         const b = drive(quiet, seed, n);
-        const quietParticles = fills1x1(quiet);
+        const quietParticles = fills(quiet, side);
         assert.deepEqual(a, b);
         assert.ok(
           liveParticles > quietParticles,

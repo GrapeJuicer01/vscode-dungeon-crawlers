@@ -16,6 +16,8 @@ const COLORS: ParticleColors = {
   bubble: ['#b1', '#b2', '#b3'],
   wisp: ['#w1', '#w2', '#w3'],
   firefly: ['#f1', '#f2', '#f3', '#f4'],
+  snow: ['#n1', '#n2', '#n3'],
+  murk: ['#k1', '#k2', '#k3'],
 };
 
 void describe('Particles', () => {

@@ -143,6 +143,14 @@ const ENEMY_STAGE = {
     'elder-dryad',
   ],
   'molten-core': ['ember-imp', 'slag-snail', 'magma-crab', 'furnace-guard', 'molten-colossus'],
+  'frozen-citadel': ['rime-penguin', 'frost-hare', 'snow-sentry', 'snow-yeti', 'glacier-mammoth'],
+  'shadow-realm': [
+    'lantern-wraith',
+    'shard-cluster',
+    'mirror-mimic',
+    'gloom-stag',
+    'eclipse-warden',
+  ],
 };
 const palFor = (stageId, phase) => ({
   ...MASTER_PALETTE,

@@ -98,6 +98,8 @@ export const STAGE_TILE_CHARS: Readonly<Record<string, string>> = {
   'ancient-catacombs': '12345678',
   'enchanted-forest-ruins': '12345678',
   'molten-core': '12345678',
+  'frozen-citadel': '12345678',
+  'shadow-realm': '12345678',
 };
 
 /** Stage id -> the character that fills the background (near-black, luminance under 0.02). */
@@ -108,6 +110,8 @@ export const STAGE_CLEAR_CHAR: Readonly<Record<string, string>> = {
   'ancient-catacombs': 'n',
   'enchanted-forest-ruins': 'n',
   'molten-core': 'n',
+  'frozen-citadel': 'n',
+  'shadow-realm': 'n',
 };
 
 /** Stage id -> the darkness tint multiplied over the environment (cool gray-blue, never black). */
@@ -118,6 +122,8 @@ export const STAGE_AMBIENT_CHAR: Readonly<Record<string, string>> = {
   'ancient-catacombs': 'g',
   'enchanted-forest-ruins': 'g',
   'molten-core': 'g',
+  'frozen-citadel': 'g',
+  'shadow-realm': 'g',
 };
 
 /** Stage id -> partial palette over the master (characters 1 to 8, g, T). See palettesE1.ts. */
@@ -132,7 +138,16 @@ export const LIGHT_CHARS: { readonly torch: string; readonly campfire: string } 
 /** Particle color ramps, bright to dim by age. */
 export const PARTICLE_PALETTE: Readonly<
   Record<
-    'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly',
+    | 'ember'
+    | 'spark'
+    | 'drip'
+    | 'splash'
+    | 'mote'
+    | 'bubble'
+    | 'wisp'
+    | 'firefly'
+    | 'snow'
+    | 'murk',
     readonly string[]
   >
 > = {
@@ -149,6 +164,11 @@ export const PARTICLE_PALETTE: Readonly<
   // fireflies (stage 5 ambient, E3): a slow blink, yellow, dark green, lime, dark green, yellow;
   // master characters, no new colors. Alternates bright and dim; each step is 1/5 of the life.
   firefly: ['Y', 'N', 'L', 'N', 'Y'],
+  // falling snow (stage 7 ambient, E4): white, pale water blue, mid water blue; no Y O R D, so a
+  // flake is never mistaken for a hit spark or an ember. Steps over more than 1 s (no flashing).
+  snow: ['w', 'q', 'Q'],
+  // drifting murk (stage 8 ambient, E4): dim blue-gray, indigo, stone gray; dim motes, no warm hues
+  murk: ['g', 'b', 'P'],
 };
 
 /**

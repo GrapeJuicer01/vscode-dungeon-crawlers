@@ -177,11 +177,12 @@ void describe('the boot gate (awaitProgress)', () => {
     assert.ok(spy.updates() > 0);
   });
 
-  void it('a stored stage above the delivered count wraps instead of failing (E3: six stages, ((i - 1) % 6) + 1; 7 -> 1, 8 -> 2, 10 -> 4; 3 to 6 stay)', () => {
+  void it('a stored stage above the delivered count wraps instead of failing (E4: eight stages, ((i - 1) % 8) + 1; 7 and 8 stay, 9 -> 1, 10 -> 2; 3 to 6 stay)', () => {
     for (const [stored, expected] of [
-      [7, 1],
-      [8, 2],
-      [10, 4],
+      [7, 7],
+      [8, 8],
+      [9, 1],
+      [10, 2],
       // 11 and 12 are outside the stored schema (MAX_STAGE_INDEX 10): rejected, so default Stage 1.
       [11, 1],
       [12, 1],
@@ -248,6 +249,26 @@ void describe('onProgress: numbers out, never a reference in', () => {
     assert.equal(reports.filter((r) => r.urgent).length, 1);
     const before = reports.filter((r) => !r.urgent).length;
     assert.ok(before >= 5, 'at least the threshold of regular kills came first');
+  });
+
+  void it('the Stage 8 boss defeat wraps to Stage 1 and reports cycle + 1 (New Game+ after eight stages)', () => {
+    const reports: { progress: Progress; urgent: boolean }[] = [];
+    const rig = gameRig({
+      deps: { onProgress: (progress, urgent) => void reports.push({ progress, urgent }) },
+    });
+    rig.game.applyConfig({ enemiesEnabled: true, killsPerStage: 5, maxEnemies: 12 });
+    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: 8, bossesDefeated: 7, cycle: 0 });
+    party(rig, 8);
+    for (let i = 0; i < 60 * 600 && !reports.some((r) => r.urgent); i++) {
+      rig.game.step();
+    }
+    const urgent = reports.find((r) => r.urgent);
+    assert.ok(urgent, 'the Stage 8 boss fell');
+    assert.equal(urgent.progress.stageIndex, 1);
+    assert.equal(urgent.progress.cycle, 1);
+    assert.equal(urgent.progress.bossesDefeated, 8);
+    assert.deepEqual(rig.errors, []);
+    assert.equal(rig.game.heroSnapshot().length, 8, 'no hero is removed by the wrap');
   });
 
   void it('a throwing callback is caught and reported once; heroes, the scene, and combat keep running', () => {

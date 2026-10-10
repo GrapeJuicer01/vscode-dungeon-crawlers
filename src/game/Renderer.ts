@@ -144,6 +144,8 @@ export class Renderer {
       wisp: css(art.particlePalette.wisp),
       // Alternating bright and dim characters in the ramp give the blink.
       firefly: css(art.particlePalette.firefly),
+      snow: css(art.particlePalette.snow),
+      murk: css(art.particlePalette.murk),
     };
     this.#white = art.palette['w'] ?? '#ffffff';
   }

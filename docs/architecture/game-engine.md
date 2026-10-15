@@ -1,0 +1,409 @@
+# Game engine
+
+Purpose: the design contract for the webview game runtime in `src/game/**` and its thin webview host: components, room layout, the fixed-step loop and crash isolation, how host agent events drive heroes, the hero phase machine, rendering order, lighting, particles, pathfinding, sprite consumption, and the performance budget. Written for M4 (engine); later milestones extend it at the seams named in section 14.
+Related: [architecture overview](overview.md), [host-webview protocol](host-webview-protocol.md), [data model](data-model.md), [M4 plan](plans/m4-engine.md), [H1 plan](plans/h1-classes.md), [E1 plan](plans/e1-enemies.md), [ADR 0013 enemy health and reaction board](adr/0013-enemy-health-and-hero-reaction-board.md), [ADR 0002 no hero health](adr/0002-no-hero-health.md), [ADR 0003 procedural sprites](adr/0003-procedural-sprites.md), [ADR 0008 DOM-free engine](adr/0008-dom-free-engine-behind-ports.md), [ADR 0009 hero lifecycle isolation](adr/0009-hero-lifecycle-isolation.md), [ADR 0010 split room layout](adr/0010-split-room-stage-layout.md), [security and safety](security-and-safety.md), [art style guide](../design/art-style-guide.md), [sprite spec](../design/sprite-spec.md), [testing strategy](../engineering/testing-strategy.md), [coding standards](../engineering/coding-standards.md), [glossary](../glossary.md), [CLAUDE.md](../../CLAUDE.md).
+
+Status: E5 as built on `feat/e5-stages-9-10` (marked "(E5)"; section 11 and section 14.3; drift in [E5 plan section 14](plans/e5-stages-9-10.md#14-as-built-notes-checked-against-the-e5-working-tree)). E1 as built on `feat/e1-enemies` (marked "(E1)"; drift from the plan in [E1 plan section 13](plans/e1-enemies.md#13-as-built-drift-checked-against-the-e1-working-tree) and section 14.2 below). M4 as built (H1 additions are marked "(H1)" and are built to [the H1 plan](plans/h1-classes.md) and synced to HEAD ec76b05 on `feat/h1-classes`, see section 13.1); M4 parts synced to commit b320b00 on `feat/m4-engine`; drift is listed in [M4 plan section 13](plans/m4-engine.md#13-as-built-drift-checked-against-commits-081732d-to-b320b00)). Where this file and the code disagree, fix one of them in the same change.
+
+## 1. Principles
+
+- **Heroes are invulnerable and follow the host.** A hero stores exactly one fact about its agent, `lifecycle` (`spawned`, `working`, `idle`, `despawned`), and it changes only through host agent-state events (Core invariants 1 and 2, [ADR 0009](adr/0009-hero-lifecycle-isolation.md)).
+- **The engine is DOM-free and clock-free.** It draws through a `Surface` port, creates bitmaps through a `BitmapFactory` port, receives time as a frame delta, and uses seeded randomness ([ADR 0008](adr/0008-dom-free-engine-behind-ports.md)).
+- **The engine cannot reach the host.** It has no host channel. Its inputs are agent events and frame deltas; its outputs are pixels and an error callback (Core invariants 3 and 4).
+- **Crash isolation at three levels.** Per entity, per frame, and per animation-frame callback; the next frame always renders.
+- **No per-frame allocation in hot paths.** Pools, preallocated arrays, cached bitmaps. Allocation on state transitions (a path request, a new hero look) is fine.
+- **Everything visual is procedural** (Core invariant 5): palette-indexed templates rasterized once; light, warp beams, particles, and shadows are drawn from rectangles and generated bitmaps.
+
+## 2. Components
+
+```mermaid
+flowchart TB
+  subgraph web[src/webview/ - browser, owns the DOM]
+    main[main.ts<br/>boot, wiring]
+    feed[sceneFeed.ts<br/>HostMessageTarget: mirror + engine]
+    mirror[hostState.ts<br/>HostStateMirror]
+    ghost[gameHost.ts<br/>rAF, visibility, pagehide, error report]
+    csurf[canvasSurface.ts<br/>Surface + BitmapFactory over canvas 2D]
+  end
+  subgraph game[src/game/ - DOM-free]
+    G[Game<br/>queue, fixed step, frame]
+    R[Roster<br/>heroes, only lifecycle writer]
+    E[entities/<br/>Hero, Campfire]
+    ST[Stage runtime<br/>strips, nav grid, lights]
+    ENG[Engagement<br/>advance/engage rhythm]
+    REN[Renderer<br/>draw order, shadows, warp beam]
+    CAM[Camera]
+    LIT[Lighting]
+    PAR[Particles]
+    AMB[Ambience<br/>drip emission]
+    PF[Pathfinding + Collision]
+    SPR[sprites/<br/>palettes, templates, factory, validator]
+    DATA[data/<br/>stages, animations, tuning, enemies, drops]
+    CMB[Combat + Enemy + Boss + Drops<br/>enemy side, E1]
+    DIR[StageDirector + Progression<br/>E1]
+  end
+  shared[[shared/protocol.ts<br/>AgentInfo, AgentState]]
+  main --> feed
+  main --> ghost
+  feed --> mirror
+  feed -- enqueueAgent, enqueueSnapshot --> G
+  ghost -- frame delta, Surface --> G
+  ghost --> csurf
+  G --> R --> E
+  R -- FighterBuffer: numbers only --> CMB
+  CMB -- HitReactions: cosmetic --> E
+  G --> CMB
+  G --> DIR --> ST
+  G --> ST
+  G --> ENG
+  G --> REN
+  REN --> CAM
+  REN --> LIT
+  G --> PAR
+  G --> AMB --> PAR
+  E --> PF
+  ST --> PF
+  REN --> SPR
+  ST --> DATA
+  E --> DATA
+  G -. imports types .-> shared
+  feed -. imports .-> shared
+```
+
+| File | Responsibility | Touches DOM |
+|---|---|---|
+| `src/game/ports.ts` | `Surface`, `Bitmap`, `BitmapFactory`, `OffscreenSurface`, `ErrorSink` | no |
+| `src/game/layout.ts` | buffer size, tile rows and zones, foot-y band, campfire position, nav constants, slot functions (`formationPosition`, `seatPosition`, `entrancePosition`), `computeIntegerScale` | no |
+| `src/game/rng.ts` | `mulberry32`, `hashId` (FNV-1a over UTF-16 units) | no |
+| `src/game/Game.ts` | event queue, fixed-step accumulator, `frame`, `heroSnapshot`, crash isolation | no |
+| `src/game/Roster.ts` | hero map, event application, snapshot reconcile, removal rules | no |
+| `src/game/Engagement.ts` | the party rhythm (advance, engage): `TimedEngagement` (M4, the fallback) and `CombatEngagement` (E1, enemy-driven; its only enemy-side import is one `import type` of `Combat`) | no |
+| `src/game/Fighters.ts` (E1) | `FighterBuffer`: preallocated typed arrays of slot, x, y, `strikeSerial`, `abilitySerial` per fighting hero; the "in" seam of [ADR 0013](adr/0013-enemy-health-and-hero-reaction-board.md) | no |
+| `src/game/HitReactions.ts` (E1) | the cosmetic reaction board by hero slot (`flash`, `update`, `flashing`, `offsetPx`, `clear`); written only by `Combat`, read only by `Hero.draw` | no |
+| `src/game/Combat.ts` (E1, enemy side) | wave director, strike resolution from the serials, enemy attacks, boss flow, withdrawal; the only code that reduces enemy health | no |
+| `src/game/Progression.ts` (E1, enemy side) | pure stage and kill counters; `load`, `onKill`, `onBossDefeated`, `snapshot` | no |
+| `src/game/StageDirector.ts` (E1, enemy side) | builds stage runtimes lazily, swaps them behind a 400 ms dark fade, `onSwap` at the midpoint | no |
+| `src/game/Drops.ts` (E1, enemy side) | pooled cosmetic drops (arc, rest, fade); nothing collects them | no |
+| `src/game/entities/Enemy.ts`, `Boss.ts` (E1, enemy side) | pooled enemy (health, bar, attack timing, dissolve) and the one pooled boss (intro, telegraph, two phases); `strike` is the only health mutator | no |
+| `src/game/data/enemies.ts`, `drops.ts` (E1, enemy side) | the compact enemy table, scaling formulas, `validateEnemies`; drop kinds and drop constants ([data model section 8](data-model.md#8-enemies-drops-and-the-enemy-validator-e1)) | no |
+| `src/game/Renderer.ts` | draw order, y-sort, shadows, warp beam, strip blits | no |
+| `src/game/Camera.ts` | corridor scroll, parallax offsets, integer snapping | no |
+| `src/game/Lighting.ts` | light list, low-resolution light map, multiply composite | no |
+| `src/game/Particles.ts` | pooled particles (ember, spark, drip, splash, and from E1 mote; E2 appends bubble and wisp; E3 appends firefly; E4 appends snow and murk; E5 appends shimmer and rift) | no |
+| `src/game/Pathfinding.ts`, `Collision.ts` | grid A*, AABB tests (no spatial hash: E1 uses linear scans over at most 12 enemies and 64 fighters) | no |
+| `src/game/Ambience.ts` | stage ambient effects (M4: drip emission into `Particles`; E1: `dust` motes for Stage 2; E2: `bubbles` for Stage 3, `fog` for Stage 4; E3: `fireflies` for Stage 5, `embers` for Stage 6; E4: `snow` for Stage 7, `murk` for Stage 8; E5: `shimmer` for Stage 9, `rifts` for Stage 10); cosmetic, particles only | no |
+| `src/game/Stage.ts` | build a runtime from a `StageDef` (strips, nav grid, lights, drip points, solid props, tiles under the stage palette); validate stages | no |
+| `src/game/entities/Hero.ts`, `Campfire.ts`, `Prop.ts`, `Entity.ts` | entities (all extend `GuardedEntity`) and the per-entity guard | no |
+| `src/game/entities/ClassHero.ts` (H1) | `ClassHero extends Hero` driven by a `ClassDef` row (strike and ability effect shots, a hidden ability timer) and `createHero`, the default `HeroFactory` (`classFor(id)`) | no |
+| `src/game/Effects.ts` (H1) | `EffectPool`: pooled cosmetic sprites (projectiles, bursts) spawned by class hooks; no collision, no targets | no |
+| `src/game/entities/Summon.ts`, `src/game/Summons.ts` (H2) | `Summon` (a `GuardedEntity`, not a hero) and `SummonPool`: cosmetic allies of summoning classes, leased by the owner each update, y-sorted by the renderer; no hero reference, no target, no health ([ADR 0011](adr/0011-summons-are-leased-cosmetic-entities.md)) | no |
+| `src/game/data/classes.ts`, `classMap.ts`, `effects.ts` (H1), `summons.ts` (H2) | class rows, `classFor(id)`, effect ids, summon ids ([data model](data-model.md#6-hero-identity-and-classes-m4-h1-h2)) | no |
+| `src/game/data/stages.ts`, `animations.ts`, `tuning.ts` | typed tables and constants ([data model](data-model.md)) | no |
+| `src/game/sprites/palettes.ts`, `spriteTemplates.ts` (and other template files) | art data (pixel-artist) | no |
+| `src/game/sprites/artSet.ts` | `SHIPPED_ART`: gathers the artist's exports into the `ArtSet` (developer glue) | no |
+| `src/game/sprites/spriteFactory.ts`, `spriteValidator.ts` | template to bitmaps, layer compositing, swaps, enemy flash and dissolve and hero flash silhouettes (E1), stage palettes (E1), validation | no |
+| `src/webview/canvasSurface.ts` | `Surface` and `BitmapFactory` over `CanvasRenderingContext2D` | yes |
+| `src/webview/gameHost.ts` | the frame loop over an injected `FrameScheduler` (`main.ts` passes `requestAnimationFrame`), pause when hidden, error reporting | no (browser functions injected) |
+| `src/webview/sceneFeed.ts` | `HostMessageTarget` that updates the mirror and the engine | no |
+
+## 3. Room layout
+
+Fixed geometry from [ADR 0010](adr/0010-split-room-stage-layout.md); every stage reuses it.
+
+```text
+x:   0                 128 144                          320
+y:   +------ alcove -----+D+------- corridor ------------+
+ 0   | back wall  (8 rows, 128 px)   backdrop shows through
+     |                     |o|  transparent wall pixels  |
+128  +---------------------+o+----------------------------+
+     | floor band (2 rows, 32 px): heroes walk here       |
+     |  campfire (x 64)  seats        formation slots     |
+160  +----------------------------------------------------+
+     | foreground row (1 row, 16 px), then 4 px fill      |
+180  +----------------------------------------------------+
+```
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `INTERNAL_WIDTH`, `INTERNAL_HEIGHT` | 320, 180 | the only buffer size |
+| `TILE` | 16 | tile edge |
+| wall rows | 8 (y 0-127) | row 0 `wallTop`, rows 1-6 `wallMid`, row 7 `wallBase` |
+| floor rows | 2 (y 128-159) | row 0 `floorBack`, row 1 `floorFront` |
+| foreground | y 160-175, then fill to 180 | `foreground` tile row, then the stage clear color |
+| alcove | x 0-127 | static; campfire at x 64, foot y 152 |
+| door | x 128-143 | the `door` zone: one column with its own 16x180 strip and exactly one non-solid wall prop (the door frame) at its x 0 |
+| corridor | x 144-319 | draws a repeating 24-tile (384 px) segment shifted by the scroll |
+| foot-y band | 140-158 | where a hero's feet may be (kept by the slot formulas in `layout.ts`) |
+| floor band | y 128-159 | where a floor prop's foot y may be (the stage validator rule) |
+| campfire | x 64, foot y 152 | `CAMPFIRE_X`, `CAMPFIRE_FOOT_Y` |
+
+Placement zones are `alcove`, `door`, and `corridor`. Solid props exist only in the alcove (the corridor scrolls, so a solid there would have to move its nav cells; the validator rejects it). Corridor props scroll and repeat every 384 px.
+
+Tile variants are picked by a deterministic hash of the tile cell, the zone, and the stage index (`hashCell`), so the picture is stable across reloads. Wall tiles may contain transparent pixels; the parallax backdrop shows through them. The barred-opening wall variants appear only in wall row 3, never in the first or last column of a zone, never in the door zone, never adjacent, and for about one cell in six.
+
+## 4. The loop and crash isolation
+
+`Game.frame(deltaMs, surface)` is the only per-frame entry point. It never throws.
+
+```mermaid
+sequenceDiagram
+  participant Raf as gameHost (rAF callback)
+  participant G as Game
+  participant R as Roster
+  participant E as Entities
+  participant Rn as Renderer
+  participant S as Surface
+  Raf->>Raf: schedule next rAF first
+  Raf->>G: frame(delta, surface)
+  G->>G: accumulate min(delta, 100 ms)
+  loop up to 5 fixed steps of 16.67 ms
+    G->>R: drain event queue (apply lifecycle)
+    G->>E: each entity update, own try/catch
+    E-->>G: fault count, report once
+  end
+  G->>Rn: render(surface)
+  Rn->>S: layers, entities by foot y, light, particles
+  Note over Raf,S: any throw is caught at the entity, the step, the render, or the rAF callback;<br/>the next frame runs normally
+```
+
+- **Fixed step.** `STEP_MS = 1000 / 60`. The accumulator adds `min(delta, MAX_FRAME_MS = 100)` (a `NaN` or non-positive delta adds 0; `Infinity` clamps to 100); at most `MAX_STEPS_PER_FRAME = 5` steps run per frame, and leftover time beyond that is dropped (a long stall must not cause a burst of catch-up). Rendering is not interpolated: positions are snapped to whole pixels, and a display faster than 60 Hz simply redraws the same state.
+- **Levels of try/catch.** (1) `guarded(entity, 'update' | 'draw')` around each entity call; (2) a try/catch around each fixed step and around render in `Game.frame`; (3) the `gameHost` rAF callback, which schedules the next frame **before** doing any work, so even a bug in the host cannot stop the loop.
+- **Quarantine.** Update and draw faults are counted separately. An entity whose `update` throws increments `faults`; a clean call resets it. At `FAULT_LIMIT = 3` consecutive update faults the entity is frozen: skipped by `update`, still drawn. Three consecutive `draw` faults (`drawFaults`) stop it being drawn. A host lifecycle event applied to a hero (`applyAgentState`) clears `faults`, `drawFaults`, and `frozen`; the campfire and solid props receive no lifecycle event, so their quarantine lasts until the webview reloads (see "Decorations stay quarantined" below). Errors are reported through `ErrorSink(error, scope)` once per distinct message per entity, once per distinct `scope:message` per `Game` (at most 64), and once per page load by the webview's single crash reporter. Faults never change `lifecycle` or remove a hero ([ADR 0009](adr/0009-hero-lifecycle-isolation.md)).
+- **Decorations stay quarantined until reload, by design.** The campfire and props have no lifecycle events, so nothing clears their `faults`, `drawFaults`, or `frozen`. A decoration that faults three times stays frozen (no embers or flicker) or hidden until the webview reloads. This is cosmetic, isolated from agents, and accepted: adding a reset path from game or host events would couple decorations to the lifecycle channel for no user benefit ([M4 plan section 13.4](plans/m4-engine.md#134-flags-nothing-violates-a-core-invariant)).
+- **Light pass guard.** `Lighting` is built and composed outside the per-entity guard, so `Renderer.#guardedLightPass` wraps it in its own try/catch. A fault is reported once through the `ErrorSink` with scope `'render'`, increments a fault counter, and resets the composite to `source-over` and alpha to 1 so a half-finished multiply cannot darken what follows; entities, foreground, and particles still draw that frame. After `LIGHT_FAULT_LIMIT = 3` faults the light pass is skipped for the rest of the page's life (the scene is drawn unlit). It never touches hero state.
+- **Error text.** Messages thrown in `src/game/**` are fixed strings; they never include agent names, tool names, or ids (these could not be transcript text, but the rule keeps logs payload-free).
+- **Pause when hidden.** `gameHost` cancels the animation frame on `visibilitychange` to hidden and on `pagehide`, and resumes on visible with the last timestamp cleared, so the first resumed frame has delta 0. With `retainContextWhenHidden: false` a hidden panel usually destroys the document, but this also covers a visible-but-occluded document.
+- **Dispose.** `pagehide` removes every listener and calls `Game.dispose()` (clears the queue and pools).
+
+## 5. Events in, heroes out
+
+Host messages reach the engine through `SceneFeed`, a `HostMessageTarget` that forwards each call to the `HostStateMirror` and then to `Game`:
+
+| Host message | `SceneFeed` | `Game` |
+|---|---|---|
+| `agentState` | `mirror.applyAgent`, then `game.enqueueAgent(agent)` | append to the event queue (cap 256) |
+| `agentList` | `mirror.replaceAgents`, then `game.enqueueSnapshot(agents)` | replace the queue with one snapshot marker |
+| `config` | `mirror.applyConfig`, then `game.applyConfig` (E1: enemies on or off, kills per stage, enemy cap; forwarded to `Combat.configure`) | none in M4 |
+| `progress` (E1) | `mirror.applyProgress`, then `game.applyProgress`, then `onProgressLoaded` (opens the `ProgressSaver`) | loads `Progression`, shows the stored stage, sets the combat stage; applied once per `Game`, also when it arrives after the boot gate (section 14.2) |
+
+The queue is drained at the start of each fixed step. Rules in `Roster`:
+
+| Input | Effect on the roster |
+|---|---|
+| `spawned`, id unknown | create the hero (animated entry: `warpIn`) |
+| `working` or `idle`, id unknown | create the hero already in that lifecycle (a missed `spawned` is tolerated, as in the mirror), no warp-in |
+| any state, id known | `hero.applyAgentState(info)`; `phase` follows on later updates |
+| `spawned`, `working`, or `idle`, id known and the hero is exiting (lifecycle `despawned`, mid-victory or `warpOut`) | exiting heroes are replaced, never revived: `Roster.#updateOrReplace` removes the old hero (freeing its slot) and creates a fresh one, instantly for `working` and `idle`, with warp-in for `spawned`. `Hero.applyAgentState` stays the only lifecycle writer and cannot leave `despawned` |
+| `despawned`, id unknown | ignored |
+| snapshot | **instant rebuild**: for each listed agent, create or update without warp-in and place it by lifecycle (`working` in its formation slot, `idle` in its seat, `spawned` in standby at the door); a listed `despawned` agent that is unknown creates nothing; an exiting hero listed as live is replaced; an existing hero missing from the list gets a synthetic `despawned` (same exit animation) |
+| queue overflow | the event that finds 256 queued clears the queue and flags a resync; the next step reconciles from `GameDeps.agentSource()` (the mirror's list, which already holds every event because `SceneFeed` updates the mirror first). A later snapshot supersedes a pending resync |
+
+Removal rule: a hero leaves the roster only when its lifecycle is `despawned` and its exit animation finished, or `EXIT_FAILSAFE_MS = 5000` of game time passed since the event (`Hero.exitClockMs`, ticked by `Roster.update`; covers a frozen entity), or never otherwise. `Roster` also exposes `countFighting()` (heroes in `advance` or `attack`, which drives `Engagement`) and `countResting()` (heroes in `rest`, which drives the campfire); `lookFor(id)` derives the stable look. `Game.heroSnapshot()` returns `{ id, lifecycle, exiting }` for each hero; it is read-only and is how tests and the dev tooling observe state.
+
+**Scene rebuild on webview reload** is the same code path: a new document boots, `ready` is sent, the host answers `config` then `agentList`, `SceneFeed` forwards the snapshot, and the next step builds the same set of heroes in the same lifecycles. Positions are a function of the stable slot index each hero gets (lowest free index at creation), so a rebuilt scene matches the previous arrangement whenever the list order matches.
+
+## 6. Hero behavior
+
+A hero has `lifecycle` (host-driven, section 5) and `phase` (cosmetic, derived). Animation names are exactly the [sprite spec](../design/sprite-spec.md) names; there is no hurt, downed, or death animation.
+
+```mermaid
+stateDiagram-v2
+  [*] --> warpIn: spawned event (animated)
+  [*] --> standby: snapshot, lifecycle spawned
+  [*] --> advance: snapshot, lifecycle working
+  [*] --> rest: snapshot, lifecycle idle
+  warpIn --> standby: done, lifecycle spawned
+  warpIn --> travel: done, lifecycle working or idle
+  standby --> travel: lifecycle working or idle
+  travel --> advance: arrived at formation, working
+  travel --> rest: arrived at seat, idle
+  advance --> attack: engagement engages
+  attack --> advance: engagement advances
+  attack --> ability: class timer (H1)
+  ability --> attack: animation done, engaged
+  ability --> advance: animation done, not engaged
+  ability --> travel: lifecycle idle
+  ability --> victory: lifecycle despawned
+  advance --> travel: lifecycle idle
+  attack --> travel: lifecycle idle
+  rest --> travel: lifecycle working
+  advance --> victory: lifecycle despawned
+  attack --> victory: lifecycle despawned
+  rest --> victory: lifecycle despawned
+  standby --> victory: lifecycle despawned
+  travel --> victory: lifecycle despawned
+  warpIn --> victory: lifecycle despawned
+  victory --> warpOut: 1200 ms
+  warpOut --> [*]: 600 ms, hero removed
+```
+
+The diagram is cosmetic. Every arrow labelled "lifecycle ..." is evaluated by the hero's own `update` comparing its stored `lifecycle` with the phase it should be in, never by a combat, boss, or stage event.
+
+| Phase | Animation | Meaning |
+|---|---|---|
+| `warpIn` | `idle` | 600 ms: a light beam and sparkles at the door while the sprite is revealed bottom-up by region draws |
+| `standby` | `idle` | `spawned` and waiting; stands at the door |
+| `travel` | `walk` | follows an A* path to the goal (`entrance`, `formation`, or `seat`); 40 px/s; faces its movement; re-paths if the desired goal changed. An unreachable goal leaves the hero in `standby` and retries after `PATH_RETRY_MS` (1 s); never an error or a removal |
+| `advance` | `walk` | in its formation slot, walking in place while the corridor scrolls |
+| `attack` | `attack` | in its formation slot, swinging at the enemy in front (E1; at nothing when enemies are off), staggered 0-400 ms per hero; a class hero spawns its strike effects once per cycle on frame 1 (H1) |
+| `ability` (H1) | `ability` | 3 frames (120/140/200 ms) in place, entered only from `attack` when the class hero's hidden seeded timer (4-8 s of attack time) fires; effects spawn on frame 1; then back to `attack` (engaged) or `advance`. Cosmetic: the base `Hero` never enters it. Counts as fighting for `Engagement` |
+| `rest` | one of `sit`, `eat`, `sleep`, `polish`, `read`, `warmHands` | at its seat, facing the fire; starts on `sit` (a snapshot rebuild starts on a hash-chosen non-sleep pose); pose changes every 9-16 s (seeded); `sleep` only after 30 s of rest |
+| `victory` | `victory` | 1200 ms in place when `despawned` |
+| `warpOut` | `victory` | 600 ms: beam and sparkles, sprite hidden top-down; then removal |
+
+- **Non-interruptible phases.** `warpIn`, `victory`, and `warpOut` finish before any other phase, except that a `despawned` lifecycle interrupts `warpIn` and `travel` at once. A `working` or `idle` event during `warpIn` updates `lifecycle` immediately; the hero begins to travel when the warp finishes.
+- **Identity.** Skin tone (4) and hair color (6) come from `hashId(id)` (`lookFor`); the class-less base hero uses `accent: null` (the master `a` colour; a CSS `#rrggbb` overrides `a`). From H1 the **class** is chosen by `classFor(id)` (a pure hash of the session id over the delivered classes, [H1 plan](plans/h1-classes.md#1-goal)), set in `HeroLook.classId` by `createHero`, and recolors the hero through a class partial palette applied before skin and hair; it never changes for an id. `Hero` exposes `x`, `y`, `faceRight`, `warpBeam`, `classId`, a protected `heroLayers(world)` hook, and (H1) the protected hooks `onAttackStrike`, `shouldCastAbility`, and `onAbilityRelease`, which receive only a `World` (no roster, so no path to `applyAgentState`). Name labels are not drawn in M4 (no pixel font until U1; the M7 roster shows names).
+- **Summons and auras (H2 as built, [H2 plan](plans/h2-classes.md)).** A class row may declare a summon (the Necromancer's skeleton; after H3 also the Druid's beast and the Artificer's turret). The pool is kind-aware: `raise(slot, kind, ...)` restarts a sinking or other-kind summon, `renew(slot, kind, ...)` ignores a mismatch, and `Summon.shadowWidth` is a getter reading `SUMMON_SHADOW_PX[kind]` (skeleton 8, beast 12, turret 10). While the owner's phase is `advance`, `attack`, or `ability`, `ClassHero.update` renews a short lease in `SummonPool` (`SUMMON_LEASE_MS` 250) with plain numbers; the ability raises it. When renewals stop for any reason (idle, despawned, replaced, quarantined, removed) the lease expires and the summon sinks and is freed in about 0.55 s. The summon follows the owner's cosmetic phase, never the reverse: it holds no hero reference, is not in the roster, is never a target, and has no health. Buffs and "heals" (Cleric Blessing, Paladin Radiant Smite, Bard Chorus) are one-shot cosmetic effects from `EffectPool` centered on the caster; there is no persistent aura, icon, or restore.
+- **No gauges, no health.** Nothing is drawn over or under a hero except its fixed-size shadow, which the renderer draws. Hero drawing calls only `drawBitmap`/`drawBitmapRegion`.
+- **The only hit reaction (E1).** When an enemy attack lands, `Combat` calls `HitReactions.flash(slot, -1, strong)`. `Hero.draw` (outside `warpIn` and `warpOut`) reads `ctx.reactions.flashing(slot)` and `offsetPx(slot)`: it draws the white silhouette frame (`SpriteCache.heroFlash`, built lazily per look) instead of the normal frame for `HERO_FLASH_MS` 100 and shifts its draw x by 1 px (2 for a boss slam) decaying over `HERO_KNOCK_MS` 160. A slot flashes at most once per `HERO_FLASH_GAP_MS` 500. The hero's `x`, `y`, `phase`, and `lifecycle` are never written; it is the style guide's allowed list (flash, 1 to 2 px slide, spark) and nothing more ([ADR 0013](adr/0013-enemy-health-and-hero-reaction-board.md)).
+
+## 7. Campfire, seats, formation
+
+- **Campfire** (entity, drawn identically across stages): logs and stones base, a 4-frame flame loop in two sizes (small, large), embers, and a flickering warm light. `restingCount` (heroes in `rest` phase) selects the flame: large from 3 resting; emission rate and light radius scale with the count. It has no state a hero can read except `restingCount`.
+- **Slots.** Each hero gets a stable `slot` index (lowest free, freed on removal). Defaults (tunable constants, `tuning.ts`):
+  - Formation slot `i`: `col = i % 8`, `row = floor(i / 8) % 4`, `x = 168 + col * 18 + (row % 2) * 9`, foot `y = 156 - row * 5`.
+  - Seat `i`: `side = i % 2 == 0 ? -1 : +1`, `ring = floor((i % 8) / 2)`, `x = 64 + side * (16 + ring * 12) + (row % 2) * 6 * side`, same row rule; the hero faces the fire.
+  - Entrance (`spawned`, standby): x 136 (the door column centre), foot `y = 146 + (slot % 3) * 4`.
+  - For `i >= 32` the slot wraps with a 6 px x-offset per wrap (overlap accepted, [ADR 0010](adr/0010-split-room-stage-layout.md)).
+  - The slot functions live in `layout.ts` and write into a caller-supplied point (no allocation). `Stage` validation checks every seat and formation cell is open and reachable from the entrance.
+- **Engagement** (`Engagement.ts`) owns the party rhythm and exposes `scrollPxPerS` and `isEngaged`. M4 `TimedEngagement`, fed `Roster.countFighting()`: while at least one hero is in `advance` or `attack` (working and in the corridor), `advance` for 5 s (scroll 24 px/s with 300 ms ease) then `engage` for 2.4 s (scroll stops, working heroes attack); with no working hero the corridor does not scroll. **E1 `CombatEngagement`** replaces the timer behind the same interface: with at least one working hero, `isEngaged` is `Combat.inContact` (an enemy stands engaged in front of the party, the boss included during its intro) and the scroll eases (300 ms) to 0 on contact and back to 24 px/s otherwise; with no working hero it is not engaged and the scroll eases to 0. When `Combat.disabled` (setting off, invalid enemy table, three faults) it delegates to a `TimedEngagement`, reproducing the M4 rhythm exactly. It reads two booleans and never touches a hero.
+
+## 8. Rendering
+
+`Renderer.render(surface)` draws in this order. Environment layers are lit; entities are not.
+
+1. Clear with the stage clear color.
+2. Backdrop, parallax 0.25: static behind the alcove and the door, sliding behind the corridor view.
+3. Environment strips: alcove (x 0), door (x 128), corridor view (x 144). Static wall and floor props are baked into the strips.
+4. Live props: animated props (torches, ripples), clipped to their zone; corridor props are drawn at the scroll offset and at plus and minus one segment.
+5. **Light pass**: `Lighting.compose(surface)` multiplies the environment (steps 2-4) by the light map. Torch lights flicker; the campfire light is added last.
+6. Shadows, then entities sorted by foot y (heroes, summons from H2, enemies and the boss from E1, campfire, solid alcove props), stable order. Enemy shadows are 10, 14, or 30 px by tier (`TIER_SHADOW_PX`; none while dissolving). A warp beam is drawn right after the hero it belongs to.
+6b. (H1) Effects: `EffectPool.draw` (class projectiles and bursts), unlit, in its own guarded pass (fault counter, scope `render`, disabled after 3 faults).
+6c. (E1) Drops: `extras.drops` (`Combat.drawDrops`), unlit, in its own guarded pass (`PASS_FAULT_LIMIT` 3, scope `render`).
+7. Foreground: `nearForeground` (alcove and door) and the corridor foreground view.
+8. Particles.
+9. (E1) The stage fade: a full-screen `fillRect` in the stage clear color at `extras.fadeAlpha`, drawn last, in its own guarded pass. Dark, never white.
+
+`Renderer.render(surface, world, heroes, camera, extras?)` takes an optional `RenderExtras` (`foes`, `reactions`, `drops`, `fadeAlpha`; one reused object owned by `Game`). Without it the renderer behaves as in H3: no foes, an empty internal reaction board, no drop pass, no fade. Each enemy draws its sprite (or its white flash silhouette for 100 ms after a strike, or a dissolve frame), then, only after damage or for an engaged boss, its health bar (2 `fillRect` and 1 bitmap). `Hero.draw` receives the reaction board through `DrawContext.reactions`; `World` is unchanged.
+
+- **Strip caching.** At stage load, `Stage` pre-renders three environment strips: alcove (128x180), door (16x180), and one corridor segment (384x180), plus two foreground strips (`nearForeground` 144x20 and `corridorForeground` 384x20). Per frame the renderer blits the alcove and door once and the corridor view as one or two region draws of the same strip (the second only where the view wraps the 384 px seam). Animated props (torches) and solid floor props that must sort with heroes are drawn live.
+- **Integer coordinates.** Every draw position is `Math.floor`ed. Mirroring uses the anchor: unflipped `dx = x - anchor.x`, flipped `dx = x - (w - 1 - anchor.x)`.
+- **Shadows.** A flat 2-row translucent rectangle under each hero at a fixed width; not a gauge and not tied to any hero field except position.
+- **Integer scaling and the canvas.** `computeIntegerScale(viewW, viewH, dpr)` (moved from `main.ts`) picks the largest integer device-pixel scale that fits, minimum 1; `canvasSurface.ts` applies it to the canvas style and keeps `imageSmoothingEnabled = false` after any resize.
+
+## 9. Camera
+
+`Camera` holds `scrollX` (corridor travel in pixels, advanced by `Engagement.scrollSpeed`) and returns whole-pixel offsets: `corridorOffset()` (`scrollX` mod segment length), `parallaxOffset(factor)`. Nothing follows a hero. E1 added **no** camera shake (the `Surface` port has no transform; decision E1-8); a hit is shown by flash, spark, and bar. A shake offset may arrive with M7 behind reduce-motion. M7 reduces or disables scroll for reduce-motion.
+
+## 10. Lighting
+
+- Sources: stage prop lights (torches) and the campfire (dynamic). A source is `{ x, y, radius, intensity, colorChar }`; at most `MAX_LIGHTS = 16` per frame, extras ignored.
+- A low-resolution **light map** (80x45, a quarter of the buffer) is an `OffscreenSurface`. Each frame: fill with the stage ambient color, draw each source's pre-built banded radial bitmap with composite `lighter`, then draw the light map scaled 4x onto the main surface with composite `multiply` and smoothing off. The 4 px blocks and 3-4 intensity bands match the art style; no gradients.
+- Radial bitmaps (a few radii, per light color) are generated once from pixel math in `Lighting`, not drawn from art. Torch flicker changes the radius by plus or minus 4 px (half a band) from a hash of the light index and the render-clock tick (`TORCH_FLICKER_MS` 140), not from the seeded generator; the campfire flickers by half a band on a 120 ms timer using the seeded generator. Neither uses the wall clock. Corridor lights are placed at the scroll offset and at plus and minus one segment so they scroll past.
+- Heroes and the campfire are drawn after the pass and are not darkened.
+
+## 11. Particles
+
+`Particles` is a fixed-capacity pool (`PARTICLE_CAPACITY = 384`) in parallel typed arrays plus a free list: x, y, vx, vy, age, life, kind, ramp index. `emit` returns `false` when full (the emission is dropped). Kinds: `ember` (campfire), `spark` (warp, and from E1 the two impact sparks per landed strike), `drip` and `splash` (Stage 1 ambient), `mote` (E1, Stage 2 dust: slow drift in both axes, `MOTE_*` in `tuning.ts`), and, appended in E2 so older indices stay stable, `bubble` (index 5, Stage 3: drawn 2x2, rises because its emitted `vy` stays negative, wobbles sideways, `BUBBLE_*`) `wisp` (index 6, Stage 4 fog: drawn 6x2, drifts left at its emitted `vx` with a small vertical wander, `FOG_*`), and, appended in E3, `firefly` (index 7, Stage 5: drawn 1x1, wanders in both axes with a plus or minus 24 px/s^2 jitter on `vx` and `vy`, `FIREFLY_*`; the blink is only its five-step ramp `Y N L N Y`, alternating bright and dark characters by age, so there is no blink code), and, appended in E4, `snow` (index 8, Stage 7: drawn 1x1, falls at its emitted positive `vy`, which `Particles` leaves alone, with a plus or minus 12 px/s^2 sideways jitter on `vx`, `SNOW_*`) and `murk` (index 9, Stage 8: drawn 2x2, rises at its emitted negative `vy` with a plus or minus 8 px/s^2 jitter on both `vx` and `vy`, `MURK_*`; the ramp is dim on purpose), and, appended in E5, `shimmer` (index 10, Stage 9 heat haze: drawn 1x3, rises at its emitted negative `vy`, with a plus or minus 5 px/s^2 jitter on `vx` only, `SHIMMER_*`; its ramp `C V W` only dims) and `rift` (index 11, Stage 10: drawn 3x1, nearly stationary, a plus or minus 2 px/s^2 jitter on both `vx` and `vy`, `RIFT_*`; its ramp `g G Q G g` is one slow pulse per life). Color is read from `PARTICLE_PALETTE[kind]`, a ramp of palette characters from bright to dim by age. Each particle is exactly one `fillRect` (1x1 by default, `drip` 1x2, `bubble` 2x2, `wisp` 6x2, `murk` 2x2, `shimmer` 1x3, `rift` 3x1), so the fill ceiling is unchanged. Emission rates are `tuning.ts` constants; M7 scales them for reduce-motion. `Ambience` (called from `Game.step`) turns the stage's `drip` effect into `drip` particles at the stage's drip points (every `puddle` prop); when a drip expires, `Particles` spawns two `splash` particles itself (dropped silently if the pool is full).
+
+**Delivered stages and ambients (as built through E5).** Ten stages (the finished game), each with one `AmbientEffect`: Stage 1 `drip`, Stage 2 `dust` (motes), Stage 3 `bubbles`, Stage 4 `fog`, Stage 5 `fireflies`, Stage 6 `embers`, Stage 7 `snow`, Stage 8 `murk`, Stage 9 `shimmer`, Stage 10 `rifts`. `Ambience.update` switches on `world.stage.def.ambient.kind` with `assertNever`. `bubbles` emits `bubble` particles at a random x across the corridor view (`CORRIDOR_X` to `INTERNAL_WIDTH`, not scrolled) and a y in the floor band (`BUBBLE_MIN_Y` to `BUBBLE_MAX_Y`), rising at `BUBBLE_RISE_MIN..MAX` px/s for `BUBBLE_LIFE_MIN..MAX_MS`. `fog` emits `wisp` particles in the low band (`FOG_MIN_Y` to `FOG_MAX_Y`) drifting left at `FOG_DRIFT_MIN..MAX` px/s for `FOG_LIFE_MIN..MAX_MS`, plus `dustPerSecond` motes through the shared mote path. `fireflies` (E3) emits `firefly` particles at a random x across the corridor view and a y in `FIREFLY_MIN_Y` to `FIREFLY_MAX_Y` (60 to 140), with a tiny random velocity on both axes (plus or minus `FIREFLY_DRIFT`, 6 px/s) and a life of `FIREFLY_LIFE_MIN..MAX_MS` (3500 to 6500); the wander and the blink live in `Particles`. `embers` (E3) emits the existing `ember` kind (not a new one) rising from the floor band `STAGE_EMBER_MIN_Y` to `STAGE_EMBER_MAX_Y` (112 to 156) at `STAGE_EMBER_RISE_MIN..MAX` (14 to 30 px/s, `vx` 0, the ember sideways wander in `Particles` does the rest) for `STAGE_EMBER_LIFE_MIN..MAX_MS` (1800 to 3200); the `STAGE_EMBER_*` constants are separate from the campfire `EMBER_*` ones. `snow` (E4) emits `snow` particles at a random x across the corridor view and a y in `SNOW_MIN_Y` to `SNOW_MAX_Y` (4 to 60, the upper band), `vx` plus or minus `SNOW_DRIFT` (5 px/s), `vy` from `SNOW_FALL_MIN` to `SNOW_FALL_MAX` (8 to 16 px/s, positive is down), life `SNOW_LIFE_MIN..MAX_MS` (3500 to 6000). `murk` (E4) emits `murk` particles across the corridor view with a y in `MURK_MIN_Y` to `MURK_MAX_Y` (90 to 156, the lower band), `vx` plus or minus `MURK_DRIFT` (4 px/s), `vy` from `-MURK_RISE_MIN` to `-MURK_RISE_MAX` (3 to 8 px/s upward), life `MURK_LIFE_MIN..MAX_MS` (4000 to 7000). `shimmer` (E5, `perSecond` 8) emits `shimmer` particles at a random x across the corridor view and a y in `SHIMMER_MIN_Y` to `SHIMMER_MAX_Y` (100 to 156, the floor band), `vx` plus or minus `SHIMMER_DRIFT` (3 px/s), `vy` from `-SHIMMER_RISE_MIN` to `-SHIMMER_RISE_MAX` (5 to 11 px/s upward), life `SHIMMER_LIFE_MIN..MAX_MS` (3000 to 5000); a faint, tall, slowly rising streak stands in for heat haze (a real distortion pass would be a new mechanic and was rejected). `rifts` (E5, `perSecond` 3) emits `rift` particles at a random x across the corridor view and a y in `RIFT_MIN_Y` to `RIFT_MAX_Y` (30 to 140, the mid band), `vx` and `vy` each plus or minus `RIFT_DRIFT` (2 px/s), life `RIFT_LIFE_MIN..MAX_MS` (4000 to 7000); slits are born at random times, so there is no global beat. None of the ambients is scrolled. The new effects keep separate fractional debts (bubbles, fog, fog dust, fireflies, embers, snow, murk, shimmer, rifts) so the rates do not couple, and each accrual goes through one `#accrue` helper that caps the debt at `max(1, perSecond)` per debt (as built: `Math.min(debt + perSecond * dt / 1000, Math.max(1, perSecond))`), a guard against a runaway burst after a stage switch (`drip` and `dust` keep their original uncapped debt). Steady state is small (about 14 bubbles; about 24 wisps and 10 motes; about 25 fireflies; about 15 stage embers; about 43 snow flakes at 9 per second; about 22 murk motes at 4 per second; about 32 shimmer streaks at 8 per second; about 16 rift slits at 3 per second), far below the 384-slot pool. Bubble, wisp, firefly, snow, murk, shimmer, and rift colors come from `PARTICLE_PALETTE.bubble`, `.wisp`, `.firefly`, `.snow` (`w q Q`), `.murk` (`g b P`), `.shimmer` (`C V W`), and `.rift` (`g G Q G g`) through the `Renderer` color map (embers use `.ember`). Stage 5 `glowBloom` and the Stage 6 `lavaFall` and `lavaChannel` lights are `flicker: false`; the lava glow is lights, the stage palette, and art only, not an effect, and no engine code reads a lava, firefly, or ember name for anything but drawing ([E3 plan section 5.1](plans/e3-stages-5-6.md#51-engine-cosmetic-ambients-one-particle-kind-and-the-lava-rules)). The Stage 7 `iceLamp` (radius 48, intensity 0.8), `iceSheet` (44, 0.5) and the Stage 8 `wispTorch` (48, 0.7), `floatingShard` (40, 0.5) lights are also `flicker: false`, and the same rule holds: nothing reads an ice, snow, shard, mirror, or murk name for anything but drawing ([E4 plan](plans/e4-stages-7-8.md#14-as-built-notes-checked-against-the-e4-working-tree)). The Stage 9 `hoardBrazier` (`BRAZIER_LIGHT`, radius 52, intensity 0.8) and `goldVein` (`GOLD_VEIN_LIGHT`, 40, 0.5) and the Stage 10 `voidRift` (`RIFT_LIGHT`, 48, 0.7) and `orbitRing` (`RING_LIGHT`, 40, 0.5) lights are also `flicker: false` (six lights per stage), and the same rule holds for dragon, gold, shimmer, rift, star, and ring names. The four animated E5 props loop at `PROP_FRAME_MS` 500, because `Stage.ts` gives the 130 ms `TORCH_FRAME_MS` only to props named exactly `torch` or `lantern` ([E5 plan section 14](plans/e5-stages-9-10.md#14-as-built-notes-checked-against-the-e5-working-tree)).
+
+**Float gait on bosses (E4-12, confirmed).** `EnemyGait` is `walk | hop | float`, and `Enemy.#gaitOffset` applies the `float` offset (`-(4 + round(sin(animMs / 240) * 2))` px) to any tier; the sprite validator accepts it on any tier too. The Eclipse Warden (a boss) is the first `float` boss, so no fallback to `walk` was needed. The offset is draw-only.
+
+## 12. Pathfinding and collision
+
+- `NavGrid`: 8 px cells over the floor band (40 columns by 4 rows, origin y 128). `Stage` marks cells blocked from the footprints of alcove `solid` props and the campfire pit box (x 56, y 144, 16x8). Corridor props never block.
+- `findPath(grid, from, to, out)`: A* with octile cost, 8 neighbors, no corner cutting, a binary heap on preallocated typed arrays. It writes cell centers into a reusable buffer; an unreachable goal returns 0 and the hero stays where it is in `standby`, retrying after 1 s (never an error, never a removal). Paths are computed on goal changes, not per frame.
+- `Collision` in M4 is `Aabb` and `overlaps`/`contains` used to build the nav grid and test zones. E1 added **no** spatial hash and no hit tests: `Combat` resolves strikes by serial counters and picks targets with linear scans over at most 12 enemies and 64 fighters (decision E1-18); revisit at 30+ enemies in E3.
+- Heroes do not collide with each other; they are y-sorted and may overlap while passing.
+
+## 13. Sprites
+
+[ADR 0003](adr/0003-procedural-sprites.md) and the [sprite spec](../design/sprite-spec.md) define the format. The engine consumes it as follows.
+
+- **Templates** (`SpriteTemplate`, `Palette`) and the art data are exported by the pixel-artist's `palettes.ts` and `spriteTemplates.ts`; the exact A0 exports are listed in the [M4 plan](plans/m4-engine.md#10-art-needs-batch-a0). The factory never reads hex from templates: characters resolve through the palette.
+- **`spriteFactory.ts`** (developer): `rasterize` template rows to RGBA (pure), then `BitmapFactory.fromRgba` to a `Bitmap`. A `SpriteCache` caches by key. Hero sprites are built lazily per `HeroLook` (skin index, hair index, accent): the layers `body`, `head`, `gear` (optional), `weapon` are composited in that order, aligned on `anchor`, over the union bounds of all layers and frames, with the skin and hair swap palettes overriding the characters they define.
+- **`ArtSet`** is the one object the engine reads art from. `sprites/artSet.ts` exports `SHIPPED_ART` built from the artist's files; it includes `stageTileChars`. `HeroLook.accent` is a CSS `#rrggbb` that overrides the `a` character, or `null`. Hero bitmaps are cached by skin, hair, accent, and layer ids.
+- **`spriteValidator.ts`** (developer): row lengths, frame sizes, characters in the palette, at most 12 colors per template and per composited default hero, required hero animation names and frame counts, equal frame counts across layers, anchor inside bounds, and no animation name matching hurt, downed, death, or dead (Core invariant 1 at the asset level). From E1 `validateEnemyArt` and `validateDropArt` (both run by `validateArtSet`) check the enemy and drop templates and the bar frames, and stage sprites are checked per stage against the master palette merged with `stagePalettes[stageId]` ([E1 plan section 13.6](plans/e1-enemies.md#13-as-built-drift-checked-against-the-e1-working-tree)). Tests run it over all shipped art (`validateArtSet(SHIPPED_ART)`); invalid art fails the test, not the user's panel. The engine does not run it at boot.
+- **Boot failure.** `Game`'s constructor validates the stage table (`validateStages`, including connectivity) and builds the stage and campfire sheets. If that throws (`RangeError`, fixed text), `main.ts` reports it once, skips the game (`SceneFeed` gets a `null` sink), and keeps mirroring host state; the canvas keeps its boot clear colour (palette `n`) and agents are unaffected. Hero bitmaps and `Lighting` are built lazily on first draw and fall under the draw and render guards instead.
+
+### 13.1 H1 as built (HEAD ec76b05)
+
+Drift from the plan, in full in [H1 plan section 13](plans/h1-classes.md#13-as-built-drift-checked-against-head-ec76b05-on-feat-h1-classes). Engine-relevant points:
+
+- `createHero` lives in `entities/ClassHero.ts`; `Game` only imports it as the default `heroFactory`.
+- `Game` dedupes error reports per scope and message across the whole game (a bounded set, `MAX_REPORTED` 64), not per hero; the per-entity once-per-message rule in `Entity.ts` sits underneath it.
+- `World.effects` is the `EffectPool`. `Game` updates it in its own try/catch (`#updateEffects`, scope `update`) and clears the pool on a fault. The renderer's effects pass stops after `EFFECT_FAULT_LIMIT` (3) faults.
+- Moving effects loop their frames at `EFFECT_FRAME_MS` (90 ms); static effects play once and hold the last frame. Effects use master colours (the class palette is not applied).
+- A class with no class layers draws the base hero recoloured by the class palette.
+- `validateArtSet` reports the shared hero/body fault once, not once per class look.
+- `HERO_POSES`, `HERO_HEAD`, and `HeroPose` are exported for art files only; the engine must not import them.
+
+### 13.2 H2 as built (to the [H2 plan](plans/h2-classes.md))
+
+- `ArtSet.summons` (`SummonSpriteId` to a single `SpriteTemplate`); `SpriteCache.summon(id: string)` (takes a string and does an own-key lookup, like `effect(id)`) builds every animation of the template with the master palette (no class palette, no swaps), cached by template id, `null` when absent (the draw is skipped).
+- A summon template has exactly `idle 2, walk 4, attack 3, rise 4, sink 3` frames, at most 24x24 and 8 colors, no animation name matching the forbidden hero pattern; `validateSummonArt` enforces it (tests only, not at boot). `rise` and `sink` play once (`onceFrameIndex`); the rest loop.
+- H3: `classFor` runs over all twelve classes with the same `CLASS_SHIFT = 20` (the final reshuffle).
+- `classFor` runs over eight delivered classes in H2; the H1 four keep indexes 0 to 3 ([H2 plan section 3.6](plans/h2-classes.md#36-classfor-with-eight-classes)). **As-built decision H2-9:** the hash slice is `hashId(id) >>> CLASS_SHIFT` with `CLASS_SHIFT = 20` (H1 used `>>> 16`). With eight classes the old slice gave only four distinct classes for `sim-0-0` to `sim-7-0`; `>>> 20` gives seven, including Cleric, Paladin, and Necromancer, and keeps class independent of skin and hair. Every id is reshuffled once relative to H1, which was never released.
+- `Summon` exposes, beyond its draw and read API (`x`, `sortY`, `phase`, `kind`), pool-only members: `pose`, `slot`, `inUse`, `finished`, `begin`, `place`, `step(dtMs, riseMs, sinkMs)` (the phase and lease arithmetic), and `release`. The pool passes `SUMMON_RISE_TOTAL_MS` and `SUMMON_SINK_TOTAL_MS` to `step`. `animations.ts` exports `SUMMON_FRAME_MS`, `SUMMON_RISE_FRAMES` (4), `SUMMON_SINK_FRAMES` (3), the two total-ms constants, `summonFrameIndex` (looping `idle`, `walk`, `attack`), and `onceFrameIndex`. None of this reaches a hero: every argument is a number, a kind id, or a boolean.
+
+## 14. Seams for later milestones
+
+| Milestone | Seam | What it adds |
+|---|---|---|
+| H1 (built to the [H1 plan](plans/h1-classes.md)) | `HeroFactory` default `createHero`; `HeroLook.classId`; class layers and palettes in `ArtSet`; protected `Hero` hooks; `EffectPool` in `World` | data-driven `ClassHero` (attack strike shots, `ability` phase), never `lifecycle`; E1 left the shots as fixed velocities (the seam "targets read from `Combat`" was closed, [ADR 0013](adr/0013-enemy-health-and-hero-reaction-board.md)) |
+| H2 (to the [H2 plan](plans/h2-classes.md)) | `World.summons: SummonPool`; `ClassDef.summon`; `ClassHero` renew/raise; renderer sort buffer | data-driven summons (no subclass file), never `lifecycle`; E1 kept summons out of `Combat` targets and the fighter buffer |
+| H3 (as built: 12 classes, 3 summon kinds, 16 effects, kind-aware pool) | the same seams | Druid beast and Artificer turret are rows plus `SUMMON_IDS` entries and art; subclasses only where code is genuinely needed, never `lifecycle` |
+| E1 (built to the [E1 plan](plans/e1-enemies.md); the earlier sketch "World gains enemies, spatial hash, camera shake" is superseded) | `Engagement` interface (new `CombatEngagement`); `Combat.ts` on the enemy side; `FighterBuffer` in and `HitReactions` out; `DrawContext.reactions`; `StageDirector`; `GameDeps.onProgress` | enemies, bosses, enemy health bars, drops, a second stage, persisted progress ([data model](data-model.md#7-persisted-progress-e1)). `World` is **not** changed (no combat, enemies, or reactions reach hero hooks); no spatial hash and no camera shake in E1 |
+| E1-E5 | `StageDef` rows and `AmbientEffect` union members | new stages are data plus art |
+| M7 | `ConfigSnapshot` fields, `Particles` density, `Camera` motion scale | reduce-motion, UI overlay drawn after particles |
+| M8 | `Game` event callbacks (engine to webview audio only, never to the host) | sound |
+
+### 14.1 E1 design summary (built to the [E1 plan](plans/e1-enemies.md))
+
+- **Two sides.** An enemy side (`Combat`, `Enemy`, `Boss`, `Drops`, `Progression`, `StageDirector`, `data/enemies.ts`, `data/drops.ts`) and the hero side meet only at a `FighterBuffer` (slot, position, two cosmetic strike counters per fighting hero, filled by `Roster.collectFighters`) and a `HitReactions` board (flash and a 1 to 2 px slide per slot, written only by `Combat`, read only by `Hero.draw`). Enemy code holds no hero reference; hero code holds no enemy reference ([ADR 0013](adr/0013-enemy-health-and-hero-reaction-board.md)).
+- **Only fighting heroes are in the buffer** (phase `advance`, `attack`, `ability`): resting, travelling, and exiting heroes are never attacked. Summons are never in it.
+- **`CombatEngagement`** replaces the timer behind the unchanged `Engagement` interface: heroes attack while at least one enemy is engaged, the corridor scrolls while enemies approach, and the M4 timer returns as the fallback when combat is disabled or faulted.
+- **Stages swap behind a dark 400 ms fade** driven by `StageDirector`; `World.stage` becomes a getter on the same field name. Heroes keep their slots and paths.
+- **Outputs.** The engine's outputs become pixels, the error callback, and a numeric `onProgress(progress, urgent)` callback that the webview forwards as `saveProgress`. It still has no host channel.
+- **Budget.** Raised ceilings are in section 15.
+
+### 14.2 E1 as built (drift from the plan)
+
+Full list, with reasons, in [E1 plan section 13](plans/e1-enemies.md#13-as-built-drift-checked-against-the-e1-working-tree). Engine-relevant points:
+
+- **`Game.step` order.** drain events, boot-gate timer, `engagement.update(countFighting)`, `camera.advance`, `roster.update`, `#updateCombat`, `reactions.update`, campfire, ambience, particles, effects, summons, `#updateDirector`, renderer clock. `#updateCombat` is skipped while the boot gate waits; otherwise it sets `Combat.setTransitioning(director.transitioning)`, refills the `FighterBuffer` (`Roster.collectFighters`), and runs `Combat.update` in its own try/catch (a throw goes to the sink and `Combat.recordFault()`; the third fault disables combat and `CombatEngagement` falls back to the timer). The director has its own guard: a fault shows the current stage and resets the combat stage.
+- **`Combat`** takes an optional seventh constructor argument, the `ErrorSink`, used to report a throwing `Enemy.update` once while quarantining only that enemy. Extra members: `setTransitioning`, `recordFault`.
+- **`inContact` uses `isEngaged`** (standing in front of the party, not dissolving), not `isTargetable`. The boss is engaged but untargetable and silent for its 1.2 s intro, so the corridor stops and heroes attack with no effect until it ends.
+- **First-sight baseline.** `Combat` counts strikes as the delta of a hero's serial since the last step it saw that slot; on first sight (including slot reuse) it records the serial and counts nothing, so a long-running hero entering the buffer cannot inject strikes.
+- **`StageDirector`** has an optional third constructor argument `onSwap(def)` fired at the fade midpoint (`Game` uses it for `combat.setStage`); `show(index)` does not fire it.
+- **`Enemy`** extra members: `canAttack`, `armAttack`, `tickAttack`, `introLeftMs`, `isWindingUp`, `attackIntervalFactor`, `spritePhase`; `Boss` supplies the intro (1200 ms), telegraph (500 ms), phase-2 interval factor 0.7, and the phase palette index.
+- **Late progress.** The boot gate (clear color only, no combat) ends when `applyProgress` arrives or after `PROGRESS_WAIT_MS` 1500 ms of game time. A `progress` message arriving after the timeout is still applied once (it restores the stored stage and clears the wave); counters earned on defaults meanwhile are never saved because `ProgressSaver` opens only on a received `progress`.
+- **`Game` imports `MAX_AGENTS`** from `src/shared/protocol` by value to size `HitReactions` and `FighterBuffer`.
+- **`SpriteCache.enemyFlash`** returns `HeroSprites` (a silhouette of every animation), not a single frame set.
+- **Bars** cost 2 `fillRect` and 1 bitmap each.
+- **Constants** live in `tuning.ts` (`ENEMY_DISSOLVE_FRAMES`, capacities, fade, gate, fault limits), `data/drops.ts` (`DROP_CAPACITY`, `DROP_*_MS`, `BOSS_COIN_BURST`), and `data/enemies.ts` (all enemy numbers).
+
+### 14.3 E5 as built (the finished ten-stage game)
+
+Full list in [E5 plan section 14](plans/e5-stages-9-10.md#14-as-built-notes-checked-against-the-e5-working-tree). Engine-relevant points:
+
+- **Ten delivered stages and 50 enemies.** `STAGES.length === MAX_STAGE_INDEX === 10`; `Progression`, `StageDirector`, and `Combat` were already generic over the stage count, so none of them changed in logic. `validateEnemies` now enforces the full contract (10 stages, 50 rows, 50 unique ids, 5 per stage, one boss per stage) with no incremental mode; an invalid table still disables combat only, reported once at boot ([data model section 8](data-model.md#8-enemies-drops-and-the-enemy-validator-e1)).
+- **Late health growth (enemy side, `data/enemies.ts`).** `healthOf` multiplies `HEALTH_GROWTH` (1.35) per stage up to Stage 8, then `HEALTH_GROWTH_LATE` (1.05) per stage from `LATE_GROWTH_FROM_STAGE` (9): the stage factor is `1.35^(min(s, 8) - 1) * 1.05^max(0, s - 8)`. Stages 1 to 8 multiply by `1.05^0 = 1`, so they are bit-identical to E4 and no earlier pin moved. The curve exists because heroes are invulnerable: stage growth buys no tension, only longer fights, and the Stage 8 boss already sat at the `VIGOR_MIN` floor ([ADR 0014](adr/0014-new-game-plus-is-the-ten-stage-loop.md)).
+- **New Game+ is the existing wrap.** After the Stage 10 boss, `Progression` sets `stageIndex` 1, `killsInStage` 0, and `cycle + 1` (saturating at `MAX_PROGRESS_COUNT`), through the usual dark fade. Enemy health then uses the existing `cycleFactor = 1 + CYCLE_HEALTH_GROWTH * min(cycle, CYCLE_CAP)` (0.25 per cycle, cap 8, so at most 3.0 times). Speed, attack timing, drops, kills per stage, and ambients do not change, and no hero field is read or written, so New Game+ lengthens fights without touching a hero (Core invariants 1 and 2). Nothing is persisted beyond the six existing `Progress` integers.
+- **Cosmetic additions only.** Two `AmbientEffect` kinds (`shimmer`, `rifts`), two `ParticleKind` entries (indices 10 and 11), two `Renderer` colour-map lines, and the `SHIMMER_*` and `RIFT_*` constants in `tuning.ts`. `ArtSet.particlePalette` is `Record<ParticleKind, ...>`, so the set needs both ramps or the type checker and `validateArtSet` reject it.
+
+## 15. Performance budget
+
+Target: 60 fps with 8+ heroes (M4) and 30+ enemies (E3 onward), 320x180 internal.
+
+| Budget | Value (8 heroes, Stage 1) |
+|---|---|
+| `drawBitmap` + `drawBitmapRegion` calls per frame | at most 120 through M4 (strip blits 3, backdrop 2-4, 8 heroes, flame, props, torches, light blit 1); 144 from H1 (plus at most `EFFECT_CAPACITY` 24 live effects); 152 from H2 (plus at most `SUMMON_CAPACITY` 8 summons); 200 from E1 (152 plus at most 12 enemies, 12 bar frames, and 16 drops = 192; a flashing hero swaps its frame for a silhouette, so it adds no draw) |
+| `fillRect` calls per frame | at most 450 (shadows, warp beams, particles at capacity); 520 from E1 (450 plus 12 enemy shadows, 24 bar rects at 2 per bar, and the fade rect = 487) |
+| fixed step plus render CPU on the reference machine | under 4 ms median, no frame over 33 ms in 60 s |
+| per-frame allocations | none in `update`, `render`, `Lighting`, `Particles`, `Pathfinding` steady state |
+| boot (sprites, strips, light bitmaps) | under 100 ms |
+| webview bundle (production, minified) | watched; assumption: under 300 KB through E5 |
+
+Measured with the DevTools Performance procedure in [testing strategy section 8](../engineering/testing-strategy.md#8-performance-benchmarks); draw-call counts and step cost are asserted in `node:test` against a counting fake `Surface`.

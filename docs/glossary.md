@@ -1,7 +1,7 @@
 # Glossary
 
 Purpose: one-line definitions of the terms used across the Pixel Agents docs, so every agent and contributor means the same thing by "hero", "host", "stage", or "gate". Owned by the architect; extended as milestones add terms.
-Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
+Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overview](architecture/overview.md), [host-webview protocol](architecture/host-webview-protocol.md), [agent detection](architecture/agent-detection.md), [game engine](architecture/game-engine.md), [roadmap](engineering/roadmap.md), [team workflow](engineering/team-workflow.md), [art style guide](design/art-style-guide.md).
 
 ## Agents and the game
 
@@ -10,8 +10,8 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | agent session | one running Claude Code session the extension observes. Identified by a session id; never controlled by the extension (Core invariant 3). |
 | agent state | the lifecycle state of an agent session as reported by the host: `spawned`, `working`, `idle`, or `despawned`. The only input that changes a hero's state (Core invariant 2). |
 | hero | the pixel-art character that represents one agent session. Invulnerable: no HP, mana, damage, death, or gauges (Core invariant 1, [ADR 0002](architecture/adr/0002-no-hero-health.md)). |
-| class | a hero's look and attack style (Warrior, Mage, and 10 more), picked from the agent's tool activity and sticky per session (H1-H3). |
-| summon | a cosmetic ally of a summoning class (skeleton, beast, turret); no health shown, no effect on hero state (H2, H3). |
+| class | a hero's look and attack style (Warrior, Mage, and 10 more), picked from the session id by `classFor` and sticky per id (H1-H3). |
+| summon | a cosmetic ally of a summoning class (skeleton, beast, turret); no health, never a target, no effect on hero state; exists only while its owner keeps fighting (H2, H3, [ADR 0011](architecture/adr/0011-summons-are-leased-cosmetic-entities.md)). |
 | enemy | a monster heroes fight while their agent is working. Only enemies have health. 50 types from a compact data table (E1-E5). |
 | boss | the one special enemy per stage, with intro pose, telegraph, and phases. |
 | stage | one of the 10 dungeon levels heroes progress through by cumulative work, each with 4 regular enemies and 1 boss. |
@@ -29,10 +29,10 @@ Related: [docs index](index.md), [CLAUDE.md](../CLAUDE.md), [architecture overvi
 | webview view, panel | the "Pixel Agents" tab in VS Code's bottom panel that hosts the webview ([ADR 0001](architecture/adr/0001-bottom-panel-webview.md)). |
 | bundle | one esbuild output: the host bundle (Node CJS) or the webview bundle (browser IIFE). They share only `src/shared/` ([ADR 0004](architecture/adr/0004-esbuild-two-bundles.md)). |
 | protocol | the typed, validated messages between host and webview in `src/shared/protocol.ts` ([host-webview protocol](architecture/host-webview-protocol.md)). |
-| handshake | the webview sends `ready`; the host answers with `config` then `agentList` snapshots, and only then pushes `agentState` events ([ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md)). |
+| handshake | the webview sends `ready`; the host answers with `config` then `agentList` snapshots (from E1, then `progress`), and only then pushes `agentState` events ([ADR 0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md)). |
 | `focusAgent` | the only webview action that reaches the host: reveal (show) an agent's terminal. It never writes to or controls the terminal. |
-| monitor | the read-only host code in `src/monitor/` that detects agent sessions and emits agent-state events (M3). |
-| source | one input to the monitor: transcript watching, terminal observation, or the simulator (fake agents for demo and tests). |
+| monitor | the read-only host code in `src/monitor/` that detects agent sessions and emits agent-state events (M3, [agent detection](architecture/agent-detection.md)). |
+| source | one input to the monitor: transcript polling, terminal observation (reveal links only), or the simulator (fake agents for demo and tests). |
 | allow-list | the only agent fields that may be read, stored, logged, or sent: session id, name, state, tool name, timestamp (Core invariant 7). |
 | CSP, nonce | the webview's Content-Security-Policy and the per-load random value that authorizes our single script and style block ([overview](architecture/overview.md#6-security-boundary)). |
 | data table | a typed, `readonly` table of game content under `src/game/data/` (enemies, stages, classes, drops, achievements). |
@@ -57,11 +57,86 @@ Full contract in [host-webview protocol](architecture/host-webview-protocol.md);
 | `WebviewBridge` | the vscode-free host object in `src/host/webviewBridge.ts` that receives webview messages, answers `ready`, posts pushes, and handles `focusAgent`. |
 | bridge state | `detached` (no view), `loading` (view attached or hidden, waiting for `ready`; pushes dropped), `ready` (pushes posted). |
 | port | `WebviewPort`, the one-method interface (`postMessage`) through which the bridge posts; `extension.ts` adapts the real `vscode.Webview` to it. |
-| reveal capability | `revealAgentTerminal`, the bridge's only outward action: show a live agent's terminal. `null` in M2; wired to `Terminal.show()` in M3. |
+| reveal capability | `revealAgentTerminal`, the bridge's only outward action: show a live agent's terminal. `null` in M2; from M3 `AgentMonitor.revealAgentTerminal`, which ends in `Terminal.show()` for a linked agent. |
 | `HostStateMirror` | the webview's in-memory copy of host state (config and agents), rebuilt from scratch on every load. The M4 `Game` reads it; the webview never writes state back. |
 | `assertNever` | the shared exhaustiveness guard in `src/shared/assertNever.ts` that ends every `switch` over a union; its error never includes the value. |
 | `src/host/` | host-bundle folder for vscode-free, unit-testable host logic; imports only `src/shared/` ([coding standards section 3](engineering/coding-standards.md#3-bundle-boundaries)). |
 | log channel | the single "Pixel Agents" `LogOutputChannel`; fixed reason strings at trace level for drops, `error.name: message` at error level; never payloads. |
+
+## Monitor (M3)
+
+Full contract in [agent detection](architecture/agent-detection.md); rationale in [ADR 0005](architecture/adr/0005-transcript-watching.md).
+
+| Term | Meaning |
+|---|---|
+| transcript | the JSONL file Claude Code appends to for one session, `<root>/<project dir>/<session uuid>.jsonl`. Read-only input; only five fields are derived from it. |
+| transcript root | the directory the monitor reads: `pixelAgents.transcriptPath`, or `~/.claude/projects` by default. Resolved with `realpath`; nothing below it is followed through a symbolic link. |
+| project directory | a directory under the root named by encoding a working directory (every character outside `[A-Za-z0-9]` becomes `-`). |
+| project scope | which project directories are read: `workspace` (this window's folders, default) or `all` (every project on the machine). |
+| poll | one pass of the transcript source: `lstat` tracked files, read appended bytes (bounded), classify complete lines, evaluate silence thresholds. Polls never overlap. |
+| signal | the fixed result of classifying one transcript line: `prompt`, `assistant`, `toolUse` (with a tool name), `toolResult`, `turnEnd`, `ignored`, or `unparseable`. Carries no transcript text. |
+| session state machine | the pure reducer that turns signals and silence into `spawned`, `working`, `idle`, `despawned` for one transcript session. |
+| silence | time since a session's last activity signal; compared with the idle, tool, and session-end timeouts. |
+| coalescing | the registry rule that emits at most one agent-state event per agent per `debounceMs`, always the latest; `spawned` and `despawned` go out immediately. |
+| registry | `AgentRegistry`: the monitor's live agent records, the `AgentInfo` snapshot behind `getAgents()`, and the per-origin agent caps. |
+| terminal link | the monitor's association of a session with the terminal that was active when the session appeared; used only to reveal. |
+| simulated agent | a fake agent from `SimulatorSource`: id `sim-<slot>-<generation>`, name `Sim <Name>`. In `auto` mode only while no real session exists. |
+| port (monitor) | a narrow interface the monitor core depends on (`ReadOnlyFileSystem`, `PathOps`, `Clock`, `TimerPort`, `TerminalPort`, `MonitorLogger`), implemented by an adapter. |
+| adapter | a file under `src/monitor/adapters/`, the only monitor code allowed to import Node built-ins or `vscode`. |
+| `safeErrorCode` | the only way monitor code describes an error: `error.code` or `error.name`, never the message or stack. |
+
+## Engine (M4)
+
+Full design in [game engine](architecture/game-engine.md) and [data model](architecture/data-model.md); rationale in ADRs [0008](architecture/adr/0008-dom-free-engine-behind-ports.md), [0009](architecture/adr/0009-hero-lifecycle-isolation.md), [0010](architecture/adr/0010-split-room-stage-layout.md).
+
+| Term | Meaning |
+|---|---|
+| lifecycle | the one fact a hero stores about its agent: `spawned`, `working`, `idle`, or `despawned`. Changed only by `Hero.applyAgentState`, called only from `Roster`, fed by host events. |
+| phase | a hero's cosmetic animation state (`warpIn`, `standby`, `travel`, `advance`, `attack`, `ability` (H1), `rest`, `victory`, `warpOut`), derived from lifecycle and timers. Never feeds back into lifecycle. |
+| `Game` | the engine facade: event queue, fixed-step loop, render, `heroSnapshot`. DOM-free, has no host channel. |
+| `Roster` | the engine's hero map; applies host events and snapshots and decides when a hero is removed. |
+| `Surface`, `BitmapFactory` | the two ports through which the engine draws and creates bitmaps; implemented over canvas 2D in `src/webview/canvasSurface.ts`. |
+| `GameHost` | the webview-side loop driver: schedules frames, pauses when hidden, reports errors. |
+| `SceneFeed` | the webview `HostMessageTarget` that updates the `HostStateMirror` and queues the same events into the engine. |
+| fixed step | the engine updates in 1/60 s steps from an accumulator (at most 5 per frame); rendering is not interpolated. |
+| quarantine | what the engine does to an entity that throws three times in a row: freeze it (no update), keep it listed, report once. It is never removed for a fault. |
+| instant rebuild | creating heroes from a snapshot directly in their lifecycle's place, with no warp-in; used on reload. |
+| alcove, corridor | the two halves of a stage's room: the static campfire room (x 0-127) and the scrolling dungeon corridor (x 144-319), split by a door column ([ADR 0010](architecture/adr/0010-split-room-stage-layout.md)). |
+| formation slot, seat | a hero's stable position index in the corridor (while working) and around the campfire (while idle). |
+| engagement | the party rhythm that decides when the corridor scrolls (advance) and when working heroes attack (engage); timed in M4, enemy-driven from E1. |
+| strip | a pre-rendered offscreen bitmap of a stage's static wall and floor (alcove 128x180, corridor segment 384x180). |
+| light map | the 80x45 offscreen buffer that holds ambient plus light sources and is multiplied onto the environment. |
+| `ArtSet` | the bundle of palettes, templates, and sprite data the engine is constructed with. |
+| A0 | the first art batch: master palette, base hero, campfire, Stage 1 environment. |
+| class (H1) | a cosmetic hero identity (Warrior, Mage, Archer, Rogue; 12 by H3): a palette, silhouette, weapon, and effect shots. It has no health, mana, or power; it is chosen by `classFor(id)` and never changes for a session id. See the [H1 plan](architecture/plans/h1-classes.md). |
+| `classFor` | the pure function in `classMap.ts` that hashes a session id (upper 16 bits of `hashId`) over the delivered classes; no state, no storage, no tool names. |
+| ability (H1) | a class hero's 3-frame signature animation, played from the `attack` phase when a hidden seeded timer fires. Cosmetic: it spawns effects and changes nothing about the hero or the host. |
+| effect, `EffectPool` (H1) | a small pooled sprite (arrow, orb, burst, whirl, dagger, smoke) spawned by a class hook and drawn after the entities; it has no collision and no target, even after E1 (class shots fly down the corridor and do not home on enemies; hits are resolved from the strike counters). |
+| delivered classes | the classes present in `classes.ts` so far; `classFor` hashes over this set. |
+| lease (H2) | the short timer (`SUMMON_LEASE_MS`) a summoning hero renews every update while it fights; when renewals stop the summon sinks and is freed. The summon system's only link to its owner, and it carries no hero data. |
+| `SummonPool` (H2) | the fixed-size pool of `Summon` entities in `World.summons`; keyed by hero slot, updated and drawn under the entity guards, outside the `Roster`. |
+| aura, buff (H2) | not an engine feature: a one-shot cosmetic effect burst (blessing glow, holy burst, notes) centered on the casting hero. Never a persistent icon, bar, or restore. |
+
+## Combat and progress (E1)
+
+Design and as-built drift in the [E1 plan](architecture/plans/e1-enemies.md); rationale in [ADR 0012](architecture/adr/0012-host-owned-versioned-progress.md) and [ADR 0013](architecture/adr/0013-enemy-health-and-hero-reaction-board.md).
+
+| Term | Meaning |
+|---|---|
+| enemy side, hero side | the two halves of the engine. The enemy side (`Combat`, `Enemy`, `Boss`, drops, progression) may use health vocabulary and holds no hero reference; the hero side keeps the strict vocabulary ban. They meet only at the `FighterBuffer` and the `HitReactions` board. |
+| `FighterBuffer` | the preallocated numeric list (slot, x, y, two strike counters) of heroes whose cosmetic phase is `advance`, `attack`, or `ability`; filled by `Roster.collectFighters`, read by `Combat`. Contains no id, name, state, or summon. |
+| `HitReactions` | the cosmetic reaction board: per hero slot, a 100 ms flash and a 1 to 2 px slide that `Combat` writes and `Hero.draw` reads. Changes only how a hero is drawn. |
+| fighter | a hero currently in a fighting phase; the only heroes enemies can target. Resting and exiting heroes are never fighters. |
+| party fights as one | the combat abstraction: any striking hero hits the nearest engaged enemy and all classes hit alike. |
+| wave | a group of regular enemies sized by the number of fighters and capped by `pixelAgents.maxEnemies`. |
+| `Progression` | the enemy-side counters (stage, kills in stage, totals, cycle) behind the persisted progress. |
+| progress | the persisted `Progress` record: five counters and a `schemaVersion`, stored by the host in `globalState`; never agent data. |
+| `ProgressStore`, migration runner | the host module that loads, validates, migrates (forward only), and writes progress; a newer stored version is read-only and never overwritten. |
+| `StageDirector` | swaps the active stage runtime behind a dark fade after a boss falls; never touches the roster. |
+| drop | cosmetic decoration (`coin gem ore chest`) that pops from a defeated enemy; collected by nothing and worth nothing. |
+| first-sight baseline | how `Combat` counts strikes: the first time it sees a hero slot (or a reused one) it only records the strike counters; later increases are strikes. A hero entering the fighter buffer therefore never injects strikes. |
+| boot gate | until the host's `progress` message is applied (or 1.5 s of game time pass) the engine draws only the clear color and `Combat` idles, so the wrong stage never flashes. A `progress` that arrives later is still applied once. |
+| `RenderExtras` | the optional fifth argument of `Renderer.render` (live enemies, the reaction board, the drop pass, the fade alpha); without it the renderer draws as in H3. |
 
 ## Process
 

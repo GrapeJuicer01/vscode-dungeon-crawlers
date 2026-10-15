@@ -20,6 +20,25 @@ const VSCODE_PATH = {
   message: 'The vscode API is host-only. See coding-standards.md section 3.',
 };
 
+/** The only Node built-ins the monitor's Node adapters may import (coding-standards.md section 3). */
+const MONITOR_NODE_ALLOWED = ['fs', 'fs/promises', 'os', 'path'];
+/** Every other built-in, bare and with the `node:` scheme (the scheme pattern cannot be used here). */
+const MONITOR_NODE_BANNED_PATHS = NODE_BUILTIN_PATHS.filter(
+  (entry) => !MONITOR_NODE_ALLOWED.includes(entry.name),
+).flatMap((entry) =>
+  entry.name.startsWith('node:') ? [entry] : [entry, { ...entry, name: `node:${entry.name}` }],
+);
+/** Groups no monitor adapter may import: game, webview, host, extension. */
+const MONITOR_ADAPTER_BANNED_GROUPS = [
+  '**/game',
+  '**/game/**',
+  '**/webview',
+  '**/webview/**',
+  '**/extension',
+  '**/host',
+  '**/host/**',
+];
+
 /** Node globals for plain JavaScript tooling files (the TS files get them from @types/node). */
 const NODE_GLOBALS = {
   process: 'readonly',
@@ -169,6 +188,78 @@ export default defineConfig(
       ],
     },
   },
+  // ---- Monitor (M3, ADR 0004 M3 notes). Placed after the host block: a later block's
+  // no-restricted-imports replaces an earlier one for the same file, so each repeats the game
+  // and webview groups. ----
+
+  // Monitor core: src/shared/ and sibling core files only; capabilities arrive as ports.
+  {
+    files: ['src/monitor/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [VSCODE_PATH, ...NODE_BUILTIN_PATHS],
+          patterns: [
+            NODE_SCHEME_PATTERN,
+            {
+              group: [
+                '**/game',
+                '**/game/**',
+                '**/webview',
+                '**/webview/**',
+                '**/extension',
+                '**/host',
+                '**/host/**',
+                './adapters',
+                './adapters/**',
+                '**/adapters/**',
+              ],
+              message: 'src/monitor core imports only src/shared/ and sibling core files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Node adapters: only the read-only fs functions, os, and path (enforced in review and tests
+  // for the exact names); never vscode or any other built-in.
+  {
+    files: ['src/monitor/adapters/nodeFileSystem.ts', 'src/monitor/adapters/nodeRuntime.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [VSCODE_PATH, ...MONITOR_NODE_BANNED_PATHS],
+          patterns: [
+            {
+              group: MONITOR_ADAPTER_BANNED_GROUPS,
+              message: 'Monitor adapters import only their allowed modules and src/monitor/ports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // vscode adapter: vscode types only, no Node built-ins.
+  {
+    files: ['src/monitor/adapters/vscodeTerminals.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: NODE_BUILTIN_PATHS,
+          patterns: [
+            NODE_SCHEME_PATTERN,
+            {
+              group: MONITOR_ADAPTER_BANNED_GROUPS,
+              message: 'Monitor adapters import only their allowed modules and src/monitor/ports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Webview runtime and game: browser bundle, no vscode, no Node, no host code.
   {
     files: ['src/webview/**/*.ts', 'src/game/**/*.ts'],
@@ -193,6 +284,69 @@ export default defineConfig(
                 'Webview code must not import host code (extension.ts, monitor/, host/, index.html.ts).',
             },
           ],
+        },
+      ],
+    },
+  },
+  // Engine (M4, ADR 0008): DOM-free and clock-free. Repeats the block above and adds the webview
+  // imports plus the browser globals and nondeterministic calls the engine must not use; the DOM,
+  // time, and randomness arrive through ports, frame deltas, and a seeded generator.
+  {
+    files: ['src/game/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [VSCODE_PATH, ...NODE_BUILTIN_PATHS],
+          patterns: [
+            NODE_SCHEME_PATTERN,
+            {
+              group: [
+                '**/monitor',
+                '**/monitor/**',
+                '**/extension',
+                '**/index.html',
+                '**/host',
+                '**/host/**',
+                '**/webview',
+                '**/webview/**',
+              ],
+              message:
+                'src/game/ imports only src/shared/ and itself (ADR 0008); the DOM arrives through ports.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'document',
+          'window',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'setTimeout',
+          'setInterval',
+          'fetch',
+          'localStorage',
+          'performance',
+          'acquireVsCodeApi',
+        ].map((name) => ({
+          name,
+          message:
+            'src/game/ is DOM-free and clock-free (ADR 0008): use a port or the frame delta.',
+        })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Use the seeded generator from rng.ts (ADR 0008).',
+        },
+        {
+          object: 'Date',
+          property: 'now',
+          message: 'Time arrives as a frame delta (ADR 0008).',
         },
       ],
     },

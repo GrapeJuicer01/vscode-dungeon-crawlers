@@ -1,7 +1,7 @@
 # ADR 0004: Build with esbuild into two bundles (host CJS, webview IIFE)
 
 Purpose: records the build tool, the two-bundle split, and the import rules that keep the extension host and the webview from depending on each other.
-Related: [architecture overview](../overview.md), [coding standards](../../engineering/coding-standards.md#3-bundle-boundaries), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [ADR 0003 procedural sprites](0003-procedural-sprites.md), [host-webview protocol](../host-webview-protocol.md), [ADR 0007 allow-list protocol](0007-allow-list-protocol-pull-handshake.md), [M1 plan](../plans/m1-scaffold.md), [M2 plan](../plans/m2-protocol.md).
+Related: [architecture overview](../overview.md), [coding standards](../../engineering/coding-standards.md#3-bundle-boundaries), [ADR 0001 bottom-panel webview](0001-bottom-panel-webview.md), [ADR 0003 procedural sprites](0003-procedural-sprites.md), [host-webview protocol](../host-webview-protocol.md), [ADR 0007 allow-list protocol](0007-allow-list-protocol-pull-handshake.md), [ADR 0005 transcript watching](0005-transcript-watching.md), [M1 plan](../plans/m1-scaffold.md), [M2 plan](../plans/m2-protocol.md), [M3 plan](../plans/m3-monitor.md), [M4 plan](../plans/m4-engine.md), [ADR 0008](0008-dom-free-engine-behind-ports.md).
 
 ## Status
 
@@ -65,3 +65,20 @@ These notes apply the decision to the M2 folders; they do not change it. Details
 - **New webview modules** `hostChannel.ts`, `hostMessages.ts`, `hostState.ts` are webview-bundle files under the existing `src/webview/**` rule. They stay DOM-free so tests can import them; only `main.ts` touches the DOM and `acquireVsCodeApi`.
 - **Bundle checks.** `dist/webview.js` must not contain host-only code (`WebviewBridge`, `onDidReceiveMessage`), and `dist/extension.js` must not contain `acquireVsCodeApi`; the tester's bundle suite asserts this on the development build, where names are not minified.
 - **Unchanged**: entry points, formats, targets, externals, the CSP, and the sourcemap modes (external for the host, inline for the webview in development, none in production). The webview is still one IIFE loaded by one nonce-bearing script tag.
+
+## Implementation notes (M3)
+
+These notes apply the decision to the monitor; they do not change it. Details are in the [M3 plan](../plans/m3-monitor.md) and [agent detection](../agent-detection.md#2-components).
+
+- **`src/monitor/` splits into a core and adapters.** Core files (`src/monitor/*.ts`) are host code that imports only `src/shared/**` and sibling core files: no `vscode`, no Node built-ins, no `src/host/**`, no adapters. Adapters (`src/monitor/adapters/`) are the only monitor files that import Node (`nodeFileSystem.ts`: `node:fs/promises`, `node:fs`, `node:os`; `nodeRuntime.ts`: `node:path`) or `vscode` (`vscodeTerminals.ts`, type-only). `extension.ts` builds the adapters and injects them, so the core is unit tested like `src/host/`. ESLint gets three blocks for these, placed after the host block because a later block's `no-restricted-imports` replaces an earlier one for the same file.
+- **Still host-only.** Everything under `src/monitor/` is bundled into `dist/extension.js` (already in `tsconfig.json` `include`); `src/host/**`, `src/webview/**`, and `src/game/**` must not import it. The bundle suite asserts `dist/webview.js` contains no monitor code.
+- **Unchanged**: entry points, formats, externals (the adapters use only Node built-ins and `vscode`), the CSP, and sourcemap modes.
+
+## Implementation notes (M4)
+
+These notes apply the decision to the engine; they do not change it. Details are in the [M4 plan](../plans/m4-engine.md) and [ADR 0008](0008-dom-free-engine-behind-ports.md).
+
+- **`src/game/**` is webview-bundle code that is also DOM-free and clock-free.** It is already in `tsconfig.webview.json` `include`. A new ESLint block (after the webview-and-game block, repeating its import bans) forbids it importing `src/webview/**` and bans the browser globals and nondeterministic calls listed in [coding standards section 3](../../engineering/coding-standards.md#3-bundle-boundaries). The webview-to-game direction stays open: `main.ts` imports the engine.
+- **New webview files**: `canvasSurface.ts` (the only canvas adapter), `gameHost.ts` and `sceneFeed.ts` (DOM-free, browser functions injected), and the changed `main.ts`.
+- **Bundle checks**: `dist/webview.js` holds the engine and sprite data and no host-only code; `dist/extension.js` holds no engine code. The production webview bundle size is reported at each milestone (assumption: under 300 KB through E5).
+- **Unchanged**: entry points, formats, targets, externals, the CSP (bitmaps use `ImageData`, no image URLs), and sourcemap modes.

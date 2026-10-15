@@ -10,6 +10,7 @@ import {
   createAgentListMessage,
   createAgentStateMessage,
   createConfigMessage,
+  createProgressMessage,
   parseHostMessage,
   parseWebviewMessage,
 } from '../../src/shared/protocol';
@@ -76,6 +77,8 @@ class Gen {
       'config',
       'agentList',
       'agentState',
+      'progress',
+      'saveProgress',
       'spawned',
       'working',
       'idle',
@@ -102,6 +105,14 @@ class Gen {
       2 ** 53,
       Number.MAX_SAFE_INTEGER,
       1_700_000_000_000,
+      5,
+      6,
+      12,
+      30,
+      500,
+      10,
+      1_000_000_000,
+      1_000_000_001,
       this.int(1_000_000),
     ]);
   }
@@ -112,6 +123,16 @@ class Gen {
       'agentId',
       'config',
       'protocolVersion',
+      'enemiesEnabled',
+      'killsPerStage',
+      'maxEnemies',
+      'progress',
+      'schemaVersion',
+      'stageIndex',
+      'killsInStage',
+      'totalKills',
+      'bossesDefeated',
+      'cycle',
       'agents',
       'agent',
       'id',
@@ -172,16 +193,42 @@ class Gen {
     };
   }
 
+  progress(): Record<string, unknown> {
+    return {
+      schemaVersion: 1,
+      stageIndex: this.pick([1, 2, 10]),
+      killsInStage: this.pick([0, 7, 30]),
+      totalKills: this.pick([0, 57, 1_000_000_000]),
+      bossesDefeated: this.pick([0, 1, 3]),
+      cycle: this.pick([0, 1, 8]),
+    };
+  }
+
   validWebview(): Record<string, unknown> {
-    return this.chance(0.5)
-      ? { type: 'ready' }
-      : { type: 'focusAgent', agentId: this.pick(['sim-1', 'a', 'x.y:z-0']) };
+    switch (this.int(3)) {
+      case 0:
+        return { type: 'ready' };
+      case 1:
+        return { type: 'focusAgent', agentId: this.pick(['sim-1', 'a', 'x.y:z-0']) };
+      default:
+        return { type: 'saveProgress', progress: this.progress() };
+    }
   }
 
   validHost(): Record<string, unknown> {
-    switch (this.int(3)) {
+    switch (this.int(4)) {
       case 0:
-        return { type: 'config', config: { protocolVersion: 1 } };
+        return {
+          type: 'config',
+          config: {
+            protocolVersion: 2,
+            enemiesEnabled: this.chance(0.5),
+            killsPerStage: this.pick([5, 30, 500]),
+            maxEnemies: this.pick([1, 6, 12]),
+          },
+        };
+      case 3:
+        return { type: 'progress', progress: this.progress() };
       case 1: {
         const count = this.int(4);
         return { type: 'agentList', agents: Array.from({ length: count }, () => this.agent()) };
@@ -227,6 +274,8 @@ class Gen {
           'config',
           'agentList',
           'agentState',
+          'progress',
+          'saveProgress',
           'stopAgent',
         ]);
         return;
@@ -289,6 +338,44 @@ function oracleAgent(value: unknown): AgentInfo | undefined {
   return ok ? { id, name, state, toolName, timestamp } : undefined;
 }
 
+const PROGRESS_KEYS = [
+  'schemaVersion',
+  'stageIndex',
+  'killsInStage',
+  'totalKills',
+  'bossesDefeated',
+  'cycle',
+] as const;
+
+function oracleCount(value: unknown, min = 0, max = 1_000_000_000): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max;
+}
+
+/** An independent restatement of the Progress rules (data-model.md section 7). */
+function oracleProgress(value: unknown): Record<string, number> | undefined {
+  if (!plain(value) || !keysAre(value, PROGRESS_KEYS)) {
+    return undefined;
+  }
+  const ok =
+    value.schemaVersion === 1 &&
+    oracleCount(value.stageIndex, 1, 10) &&
+    oracleCount(value.killsInStage) &&
+    oracleCount(value.totalKills) &&
+    oracleCount(value.bossesDefeated) &&
+    oracleCount(value.cycle);
+  if (!ok) {
+    return undefined;
+  }
+  return {
+    schemaVersion: 1,
+    stageIndex: value.stageIndex as number,
+    killsInStage: value.killsInStage as number,
+    totalKills: value.totalKills as number,
+    bossesDefeated: value.bossesDefeated as number,
+    cycle: value.cycle as number,
+  };
+}
+
 function oracleWebview(raw: unknown): WebviewToHostMessage | undefined {
   if (!plain(raw) || !Object.prototype.hasOwnProperty.call(raw, 'type')) {
     return undefined;
@@ -302,6 +389,12 @@ function oracleWebview(raw: unknown): WebviewToHostMessage | undefined {
       ? { type: 'focusAgent', agentId: id }
       : undefined;
   }
+  if (raw.type === 'saveProgress' && keysAre(raw, ['type', 'progress'])) {
+    const progress = oracleProgress(raw.progress);
+    return progress === undefined
+      ? undefined
+      : ({ type: 'saveProgress', progress } as unknown as WebviewToHostMessage);
+  }
   return undefined;
 }
 
@@ -311,9 +404,31 @@ function oracleHost(raw: unknown): HostToWebviewMessage | undefined {
   }
   if (raw.type === 'config' && keysAre(raw, ['type', 'config'])) {
     const config = raw.config;
-    return plain(config) && keysAre(config, ['protocolVersion']) && config.protocolVersion === 1
-      ? { type: 'config', config: { protocolVersion: 1 } }
-      : undefined;
+    if (
+      plain(config) &&
+      keysAre(config, ['protocolVersion', 'enemiesEnabled', 'killsPerStage', 'maxEnemies']) &&
+      config.protocolVersion === 2 &&
+      typeof config.enemiesEnabled === 'boolean' &&
+      oracleCount(config.killsPerStage, 5, 500) &&
+      oracleCount(config.maxEnemies, 1, 12)
+    ) {
+      return {
+        type: 'config',
+        config: {
+          protocolVersion: 2,
+          enemiesEnabled: config.enemiesEnabled,
+          killsPerStage: config.killsPerStage,
+          maxEnemies: config.maxEnemies,
+        },
+      };
+    }
+    return undefined;
+  }
+  if (raw.type === 'progress' && keysAre(raw, ['type', 'progress'])) {
+    const progress = oracleProgress(raw.progress);
+    return progress === undefined
+      ? undefined
+      : ({ type: 'progress', progress } as unknown as HostToWebviewMessage);
   }
   if (raw.type === 'agentList' && keysAre(raw, ['type', 'agents'])) {
     const list = raw.agents;
@@ -346,6 +461,8 @@ function viaCreators(message: HostToWebviewMessage): HostToWebviewMessage | unde
       return createAgentListMessage(message.agents);
     case 'agentState':
       return createAgentStateMessage(message.agent);
+    case 'progress':
+      return createProgressMessage(message.progress);
     default:
       return undefined;
   }
@@ -363,6 +480,9 @@ function expectedKeys(message: HostToWebviewMessage | WebviewToHostMessage): str
       return ['type', 'agents'];
     case 'agentState':
       return ['type', 'agent'];
+    case 'progress':
+    case 'saveProgress':
+      return ['type', 'progress'];
     default:
       return [];
   }
@@ -438,6 +558,9 @@ void describe(`protocol fuzz (seed 0x${SEED.toString(16)}, ${ITERATIONS} iterati
   void it('parseWebviewMessage never throws and matches the reference oracle', () => {
     const stats = fuzz(parseWebviewMessage, oracleWebview, webviewInput, (accepted, where) => {
       assert.deepEqual(Object.keys(accepted), expectedKeys(accepted), `keys at ${where}`);
+      if (accepted.type === 'saveProgress') {
+        assert.deepEqual(Object.keys(accepted.progress), [...PROGRESS_KEYS], where);
+      }
     });
     // Guards against a vacuous run: both outcomes must be exercised substantially.
     assert.ok(stats.accepted > 500, `only ${stats.accepted} acceptances`);
@@ -456,6 +579,16 @@ void describe(`protocol fuzz (seed 0x${SEED.toString(16)}, ${ITERATIONS} iterati
             where,
           );
         }
+      }
+      if (accepted.type === 'progress') {
+        assert.deepEqual(Object.keys(accepted.progress), [...PROGRESS_KEYS], where);
+      }
+      if (accepted.type === 'config') {
+        assert.deepEqual(
+          Object.keys(accepted.config),
+          ['protocolVersion', 'enemiesEnabled', 'killsPerStage', 'maxEnemies'],
+          where,
+        );
       }
       if (accepted.type === 'agentState') {
         assert.deepEqual(

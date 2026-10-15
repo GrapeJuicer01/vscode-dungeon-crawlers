@@ -3,6 +3,7 @@
 // is rebuilt from the host's `agentList` snapshot (Core invariant 4). Only host messages change
 // it (Core invariant 2).
 import { assertNever } from '../shared/assertNever';
+import type { Progress } from '../shared/progress';
 import type { AgentInfo, ConfigSnapshot } from '../shared/protocol';
 import type { HostMessageTarget } from './hostMessages';
 
@@ -10,6 +11,7 @@ import type { HostMessageTarget } from './hostMessages';
 export class HostStateMirror implements HostMessageTarget {
   readonly #agents = new Map<string, AgentInfo>();
   #config: ConfigSnapshot | null = null;
+  #progress: Progress | null = null;
 
   /** Clears, then inserts all (the snapshot is authoritative). */
   replaceAgents(agents: readonly AgentInfo[]): void {
@@ -39,6 +41,15 @@ export class HostStateMirror implements HostMessageTarget {
   /** Stores the latest snapshot. */
   applyConfig(config: ConfigSnapshot): void {
     this.#config = config;
+  }
+
+  /** Stores the stored progress; the mirror holds a read-only copy and never changes it. */
+  applyProgress(progress: Progress): void {
+    this.#progress = progress;
+  }
+
+  get progress(): Progress | null {
+    return this.#progress;
   }
 
   get config(): ConfigSnapshot | null {

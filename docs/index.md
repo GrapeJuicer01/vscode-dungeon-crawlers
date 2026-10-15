@@ -17,10 +17,10 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 |---|---|
 | [overview](architecture/overview.md) | system context, containers (incl. `src/host/` and the webview protocol modules), data flow, safety and security boundaries, current state |
 | [host-webview protocol](architecture/host-webview-protocol.md) | [M2] message catalog, field and validation rules, `WebviewBridge` states, `ready` handshake, a sequence diagram per flow, how to add a message |
-| [security and safety](architecture/security-and-safety.md) | [M2] threat model, trust boundaries B1-B4, CSP, validation, data inventory, read-only and reveal-only guarantees |
-| [agent detection](architecture/agent-detection.md) | planned [M3]: monitor sources and state machine |
-| [game engine](architecture/game-engine.md) | planned [M4]: loop, renderer, entities, crash isolation |
-| [data model](architecture/data-model.md) | planned [M4]: data tables, persisted progress, migrations |
+| [security and safety](architecture/security-and-safety.md) | [M2, M3] threat model (T1-T19), trust boundaries B1-B4, CSP, validation, data inventory, read-only and reveal-only guarantees, monitor file access |
+| [agent detection](architecture/agent-detection.md) | [M3] monitor components (core and adapters), transcript, terminal, and simulator sources, session state machine, registry and coalescing, settings, error logging, platform notes, limits |
+| [game engine](architecture/game-engine.md) | [M4 design] components, room layout, fixed-step loop and crash isolation, host events to heroes, hero phase machine, rendering order, lighting, particles, pathfinding, sprite consumption, performance budget |
+| [data model](architecture/data-model.md) | [M4 design] data tables and owners, art data contract (A0), stage table and validator, tuning constants; persisted progress and migrations, and the enemy table and validator (E1, as built) |
 
 ### Plans
 
@@ -28,6 +28,16 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 |---|---|
 | [m1-scaffold](architecture/plans/m1-scaffold.md) | M1 Scaffold |
 | [m2-protocol](architecture/plans/m2-protocol.md) | M2 Protocol (refreshed against M1 as built; includes integration test notes) |
+| [m3-monitor](architecture/plans/m3-monitor.md) | M3 Monitor (checked against M2 as built; includes decisions for the human) |
+| [m4-engine](architecture/plans/m4-engine.md) | M4 Engine (checked against M3 as built; includes the exact A0 art list and decisions for the human) |
+| [h1-classes](architecture/plans/h1-classes.md) | H1 Warrior, Mage, Archer, Rogue (checked against M4 as built; class assignment from the session id, ability phase, effect pool, `docs:tables`, exact art list, decisions H1-1 to H1-10) |
+| [h2-classes](architecture/plans/h2-classes.md) | H2 Cleric, Paladin, Necromancer, Bard (checked against H1 as built; summon convention, cosmetic buffs, eight-class `classFor`, art list, decisions H2-1 to H2-11) |
+| [h3-classes](architecture/plans/h3-classes.md) | H3 Druid (beast), Monk, Artificer (turret), Berserker (checked against H2 as built; twelve-class `classFor` spread, summon capacity, kind-aware pool, Berserker rules, art list, decisions H3-1 to H3-10) |
+| [e1-enemies](architecture/plans/e1-enemies.md) | E1 Stage 1 and 2 enemies, bosses, combat, drops, stage progression, persisted progress (checked against H3 as built, with an as-built drift section 13 added after E1 was implemented; the enemy-side and hero-side seam, enemy table and scaling, `progress` and `saveProgress` messages, migration runner, settings, art list in six steps, decisions E1-1 to E1-19) |
+| [e2-stages-3-4](architecture/plans/e2-stages-3-4.md) | E2 Stage 3 Toxic Slime Caverns and Stage 4 Ancient Catacombs (checked against E1 as built; audit of two-stage assumptions, atomic art-then-data switch, bubble and fog ambients, 4-stage wrap, art list in six steps, decisions E2-1 to E2-10) |
+| [e3-stages-5-6](architecture/plans/e3-stages-5-6.md) | E3 Stage 5 Enchanted Forest Ruins and Stage 6 Molten Core (checked against E2 as built; atomic switch with boss phase palettes, firefly and ember ambients, lava-is-decoration rules, look-alike policy and the ten known-over pairs, 6-stage wrap, boss vigor estimates, art list A-E3-0 to A-E3-6, decisions E3-1 to E3-11; section 14 as built) |
+| [e4-stages-7-8](architecture/plans/e4-stages-7-8.md) | E4 Stage 7 Frozen Citadel and Stage 8 Shadow Realm (checked against E3 as built; atomic switch, snow and murk ambients with two new particle kinds, scenery-only ice and shadow rules and no hero overlays, boss vigor estimates and the E5 vigor-floor flag, Stage 8 legibility rules, the 11 legacy look-alike pairs deferred with the report command, 8-stage wrap, art list A-E4-0 to A-E4-6, decisions E4-1 to E4-12) |
+| [e5-stages-9-10](architecture/plans/e5-stages-9-10.md) | E5 Stage 9 Dragon's Lair and Stage 10 Void Spire (checked against E4 as built; shimmer and rift ambients with two new particle kinds, scenery-only rules, the full-contract validator rewrite and its test blast radius, the late health-curve options (a) (b) (c) with fight-length arithmetic and the recommended tail growth, New Game+ and persistence with no migration, 10-stage hero-invariant looping, Necromancer-limited Stage 9 floor brightness, the 11 legacy look-alike pairs reworked first, no 64x48 boss, art list A-E5-0 to A-E5-6, decisions E5-1 to E5-14) |
 
 ### ADRs
 
@@ -36,10 +46,17 @@ Entries marked "planned" do not exist yet; the milestone in brackets is when the
 | [0001](architecture/adr/0001-bottom-panel-webview.md) | bottom-panel webview view |
 | [0002](architecture/adr/0002-no-hero-health.md) | heroes have no health; state follows agent events only |
 | [0003](architecture/adr/0003-procedural-sprites.md) | procedural palette-indexed sprites, synthesized audio |
-| [0004](architecture/adr/0004-esbuild-two-bundles.md) | esbuild, two bundles (host CJS, webview IIFE); implementation notes for M1 and M2 (`src/host/`) |
-| 0005 | reserved: transcript watching (M3) |
+| [0004](architecture/adr/0004-esbuild-two-bundles.md) | esbuild, two bundles (host CJS, webview IIFE); implementation notes for M1, M2 (`src/host/`), and M3 (monitor core and adapters) |
+| [0005](architecture/adr/0005-transcript-watching.md) | detect agents by polling Claude Code transcripts read-only (no hooks, no watchers, workspace scope by default) |
 | [0006](architecture/adr/0006-node-test-runner.md) | `node:test` compiled by esbuild, no runner package; amended: integration tests via `@vscode/test-electron` |
 | [0007](architecture/adr/0007-allow-list-protocol-pull-handshake.md) | allow-list protocol with exact-key validation and a pull handshake |
+| [0008](architecture/adr/0008-dom-free-engine-behind-ports.md) | the game engine is DOM-free and clock-free; canvas, frame loop, and visibility live in a thin webview host behind ports |
+| [0009](architecture/adr/0009-hero-lifecycle-isolation.md) | hero lifecycle separated from animation phase, one mutator fed by queued host events, quarantine instead of removal on faults |
+| [0010](architecture/adr/0010-split-room-stage-layout.md) | fixed 320x180 split room: static campfire alcove plus scrolling corridor on a 16 px tile grid |
+| [0011](architecture/adr/0011-summons-are-leased-cosmetic-entities.md) | summons are pooled cosmetic entities outside the roster, kept alive by an owner-renewed lease, never targets, with no hero reference |
+| [0012](architecture/adr/0012-host-owned-versioned-progress.md) | game progress is host-owned (`globalState`), numeric-only, versioned, migrated forward only, read-only on a newer version (E1) |
+| [0013](architecture/adr/0013-enemy-health-and-hero-reaction-board.md) | only enemies have health; combat reaches heroes only through numeric buffers and a cosmetic reaction board (E1) |
+| [0014](architecture/adr/0014-new-game-plus-is-the-ten-stage-loop.md) | New Game+ is the ten-stage loop with enemy-health scaling only, no schema change; the enemy table is validated against the full 50-enemy contract (E5; Accepted) |
 
 ## Engineering
 

@@ -1,7 +1,7 @@
 # ADR 0002: Heroes have no health; hero state follows agent events only
 
 Purpose: records why heroes are invulnerable and why only host agent-state events may change a hero's state, so the game can never misrepresent a real agent.
-Related: [architecture overview](../overview.md), [CLAUDE.md core invariants](../../../CLAUDE.md), [art style guide](../../design/art-style-guide.md#5-cosmetic-hit-reaction-visual-language), [game engine](../game-engine.md) (planned), [roadmap](../../engineering/roadmap.md).
+Related: [architecture overview](../overview.md), [CLAUDE.md core invariants](../../../CLAUDE.md), [art style guide](../../design/art-style-guide.md#5-cosmetic-hit-reaction-visual-language), [game engine](../game-engine.md), [ADR 0009 hero lifecycle isolation](0009-hero-lifecycle-isolation.md), [roadmap](../../engineering/roadmap.md).
 
 ## Status
 

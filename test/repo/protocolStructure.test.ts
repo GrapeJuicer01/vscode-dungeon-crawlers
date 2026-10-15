@@ -44,11 +44,33 @@ function typeDeclarations(source: string): string[] {
 }
 
 void describe('no controlling message types (note 6, invariant 3)', () => {
-  void it('the webview-to-host list is exactly ready and focusAgent', () => {
-    assert.deepEqual([...WEBVIEW_TO_HOST_TYPES], ['ready', 'focusAgent']);
+  void it('the webview-to-host list is exactly ready, focusAgent, and saveProgress', () => {
+    assert.deepEqual([...WEBVIEW_TO_HOST_TYPES], ['ready', 'focusAgent', 'saveProgress']);
   });
 
-  void it('protocol.ts declares exactly the five planned message types', () => {
+  void it('saveProgress carries only a progress value, and Progress holds numbers only', () => {
+    const progress = code('src/shared/progress.ts');
+    const body = blockAt(
+      progress,
+      progress.indexOf('{', progress.indexOf('export interface Progress')),
+    );
+    const fields = [...body.matchAll(/readonly\s+(\w+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2]]);
+    assert.equal(fields.length, 6);
+    for (const [name, type] of fields) {
+      assert.match(String(type), /^(number|typeof PROGRESS_SCHEMA_VERSION)$/, String(name));
+    }
+    const protocol = code(PROTOCOL);
+    const save = blockAt(
+      protocol,
+      protocol.indexOf('{', protocol.indexOf('export interface SaveProgressMessage')),
+    );
+    assert.deepEqual(
+      [...save.matchAll(/readonly\s+(\w+)\s*:/g)].map((m) => m[1]),
+      ['type', 'progress'],
+    );
+  });
+
+  void it('protocol.ts declares exactly the seven planned message types', () => {
     assert.deepEqual(
       declaredMessageTypes().sort(),
       [...HOST_TO_WEBVIEW_TYPES, ...WEBVIEW_TO_HOST_TYPES].sort(),
@@ -64,17 +86,50 @@ void describe('no controlling message types (note 6, invariant 3)', () => {
     assert.deepEqual(offenders, []);
   });
 
-  void it('no message field name is a controlling word either', () => {
-    const fields = typeDeclarations(code(PROTOCOL))
+  void it('no message field name is a controlling word either (matched as whole camelCase words)', () => {
+    // E1: the progress counters killsInStage, killsPerStage, and totalKills contain the letters
+    // "kill" but are nouns for game scores. The scan therefore compares whole camelCase words
+    // ("kills" is not "kill"); every other substring-only match must be a number-typed counter.
+    const protocol = typeDeclarations(code(PROTOCOL))
       .filter((body) => body.includes('readonly'))
       .flatMap((body) =>
-        [...body.matchAll(/readonly\s+(\w+)\s*:/g)].map((match) => match[1] ?? ''),
+        [...body.matchAll(/readonly\s+(\w+)\s*:\s*([^;]+);/g)].map((match): [string, string] => [
+          match[1] ?? '',
+          (match[2] ?? '').trim(),
+        ]),
       );
-    assert.ok(fields.includes('agentId'), 'the scan found the message fields');
-    const offenders = fields.filter((field) =>
-      BANNED_WORDS.some((word) => field.toLowerCase().includes(word)),
+    const progress = typeDeclarations(code('src/shared/progress.ts'))
+      .filter((body) => body.includes('readonly'))
+      .flatMap((body) =>
+        [...body.matchAll(/readonly\s+(\w+)\s*:\s*([^;]+);/g)].map((match): [string, string] => [
+          match[1] ?? '',
+          (match[2] ?? '').trim(),
+        ]),
+      );
+    const fields = [...protocol, ...progress];
+    assert.ok(
+      fields.some(([name]) => name === 'agentId'),
+      'the scan found the message fields',
+    );
+    const words = (name: string): string[] =>
+      name
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .toLowerCase()
+        .split(' ');
+    const offenders = fields.filter(([name]) =>
+      words(name).some((word) => BANNED_WORDS.includes(word)),
     );
     assert.deepEqual(offenders, []);
+    const substringOnly = fields.filter(
+      ([name]) =>
+        !words(name).some((word) => BANNED_WORDS.includes(word)) &&
+        BANNED_WORDS.some((word) => name.toLowerCase().includes(word)),
+    );
+    assert.deepEqual(
+      substringOnly.map(([name, type]) => `${name}:${type}`).sort(),
+      ['killsInStage:number', 'killsPerStage:number', 'totalKills:number'],
+      'the only substring matches are numeric score counters',
+    );
   });
 
   void it('src/host/** and src/extension.ts use no terminal-input, process, command, or file-write API', () => {
@@ -99,14 +154,19 @@ void describe('no controlling message types (note 6, invariant 3)', () => {
 });
 
 void describe('bundle boundaries for the new folders', () => {
-  void it('src/host/** imports nothing but src/shared/**', () => {
+  void it('src/host/** imports only src/shared/** and its own sibling files (no vscode, node:, monitor, game, or webview)', () => {
     const hostFiles = files.filter((file) => file.startsWith('src/host/'));
-    assert.ok(hostFiles.length > 0);
+    assert.ok(hostFiles.includes('src/host/progressStore.ts'));
+    assert.ok(hostFiles.includes('src/host/progressMigrations.ts'));
+    assert.ok(hostFiles.includes('src/host/gameConfig.ts'));
     for (const file of hostFiles) {
       for (const specifier of importSpecifiers(code(file))) {
         assert.ok(specifier.startsWith('.'), `${file} imports the package ${specifier}`);
         const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
-        assert.ok(resolved.startsWith('src/shared/'), `${file} imports ${specifier}`);
+        assert.ok(
+          resolved.startsWith('src/shared/') || /^src\/host\/\w+$/.test(resolved),
+          `${file} imports ${specifier}`,
+        );
       }
     }
   });
@@ -128,6 +188,8 @@ void describe('bundle boundaries for the new folders', () => {
       'src/webview/hostChannel.ts',
       'src/webview/hostMessages.ts',
       'src/webview/hostState.ts',
+      'src/webview/sceneFeed.ts',
+      'src/webview/gameHost.ts',
     ]) {
       assert.doesNotMatch(code(file), /\b(window|document|acquireVsCodeApi|globalThis)\b/, file);
     }
@@ -265,7 +327,15 @@ void describe('no test-only surface in production (security section 5)', () => {
     ].map((match) => match[1] ?? '');
     assert.deepEqual(
       publicMembers.sort(),
-      ['attach', 'detach', 'handleMessage', 'markHidden', 'postAgentState', 'state'].sort(),
+      [
+        'attach',
+        'detach',
+        'handleMessage',
+        'markHidden',
+        'postAgentState',
+        'postConfig',
+        'state',
+      ].sort(),
     );
   });
 });

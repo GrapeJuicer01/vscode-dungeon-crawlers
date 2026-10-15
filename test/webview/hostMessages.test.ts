@@ -4,6 +4,8 @@
 // mirror (invariant 2); a fresh mirror fed the same agentList equals the old one (invariant 4).
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { DEFAULT_PROGRESS } from '../../src/shared/progress';
+import type { Progress } from '../../src/shared/progress';
 import type { AgentInfo, ConfigSnapshot, WebviewToHostMessage } from '../../src/shared/protocol';
 import { createHostChannel } from '../../src/webview/hostChannel';
 import { handleHostMessage } from '../../src/webview/hostMessages';
@@ -21,6 +23,22 @@ function agent(id: string, overrides: Partial<AgentInfo> = {}): AgentInfo {
   };
 }
 
+/** A valid E1 config (protocol version 2 plus the three game settings). */
+const CONFIG: ConfigSnapshot = {
+  protocolVersion: 2,
+  enemiesEnabled: true,
+  killsPerStage: 30,
+  maxEnemies: 6,
+};
+const PROGRESS: Progress = {
+  schemaVersion: 1,
+  stageIndex: 2,
+  killsInStage: 4,
+  totalKills: 64,
+  bossesDefeated: 1,
+  cycle: 0,
+};
+
 function list(...agents: AgentInfo[]): unknown {
   return { type: 'agentList', agents };
 }
@@ -30,13 +48,19 @@ function push(value: AgentInfo): unknown {
 }
 
 function snapshot(mirror: HostStateMirror): unknown {
-  return { config: mirror.config, count: mirror.agentCount, agents: mirror.agents() };
+  return {
+    config: mirror.config,
+    progress: mirror.progress,
+    count: mirror.agentCount,
+    agents: mirror.agents(),
+  };
 }
 
 function seeded(): HostStateMirror {
   const mirror = new HostStateMirror();
-  assert.equal(handleHostMessage({ type: 'config', config: { protocolVersion: 1 } }, mirror), true);
+  assert.equal(handleHostMessage({ type: 'config', config: { ...CONFIG } }, mirror), true);
   assert.equal(handleHostMessage(list(agent('a'), agent('b', { state: 'idle' })), mirror), true);
+  assert.equal(handleHostMessage({ type: 'progress', progress: { ...PROGRESS } }, mirror), true);
   return mirror;
 }
 
@@ -66,8 +90,15 @@ const INVALID: [string, unknown][] = [
   ['agents not an array', { type: 'agentList', agents: {} }],
   ['65 agents', list(...Array.from({ length: 65 }, (_, i) => agent(`a${i}`)))],
   ['duplicate ids', list(agent('a'), agent('a'))],
-  ['config version 2', { type: 'config', config: { protocolVersion: 2 } }],
-  ['config with an extra key', { type: 'config', config: { protocolVersion: 1, x: 1 } }],
+  ['config version 1', { type: 'config', config: { ...CONFIG, protocolVersion: 1 } }],
+  ['config with only the old key', { type: 'config', config: { protocolVersion: 2 } }],
+  ['config with an extra key', { type: 'config', config: { ...CONFIG, x: 1 } }],
+  ['config with killsPerStage 4', { type: 'config', config: { ...CONFIG, killsPerStage: 4 } }],
+  ['a save message (wrong direction)', { type: 'saveProgress', progress: PROGRESS }],
+  ['progress with an extra key', { type: 'progress', progress: { ...PROGRESS, name: 'x' } }],
+  ['progress with stageIndex 0', { type: 'progress', progress: { ...PROGRESS, stageIndex: 0 } }],
+  ['progress with a float counter', { type: 'progress', progress: { ...PROGRESS, cycle: 1.5 } }],
+  ['progress missing a key', { type: 'progress', progress: { stageIndex: 1 } }],
   ['an inherited type', Object.create({ type: 'agentList', agents: [] }) as unknown],
 ];
 
@@ -81,11 +112,31 @@ void describe('handleHostMessage + HostStateMirror', () => {
 
   void it('config stores the snapshot', () => {
     const mirror = new HostStateMirror();
+    assert.equal(handleHostMessage({ type: 'config', config: { ...CONFIG } }, mirror), true);
+    assert.deepEqual(mirror.config, CONFIG);
+  });
+
+  void it('a fresh mirror has no progress, and a progress message stores a copy', () => {
+    const mirror = new HostStateMirror();
+    assert.equal(mirror.progress, null);
+    const raw = { type: 'progress', progress: { ...PROGRESS } };
+    assert.equal(handleHostMessage(raw, mirror), true);
+    assert.deepEqual(mirror.progress, PROGRESS);
+    raw.progress.totalKills = 999;
     assert.equal(
-      handleHostMessage({ type: 'config', config: { protocolVersion: 1 } }, mirror),
-      true,
+      (mirror.progress as Progress | null)?.totalKills,
+      64,
+      'the sender cannot change the mirror later',
     );
-    assert.deepEqual(mirror.config, { protocolVersion: 1 });
+  });
+
+  void it('progress does not touch the agent set or the config', () => {
+    const mirror = seeded();
+    const agentsBefore = mirror.agents();
+    handleHostMessage({ type: 'progress', progress: { ...DEFAULT_PROGRESS } }, mirror);
+    assert.deepEqual(mirror.agents(), agentsBefore);
+    assert.deepEqual(mirror.config, CONFIG);
+    assert.deepEqual(mirror.progress, DEFAULT_PROGRESS);
   });
 
   void it('agentList replaces the whole set (a previously present agent disappears)', () => {
@@ -176,13 +227,13 @@ void describe('handleHostMessage + HostStateMirror', () => {
       agent('c', { toolName: null }),
     );
     const old = new HostStateMirror();
-    handleHostMessage({ type: 'config', config: { protocolVersion: 1 } }, old);
+    handleHostMessage({ type: 'config', config: { ...CONFIG } }, old);
     handleHostMessage(list(agent('x')), old);
     handleHostMessage(push(agent('y')), old);
     handleHostMessage(snapshotMessage, old);
 
     const fresh = new HostStateMirror();
-    handleHostMessage({ type: 'config', config: { protocolVersion: 1 } }, fresh);
+    handleHostMessage({ type: 'config', config: { ...CONFIG } }, fresh);
     handleHostMessage(snapshotMessage, fresh);
     assert.deepEqual(snapshot(fresh), snapshot(old));
   });
@@ -194,6 +245,7 @@ void describe('handleHostMessage + HostStateMirror', () => {
       },
       applyAgent: () => undefined,
       applyConfig: (_config: ConfigSnapshot) => undefined,
+      applyProgress: (_progress: Progress) => undefined,
     };
     assert.throws(() => handleHostMessage(list(), target), /target failed/);
   });
@@ -204,12 +256,14 @@ void describe('handleHostMessage + HostStateMirror', () => {
       replaceAgents: () => calls.push('replaceAgents'),
       applyAgent: () => calls.push('applyAgent'),
       applyConfig: () => calls.push('applyConfig'),
+      applyProgress: () => calls.push('applyProgress'),
     };
-    handleHostMessage({ type: 'config', config: { protocolVersion: 1 } }, target);
+    handleHostMessage({ type: 'config', config: { ...CONFIG } }, target);
     handleHostMessage(list(agent('a')), target);
     handleHostMessage(push(agent('a')), target);
+    handleHostMessage({ type: 'progress', progress: { ...PROGRESS } }, target);
     handleHostMessage({ type: 'nope' }, target);
-    assert.deepEqual(calls, ['applyConfig', 'replaceAgents', 'applyAgent']);
+    assert.deepEqual(calls, ['applyConfig', 'replaceAgents', 'applyAgent', 'applyProgress']);
   });
 });
 
@@ -227,6 +281,13 @@ void describe('createHostChannel', () => {
     const message: WebviewToHostMessage = { type: 'focusAgent', agentId: 'sim-1' };
     channel.send(message);
     assert.deepEqual(posted, [{ type: 'focusAgent', agentId: 'sim-1' }]);
+  });
+
+  void it('sends saveProgress unchanged (the only other webview-to-host message)', () => {
+    const posted: unknown[] = [];
+    const channel = createHostChannel({ postMessage: (message) => posted.push(message) });
+    channel.send({ type: 'saveProgress', progress: PROGRESS });
+    assert.deepEqual(posted, [{ type: 'saveProgress', progress: PROGRESS }]);
   });
 
   void it('creating the channel posts nothing', () => {

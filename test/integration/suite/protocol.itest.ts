@@ -16,9 +16,24 @@ const FOCUS_COMMAND = `${VIEW_ID}.focus`;
 const RELOAD_WEBVIEWS = 'workbench.action.webview.reloadWebviewAction';
 /** How long to watch for unexpected extra traffic after an expected event. */
 const SETTLE_MS = 1_500;
+/** E1 (ADR 0012): config with the three game settings (protocol version 2), the list, then progress. */
 const EXPECTED_ANSWER = [
-  { type: 'config', config: { protocolVersion: 1 } },
+  {
+    type: 'config',
+    config: { protocolVersion: 2, enemiesEnabled: true, killsPerStage: 30, maxEnemies: 6 },
+  },
   { type: 'agentList', agents: [] },
+  {
+    type: 'progress',
+    progress: {
+      schemaVersion: 1,
+      stageIndex: 1,
+      killsInStage: 0,
+      totalKills: 0,
+      bossesDefeated: 0,
+      cycle: 0,
+    },
+  },
 ];
 
 function resolutions(): Resolution[] {
@@ -111,7 +126,7 @@ describe('protocol: ready handshake in the real webview (M2)', () => {
     assert.deepEqual(parseWebviewMessage(messages[0]), { type: 'ready' });
   });
 
-  it('every message received so far is a valid ready (no focusAgent in M2, nothing invalid)', () => {
+  it('every message received so far is a valid ready (the webview sends saveProgress only after a kill)', () => {
     for (const resolution of resolutions()) {
       for (const message of resolution.received) {
         assert.deepEqual(parseWebviewMessage(plain(message)), { type: 'ready' });
@@ -135,7 +150,7 @@ describe('protocol: ready handshake in the real webview (M2)', () => {
     }
   });
 
-  it('each ready is answered with exactly config then agentList (protocolVersion 1, agents [])', () => {
+  it('each ready is answered with exactly config, agentList, then progress (protocolVersion 2, agents [], default progress)', () => {
     for (const resolution of resolutions()) {
       if (!postRecorderOrSkip(resolution, 'ready answers')) {
         return;
@@ -149,7 +164,8 @@ describe('protocol: ready handshake in the real webview (M2)', () => {
         readies += 1;
         assert.equal(timeline[index + 1]?.kind, 'posted', `post after ready #${readies}`);
         assert.equal(timeline[index + 2]?.kind, 'posted', `second post after ready #${readies}`);
-        const answer = [timeline[index + 1], timeline[index + 2]].map((next) =>
+        assert.equal(timeline[index + 3]?.kind, 'posted', `third post after ready #${readies}`);
+        const answer = [timeline[index + 1], timeline[index + 2], timeline[index + 3]].map((next) =>
           plain(messageOf(next)),
         );
         assert.deepEqual(answer, EXPECTED_ANSWER, `answer to ready #${readies}`);
@@ -161,7 +177,7 @@ describe('protocol: ready handshake in the real webview (M2)', () => {
           );
         }
       }
-      assert.equal(postsOf(resolution).length, 2 * readies, 'nothing is posted except the answers');
+      assert.equal(postsOf(resolution).length, 3 * readies, 'nothing is posted except the answers');
     }
   });
 
@@ -190,7 +206,7 @@ describe('protocol: ready handshake in the real webview (M2)', () => {
     await delay(SETTLE_MS);
     assert.equal(readyCount(resolution), readiesBefore + 1, 'exactly one ready for the new load');
     if (postRecorderOrSkip(resolution, 'answer after show')) {
-      assert.equal(postsOf(resolution).length, postsBefore + 2);
+      assert.equal(postsOf(resolution).length, postsBefore + 3);
     }
   });
 

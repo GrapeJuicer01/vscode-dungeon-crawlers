@@ -10,6 +10,7 @@ import {
   HOST_TO_WEBVIEW_TYPES,
   WEBVIEW_TO_HOST_TYPES,
 } from '../../src/shared/protocol';
+import type { Progress } from '../../src/shared/progress';
 import type {
   AgentInfo,
   AgentInfoKeysComplete,
@@ -18,7 +19,9 @@ import type {
   FocusAgentMessage,
   HostToWebviewMessage,
   HostTypesComplete,
+  ProgressMessage,
   ReadyMessage,
+  SaveProgressMessage,
   WebviewToHostMessage,
   WebviewTypesComplete,
 } from '../../src/shared/protocol';
@@ -30,10 +33,13 @@ const proofs: [HostTypesComplete, WebviewTypesComplete, AgentInfoKeysComplete] =
 
 // Independent restatements of the plan, so a change in protocol.ts that also edits the proofs
 // still fails here.
-const webviewTypesArePlanned: Exact<WebviewToHostMessage['type'], 'ready' | 'focusAgent'> = true;
+const webviewTypesArePlanned: Exact<
+  WebviewToHostMessage['type'],
+  'ready' | 'focusAgent' | 'saveProgress'
+> = true;
 const hostTypesArePlanned: Exact<
   HostToWebviewMessage['type'],
-  'config' | 'agentList' | 'agentState'
+  'config' | 'agentList' | 'agentState' | 'progress'
 > = true;
 const statesArePlanned: Exact<AgentState, 'spawned' | 'working' | 'idle' | 'despawned'> = true;
 const agentKeysArePlanned: Exact<
@@ -42,7 +48,19 @@ const agentKeysArePlanned: Exact<
 > = true;
 const readyHasOnlyType: Exact<keyof ReadyMessage, 'type'> = true;
 const focusHasOnlyTypeAndId: Exact<keyof FocusAgentMessage, 'type' | 'agentId'> = true;
-const configHasOnlyVersion: Exact<keyof ConfigSnapshot, 'protocolVersion'> = true;
+const configHasExactlyFourKeys: Exact<
+  keyof ConfigSnapshot,
+  'protocolVersion' | 'enemiesEnabled' | 'killsPerStage' | 'maxEnemies'
+> = true;
+const saveProgressHasOnlyTypeAndProgress: Exact<keyof SaveProgressMessage, 'type' | 'progress'> =
+  true;
+const progressMessageHasOnlyTypeAndProgress: Exact<keyof ProgressMessage, 'type' | 'progress'> =
+  true;
+// The progress value is numbers only: no string-typed field can carry agent or transcript data.
+const progressIsNumbersOnly: Exact<
+  { [K in keyof Progress]: Progress[K] extends number ? true : false }[keyof Progress],
+  true
+> = true;
 // No optional properties: Required<T> is identical to T.
 const agentInfoHasNoOptional: Exact<Required<AgentInfo>, AgentInfo> = true;
 const focusHasNoOptional: Exact<Required<FocusAgentMessage>, FocusAgentMessage> = true;
@@ -56,6 +74,8 @@ function describeHostType(type: HostToWebviewMessage['type']): string {
       return 'agentList';
     case 'agentState':
       return 'agentState';
+    case 'progress':
+      return 'progress';
     default:
       return assertNever(type);
   }
@@ -67,6 +87,8 @@ function describeWebviewType(type: WebviewToHostMessage['type']): string {
       return 'ready';
     case 'focusAgent':
       return 'focusAgent';
+    case 'saveProgress':
+      return 'saveProgress';
     default:
       return assertNever(type);
   }
@@ -93,6 +115,8 @@ function describeWebviewMessage(message: WebviewToHostMessage): string {
       return 'ready';
     case 'focusAgent':
       return `focus ${message.agentId}`;
+    case 'saveProgress':
+      return `save ${message.progress.totalKills}`;
     default:
       return assertNever(message);
   }
@@ -126,6 +150,29 @@ const agentWithText: AgentInfo = {
   // @ts-expect-error: AgentInfo has no transcript text field (invariant 7).
   text: 'x',
 };
+const saveWithAgent: WebviewToHostMessage = {
+  type: 'saveProgress',
+  progress: {
+    schemaVersion: 1,
+    stageIndex: 1,
+    killsInStage: 0,
+    totalKills: 0,
+    bossesDefeated: 0,
+    cycle: 0,
+  },
+  // @ts-expect-error: saveProgress names no agent, terminal, or command (invariant 3).
+  agentId: 'a',
+};
+const progressWithText: Progress = {
+  schemaVersion: 1,
+  stageIndex: 1,
+  killsInStage: 0,
+  totalKills: 0,
+  bossesDefeated: 0,
+  cycle: 0,
+  // @ts-expect-error: Progress has no string field, so no agent or transcript data can be stored.
+  agentName: 'x',
+};
 // @ts-expect-error: toolName is never optional; absence is null.
 const agentWithoutTool: AgentInfo = { id: 'a', name: 'A', state: 'idle', timestamp: 0 };
 // @ts-expect-error: dead is not an agent state (invariant 1).
@@ -142,7 +189,10 @@ void describe('protocol types (compile-time proofs, note 1)', () => {
         agentKeysArePlanned,
         readyHasOnlyType,
         focusHasOnlyTypeAndId,
-        configHasOnlyVersion,
+        configHasExactlyFourKeys,
+        saveProgressHasOnlyTypeAndProgress,
+        progressMessageHasOnlyTypeAndProgress,
+        progressIsNumbersOnly,
         agentInfoHasNoOptional,
         focusHasNoOptional,
         toolNameIsNullable,
@@ -155,6 +205,20 @@ void describe('protocol types (compile-time proofs, note 1)', () => {
     assert.deepEqual(WEBVIEW_TO_HOST_TYPES.map(describeWebviewType), [...WEBVIEW_TO_HOST_TYPES]);
     assert.deepEqual(AGENT_STATES.map(describeState), [...AGENT_STATES]);
     assert.equal(describeWebviewMessage({ type: 'focusAgent', agentId: 'sim-1' }), 'focus sim-1');
+    assert.equal(
+      describeWebviewMessage({
+        type: 'saveProgress',
+        progress: {
+          schemaVersion: 1,
+          stageIndex: 1,
+          killsInStage: 0,
+          totalKills: 9,
+          bossesDefeated: 0,
+          cycle: 0,
+        },
+      }),
+      'save 9',
+    );
   });
 
   void it('an unexpected runtime variant reaches assertNever and throws', () => {
@@ -168,8 +232,17 @@ void describe('protocol types (compile-time proofs, note 1)', () => {
   void it('the inexpressible messages above are still only values at runtime (kept for typecheck)', () => {
     // Referencing them keeps noUnusedLocals satisfied; their value is the @ts-expect-error.
     assert.equal(
-      [stop, focusWithCommand, agentWithHp, agentWithText, agentWithoutTool, deadState].length,
-      6,
+      [
+        stop,
+        focusWithCommand,
+        saveWithAgent,
+        progressWithText,
+        agentWithHp,
+        agentWithText,
+        agentWithoutTool,
+        deadState,
+      ].length,
+      8,
     );
   });
 });

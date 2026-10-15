@@ -27,7 +27,9 @@ type MutableArt = Omit<ArtSet, 'skinTones' | 'hairColors' | 'particlePalette'> &
     | 'wisp'
     | 'firefly'
     | 'snow'
-    | 'murk',
+    | 'murk'
+    | 'shimmer'
+    | 'rift',
     string[]
   >;
 };

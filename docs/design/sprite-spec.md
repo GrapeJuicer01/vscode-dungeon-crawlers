@@ -233,3 +233,29 @@ Notes:
 - Enemy frames come from `enemyBuilder.ts` primitives plus `enemyFrames.ts` helpers or from a builder pose parameter (the bosses). The base idle frame's silhouette was tuned with the look-alike tool; do not change an idle frame 0 outline without re-running `node test/support/lookAlikesReport.mjs <file.ts>:<Export>:<stage>[:<id>]`.
 - Three enemies are drawn off their frame center on purpose so the anchor-relative silhouette clears older enemies: `rime-penguin` two pixels left, `frost-hare` one pixel right, `lantern-wraith` about two pixels left. The anchor stays at the foot center. `lantern-wraith`, `shard-cluster` and the `eclipse-warden` boss are `float` enemies: the sprites are drawn complete and the engine adds the hover as a cosmetic draw offset (the warden's tendril tips reach row 46, next to the foot row 47).
 - The preview tool knows both new ids (`SPRITE_ENTRY=<file.ts> node tools/sprite-preview.mjs enemies shadow-realm out.png`, and `stage` mode); until the barrels are wired use a small entry file that re-exports the wired tables plus the new ones.
+
+## 14. Batch E5 art (Stages 9 and 10)
+
+Delivered in steps A-E5-1 to A-E5-6 ([E5 plan section 11](../architecture/plans/e5-stages-9-10.md#11-art-needs-batch-e5)). Atomic wiring as in E2 to E4: the new files exist on their own until the final step edits the barrels (`enemyTemplates.ts`, `spriteTemplates.ts`).
+
+| Export | File | Content |
+|---|---|---|
+| `STAGE_PALETTES['dragons-lair']`, `['void-spire']` | `palettesE1.ts` | overrides of `1`-`8`, `g`, `T` only |
+| `STAGE_TILE_CHARS`, `STAGE_CLEAR_CHAR`, `STAGE_AMBIENT_CHAR` entries for both ids | `palettes.ts` | `12345678`, `n`, `g` |
+| `PARTICLE_PALETTE.shimmer`, `.rift` | `palettes.ts` | `['C', 'V', 'W']` and `['g', 'G', 'Q', 'G', 'g']`; the type is widened to twelve kinds; master characters only |
+| `DRAGONS_LAIR` | `stage9Templates.ts` | `StageSprites`; props `scorchedPillar drakeSkull hoardBrazier(4) goldVein(2) scaleBanner hoardPile goldScatter doorFrame`, ids `dragons-lair/<name>` |
+| `VOID_SPIRE` | `stage10Templates.ts` | `StageSprites`; props `spirePillar voidRift(4) starWindow orbitRing(2) riftPedestal crackedSlab doorFrame`, ids `void-spire/<name>` |
+| `ENEMIES_STAGE9` | `enemiesStage9.ts` | `drake-whelp kobold-sapper gilded-crown ash-wyvern` |
+| `ENEMIES_STAGE10` | `enemiesStage10.ts` | `crescent-drifter comet-tadpole eye-strider obelisk-sentinel` |
+| `HOARD_DRAGON` | `hoardDragonTemplate.ts` | boss template (11 frames); also exports the builder `dragonFrame` |
+| `VOID_SOVEREIGN` | `voidSovereignTemplate.ts` | boss template (11 frames); also exports the builder `sovereignFrame` |
+| `BOSS_PHASE_PALETTES_E5` | `palettesE5.ts` | phase 2 palettes for `hoard-dragon` (`R D a Y`) and `void-sovereign` (`8 6 7 5`); four overrides each, `#rrggbb`, master characters |
+
+Notes:
+
+- Stage props follow the rules of Stages 1 to 8 (characters `1`-`8` only, at most 12 colors, `idle` only). Light props: `hoardBrazier` 4 frames, `goldVein` 2, `voidRift` 4, `orbitRing` 2; the developer adds them to `FLAME_PROPS` (`hoardBrazier: 4`, `goldVein: 2`, `voidRift: 4`, `orbitRing: 2`) with the required-prop lists, and their lights use `flicker: false` (suggested: `hoardBrazier` radius 52 intensity 0.8, `goldVein` 40 / 0.5, `voidRift` 48 / 0.7, `orbitRing` 40 / 0.5, all `colorChar` `T`). Solid alcove props are `hoardPile` and `riftPedestal` (foot anchor `(8, 14)`, foot y 134, 12x5 footprint). The floor-layer props are exactly `hoardPile goldScatter riftPedestal crackedSlab`. `starWindow` is static. No prop is named `torch`, `lantern`, or `puddle`, so every animated prop loops at `PROP_FRAME_MS` (500 ms).
+- Pixel change between consecutive idle frames (limit: the largest shipped enemy idle pair, `ooze-queen` 466): minions and elites 20 to 102, `hoard-dragon` 258, `void-sovereign` 196. `telegraph` differs from `attack` for both bosses (817 and 641 pixels).
+- Colors per sprite: 6 to 11 for enemies (the dragon uses 11 of 12), 8 for the sovereign. Heroes and enemies never share a template; nothing is drawn on a hero.
+- Enemy frames come from `enemyBuilder.ts` primitives plus `enemyFrames.ts` helpers or a builder pose parameter (`dragonFrame`, `sovereignFrame`). `gilded-crown`, `crescent-drifter`, `obelisk-sentinel`, and `void-sovereign` are `float` enemies: the sprites are drawn complete and the engine adds the hover as a cosmetic draw offset; the Void Sovereign's point ends at row 46.
+- The preview tool knows both ids (`SPRITE_ENTRY=<file.ts> node tools/sprite-preview.mjs enemies void-spire out.png`, and `stage` mode); after wiring no entry file is needed.
+- Look-alike and legibility commands: `node test/support/lookAlikesReport.mjs src/game/sprites/enemiesStage9.ts:ENEMIES_STAGE9:9 ...` and `node test/support/legibilityReport.mjs <file.ts>:<PaletteExport>:<FloorBackExport>:<FloorFrontExport>:<9|10>`.

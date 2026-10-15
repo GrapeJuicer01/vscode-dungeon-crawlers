@@ -286,8 +286,8 @@ void describe('the Stage 6 tint rule (E3 plan 5.1 rule 4)', () => {
 });
 
 void describe('the ten new enemies', () => {
-  void it('one template per enemy row (forty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
-    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 40);
+  void it('one template per enemy row (fifty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
+    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 50);
     assert.deepEqual(validateEnemyArt(SHIPPED_ART), []);
     const size = { minion: 16, elite: 24, boss: 48 } as const;
     for (const id of E3_ENEMIES) {

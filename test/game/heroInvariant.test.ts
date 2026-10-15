@@ -272,7 +272,9 @@ void describe('non-lifecycle stimuli never change a hero or remove one', () => {
         return ok;
       },
     );
-    const rig = gameRigWithStages([crowded]);
+    // The enemy validator enforces the full ten-stage contract (ADR 0014): swap the crowded stage into the
+    // real table rather than shortening it, so the boot report stays empty and the shipped enemies run.
+    const rig = gameRigWithStages(STAGES.map((s, i) => (i === 0 ? crowded : s)));
     for (const a of list(8)) feed(rig, a);
     steps(rig, 30_000, 100);
     const before = snap(rig);
@@ -300,8 +302,7 @@ function gameRigWithStages(stages: readonly StageDef[]): GameRig {
       },
       seed: ENGINE_SEED,
       agentSource: () => rig.mirror,
-      // A one-stage test table needs the matching one-stage enemy rows (the validator is exact).
-      enemies: ENEMIES.filter((row) => row.stage === 1),
+      enemies: ENEMIES,
     }),
   });
 }

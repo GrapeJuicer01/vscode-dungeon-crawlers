@@ -146,6 +146,8 @@ export class Renderer {
       firefly: css(art.particlePalette.firefly),
       snow: css(art.particlePalette.snow),
       murk: css(art.particlePalette.murk),
+      shimmer: css(art.particlePalette.shimmer),
+      rift: css(art.particlePalette.rift),
     };
     this.#white = art.palette['w'] ?? '#ffffff';
   }

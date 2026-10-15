@@ -260,11 +260,14 @@ export const TOMB_SCARAB: SpriteTemplate = enemyTemplate('tomb-scarab', W, W, AN
 });
 
 // ---------------------------------------------------------------- Crypt Mummy (elite 24x24)
-// A bandaged shuffler leaning forward: glowing eyes in a dark gap, bands across the body, two
-// arms reaching forward at chest height (no raised fists), one loose wrap trailing behind.
+// A bandaged shuffler standing right of centre: glowing eyes in a dark gap, bands across the body,
+// two long arms reaching forward to the left edge at chest height (no raised fists), one loose wrap
+// trailing behind on the right (reworked in A-E5-0 to clear rock-golem).
 // Colors: 1 7 5 2 e Y 8 = 7.
 
 const MW = 24;
+/** Columns the body is moved right of the 24x24 centre (arms stretch back to the left edge). */
+const MUMMY_SHIFT = 3;
 
 interface MummyPose {
   readonly bob?: number;
@@ -290,7 +293,8 @@ function wrapBands(d: ReturnType<typeof draft>): void {
 function mummyFrame(p: MummyPose): string[] {
   const d = draft(MW, MW);
   const bob = p.bob ?? 0;
-  const lean = p.lean ?? 0;
+  // the whole body stands right of centre; the long arms and the foot reach left, the wrap trails
+  const lean = (p.lean ?? 0) + MUMMY_SHIFT;
   // legs (wrapped) with long feet pointing forward
   const lx = p.legs === 0 ? [8, 13] : p.legs === 1 ? [6, 14] : [9, 11];
   for (const x of lx) {
@@ -308,13 +312,13 @@ function mummyFrame(p: MummyPose): string[] {
     if (d.g.get(x, 6 + bob) === 'x') d.g.set(x, 6 + bob, '2');
   // arms reach forward at chest height
   if (p.arms === 'out') {
-    body(d, 0 + lean, 10 + bob, 8, 3);
-    body(d, 3 + lean, 13 + bob, 5, 2);
+    body(d, 0, 10 + bob, 8 + lean, 3);
+    body(d, 2, 13 + bob, 6 + lean, 2);
   } else if (p.arms === 'back') {
-    body(d, 3 + lean, 11 + bob, 5, 3);
+    body(d, 4, 11 + bob, 4 + lean, 3);
   } else {
-    body(d, 0, 12 + bob, 9, 3);
-    body(d, 2, 15 + bob, 6, 2);
+    body(d, 0, 12 + bob, 9 + lean, 3);
+    body(d, 2, 15 + bob, 6 + lean, 2);
   }
   wrapBands(d);
   dots(d, [
@@ -340,16 +344,16 @@ function mummyFrame(p: MummyPose): string[] {
       ? [
           [16 + lean, 11 + bob],
           [18 + lean, 13 + bob],
-          [20 + lean, 14 + bob],
-          [21 + lean, 17 + bob],
-          [20 + lean, 20 + bob],
+          [19 + lean, 15 + bob],
+          [19 + lean, 18 + bob],
+          [18 + lean, 20 + bob],
         ]
       : [
           [16 + lean, 11 + bob],
-          [19 + lean, 12 + bob],
-          [21 + lean, 15 + bob],
-          [20 + lean, 18 + bob],
-          [21 + lean, 21 + bob],
+          [18 + lean, 12 + bob],
+          [19 + lean, 15 + bob],
+          [18 + lean, 18 + bob],
+          [19 + lean, 21 + bob],
         ];
   looseLine(g, wr, '7');
   looseLine(

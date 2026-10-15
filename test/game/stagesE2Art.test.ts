@@ -43,8 +43,8 @@ const row = (id: string): EnemyRow => {
 };
 
 void describe('the shipped Stage 3 and Stage 4 environments', () => {
-  void it('validateStages(STAGES, SHIPPED_ART) and validateArtSet(SHIPPED_ART) are empty with eight stages (E4)', () => {
-    assert.equal(STAGES.length, 8);
+  void it('validateStages(STAGES, SHIPPED_ART) and validateArtSet(SHIPPED_ART) are empty with ten stages (E5)', () => {
+    assert.equal(STAGES.length, 10);
     assert.deepEqual(validateStages(STAGES, SHIPPED_ART), []);
     assert.deepEqual(validateArtSet(SHIPPED_ART), []);
     assert.deepEqual(Object.keys(SHIPPED_ART.stageSprites).sort(), STAGES.map((s) => s.id).sort());
@@ -128,8 +128,8 @@ void describe('the shipped Stage 3 and Stage 4 environments', () => {
 });
 
 void describe('the ten new enemies', () => {
-  void it('there is one template per enemy row (forty), at the documented tier sizes and animation sets', () => {
-    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 40);
+  void it('there is one template per enemy row (fifty), at the documented tier sizes and animation sets', () => {
+    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 50);
     assert.deepEqual(validateEnemyArt(SHIPPED_ART), []);
     const size = { minion: 16, elite: 24, boss: 48 } as const;
     for (const id of NEW_ENEMIES) {
@@ -255,17 +255,19 @@ void describe('rasterization over the stage palette (drift 13.6, extended to Sta
     }
   });
 
-  void it('ENEMY_PHASE_PALETTES keys are exactly the eight boss ids, one phase each, at most four master characters', () => {
+  void it('ENEMY_PHASE_PALETTES keys are exactly the ten boss ids, one phase each, at most four master characters', () => {
     const bosses = ENEMIES.filter((r) => r.tier === 'boss').map((r) => r.id);
     assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), [
       'eclipse-warden',
       'elder-dryad',
       'glacier-mammoth',
       'goblin-foreman',
+      'hoard-dragon',
       'molten-colossus',
       'ooze-queen',
       'rat-king',
       'tomb-lich',
+      'void-sovereign',
     ]);
     assert.deepEqual(Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(), bosses.sort());
     for (const list of Object.values(SHIPPED_ART.enemyPhasePalettes)) {

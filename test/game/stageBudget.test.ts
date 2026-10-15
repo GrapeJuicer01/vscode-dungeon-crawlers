@@ -1,6 +1,6 @@
 // E2 plan test notes 5 and 9: the E1 draw ceilings (200 bitmap draws, 520 fills) and the node CPU
 // benchmark, run once per stage. The engineered worst case fills every pool at once in that
-// stage's world with that stage's enemies and all ten particle kinds; the real-game runs use
+// stage's world with that stage's enemies and all twelve particle kinds; the real-game runs use
 // hard combat from the stage's stored progress. Real numbers are printed as diagnostics.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -43,6 +43,8 @@ const KINDS: ParticleKind[] = [
   'firefly',
   'snow',
   'murk',
+  'shimmer',
+  'rift',
 ];
 
 function worstFrame(stage: number): { bitmaps: number; fills: number } {

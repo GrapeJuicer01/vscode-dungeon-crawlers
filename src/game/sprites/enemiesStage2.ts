@@ -4,7 +4,8 @@
 // attack 3; no hit or death art (engine flash and dissolve). Characters: the stage's `1` outline and
 // `2 3 4 5 6 7 8` (recolored by STAGE_PALETTES['goblin-mine-shafts']) plus master accents; at most
 // 12 colors per sprite. Silhouettes: miner upright with a pickaxe and long ears; scout leaning and
-// stretched with trailing ears; beetle a low wide dome; golem a compact blocky stack of rocks.
+// stretched with trailing ears (a crouch with a long diagonal spear, reworked in A-E5-0); beetle a
+// low shell with a tall crystal comb; golem a compact blocky stack of rocks.
 
 import {
   dots,
@@ -141,17 +142,25 @@ export const GOBLIN_MINER: SpriteTemplate = enemyTemplate('goblin-miner', W, W, 
 });
 
 // ---------------------------------------------------------------- Goblin Scout (16x16)
-// Lean goblin sprinting forward: head and chest low, long ears streaming back, leather vest.
-// Colors: 1 N L 4 3 e w m k = 9.
+// Crouching goblin with a long diagonal spear crossing the corners, long ears streaming back,
+// leather vest. Colors: 1 N L 4 3 e w m k = 9.
 
 function scoutFrame(
   stride: 0 | 1 | 2,
-  opts: { dx?: number; open?: boolean; knife?: boolean; bob?: number } = {},
+  opts: { dx?: number; open?: boolean; thrust?: boolean; bob?: number } = {},
 ): string[] {
   const d = draft(W, W);
-  const dx = opts.dx ?? 0;
-  const bob = opts.bob ?? 0;
-  // long ears streaming back
+  const dx = (opts.dx ?? 0) + 2;
+  const bob = (opts.bob ?? 0) + 1;
+  // long spear behind the body: a brown shaft from the lower right to a steel tip in the top left
+  const tip: Pt = opts.thrust ? [0, 8] : [1, 2];
+  const butt: Pt = opts.thrust ? [14, 13] : [14, 15];
+  stroke(d, [tip, butt], 'k', 1);
+  dots(d, [
+    [tip[0], tip[1], 'm'],
+    [tip[0] + 1, tip[1] + (opts.thrust ? 0 : 1), 'm'],
+  ]);
+  // ears streaming back
   stroke(
     d,
     [
@@ -162,21 +171,8 @@ function scoutFrame(
     'N',
     1,
   );
-  stroke(
-    d,
-    [
-      [8 + dx, 7 + bob],
-      [12 + dx, 6 + bob],
-      [14, 6 + bob],
-    ],
-    'N',
-    1,
-  );
-  dots(d, [
-    [14, 3 + bob, 'L'],
-    [14, 6 + bob, 'L'],
-  ]);
-  // leaning torso (vest), head forward
+  dots(d, [[14, 3 + bob, 'L']]);
+  // hunched torso (vest), head forward
   put(d, ['..4444...', '.433333..', '.3333333.'], 4 + dx, 9 + bob);
   put(d, ['.NNNNN', 'NLNNNN', 'NNNNNN', '.NNNN.'], 2 + dx, 5 + bob);
   dots(d, [
@@ -191,50 +187,41 @@ function scoutFrame(
       [2 + dx, 9 + bob, 'e'],
       [3 + dx, 9 + bob, 'e'],
     ]);
-  // legs: long stride (two poses) with boots
-  const legsets: Pt[][] = [
-    [
-      [6, 12],
-      [5, 13],
-      [3, 14],
-    ],
-    [
-      [8, 12],
-      [9, 13],
-      [11, 14],
-    ],
-  ];
+  // bent legs in a crouch (two poses) with boots
   const legsB: Pt[][] = [
     [
-      [6, 12],
       [6, 13],
       [6, 14],
     ],
     [
-      [8, 12],
       [8, 13],
       [9, 14],
     ],
   ];
-  const useSet =
-    stride === 0
-      ? legsB
-      : stride === 1
-        ? legsets
-        : [
-            [
-              [6, 12],
-              [4, 13],
-              [2, 14],
-            ] as Pt[],
-            [
-              [8, 12],
-              [10, 13],
-              [12, 14],
-            ] as Pt[],
-          ];
-  for (const leg of useSet) stroke(d, leg, 'N', 1);
-  for (const leg of useSet) {
+  const legsA: Pt[][] = [
+    [
+      [6, 13],
+      [4, 14],
+    ],
+    [
+      [8, 13],
+      [10, 14],
+    ],
+  ];
+  const legsC: Pt[][] = [
+    [
+      [6, 13],
+      [3, 14],
+    ],
+    [
+      [8, 13],
+      [11, 14],
+    ],
+  ];
+  const useSet = stride === 0 ? legsB : stride === 1 ? legsA : legsC;
+  const legs = useSet.map((leg) => leg.map((p): Pt => [p[0] + 2, p[1]]));
+  for (const leg of legs) stroke(d, leg, 'N', 1);
+  for (const leg of legs) {
     const foot = leg[leg.length - 1];
     if (foot)
       dots(d, [
@@ -242,28 +229,16 @@ function scoutFrame(
         [foot[0] - 1, foot[1], 'k'],
       ]);
   }
-  // arm and optional knife
+  // arm gripping the shaft
   stroke(
     d,
     [
       [8 + dx, 10 + bob],
-      [11, 11 + bob],
+      [13, 11 + bob],
     ],
     'N',
     1,
   );
-  if (opts.knife) {
-    stroke(
-      d,
-      [
-        [2, 11],
-        [5, 11],
-      ],
-      'm',
-      1,
-    );
-    dots(d, [[5, 11, 'N']]);
-  }
   return finish(d);
 }
 
@@ -272,14 +247,15 @@ export const GOBLIN_SCOUT: SpriteTemplate = enemyTemplate('goblin-scout', W, W, 
   walk: [scoutFrame(1), scoutFrame(2, { bob: 1 })],
   attack: [
     scoutFrame(0, { dx: 1, bob: 1 }),
-    scoutFrame(2, { open: true, knife: true }),
+    scoutFrame(2, { open: true, thrust: true }),
     scoutFrame(1, { open: true }),
   ],
 });
 
 // ---------------------------------------------------------------- Ore Beetle (16x16)
-// Round indigo shell crusted with teal ore crystals, big eyes, small mandibles, six stubby legs.
-// Low and wide. Colors: 1 b d 8 7 Y e k P = 9.
+// Low, long indigo shell with big eyes, two curved horns, small mandibles, and short legs, carrying
+// a tall comb of teal ore crystals on its back (reworked in A-E5-0 so the crystals fill the empty
+// top centre). Colors: 1 b d 8 7 w Y e k P 2 = 11.
 
 function beetleFrame(
   leg: 0 | 1,
@@ -288,52 +264,62 @@ function beetleFrame(
   const d = draft(W, W);
   const dx = opts.dx ?? 0;
   const bob = opts.bob ?? 0;
-  // shell dome, shade, highlight
-  ellipse(d, 8 + dx, 9 + bob, 6, 4, 'b');
+  // low, long shell hugging the ground; ore crystals stand up off the back like a jagged comb
+  ellipse(d, 9 + dx, 11 + bob, 6, 1, 'b');
   d.g.rect(0, 13, W, 3, '.');
-  put(d, ['dddd', 'dd'], 6 + dx, 5 + bob);
-  put(d, ['bbbbbbbbbb'], 3 + dx, 12);
-  // head with eyes and mandibles
-  put(d, ['.bbb', 'bbbb', 'bbbb'], 1 + dx, 8 + bob);
+  put(d, ['ddddd'], 5 + dx, 10 + bob);
+  put(d, ['bbbbbbbbbbbb'], 3 + dx, 12);
+  const spike = (x: number, top: number, lit: string): void => {
+    for (let y = top; y <= 10; y++) dots(d, [[x + dx, y + bob, y === top ? lit : '8']]);
+  };
+  spike(10, 0, opts.glint ? 'w' : '7');
+  spike(12, 2, '7');
+  // head with eyes, two curved horns, and mandibles
+  put(d, ['.bbb', 'bbbb', 'bbbb', 'bbbb'], 1 + dx, 9 + bob);
   dots(d, [
-    [2 + dx, 9 + bob, 'e'],
-    [3 + dx, 9 + bob, 'Y'],
-    [2 + dx, 10 + bob, 'Y'],
+    [2 + dx, 10 + bob, 'e'],
     [3 + dx, 10 + bob, 'Y'],
+    [2 + dx, 11 + bob, 'Y'],
+    [3 + dx, 11 + bob, 'Y'],
   ]);
   dots(d, [
-    [1 + dx, 11 + bob, 'k'],
-    [2 + dx, opts.open ? 12 + bob : 11 + bob, 'k'],
-  ]);
-  // shell split line and ore crystals
-  for (let y = 5; y <= 11; y++) dots(d, [[9 + dx, y + bob, '2']]);
-  dots(d, [
-    [11 + dx, 6 + bob, '8'],
-    [11 + dx, 7 + bob, '8'],
-    [12 + dx, 7 + bob, '8'],
-    [12 + dx, 8 + bob, '8'],
-    [6 + dx, 7 + bob, '8'],
-    [6 + dx, 8 + bob, '8'],
-    [5 + dx, 8 + bob, '8'],
+    [2 + dx, 8 + bob, 'k'],
+    [1 + dx, 7 + bob, 'k'],
+    [1 + dx, 6 + bob, 'k'],
+    [1 + dx, 5 + bob, 'k'],
+    [2 + dx, 4 + bob, 'k'],
+    [4 + dx, 8 + bob, 'k'],
+    [5 + dx, 7 + bob, 'k'],
   ]);
   dots(d, [
-    [11 + dx, 5 + bob, opts.glint ? 'w' : '7'],
-    [6 + dx, 6 + bob, opts.glint ? '7' : '8'],
+    [1 + dx, 12 + bob, 'k'],
+    [2 + dx, opts.open ? 13 + bob : 12 + bob, 'k'],
+  ]);
+  // ore patches in the shell
+  dots(d, [
+    [12 + dx, 10 + bob, '8'],
+    [13 + dx, 10 + bob, '8'],
+    [13 + dx, 11 + bob, '8'],
+    [9 + dx, 11 + bob, '2'],
+    [9 + dx, 12 + bob, '2'],
+    [8 + dx, 11 + bob, '8'],
   ]);
   const out = finish(d);
-  // six loose legs below the shell
+  // six loose legs below the shell, splayed outward
   const g = draft(W, W);
   g.g.blit(out, 0, 0);
-  const xs = leg === 0 ? [4, 8, 12] : [5, 9, 11];
-  for (const x of xs)
+  const xs = leg === 0 ? [4, 7, 10, 12] : [5, 7, 11, 12];
+  for (const x of xs) {
+    const sp = x < 8 ? -1 : x === 11 ? 1 : 0;
     looseLine(
       g,
       [
-        [x + dx, 13],
-        [x + dx + (x < 8 ? -1 : 1), 15],
+        [x + dx, 14],
+        [x + dx + sp, 15],
       ],
       'P',
     );
+  }
   g.g.plot(g.loose);
   return g.g.rows();
 }

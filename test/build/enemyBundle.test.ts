@@ -50,6 +50,8 @@ void describe('enemy code in the bundles (E1)', () => {
       'molten-core',
       'frozen-citadel',
       'shadow-realm',
+      'dragons-lair',
+      'void-spire',
     ]) {
       assert.ok(webview.includes(id), id);
     }
@@ -64,6 +66,8 @@ void describe('enemy code in the bundles (E1)', () => {
         'molten-core',
         'frozen-citadel',
         'shadow-realm',
+        'dragons-lair',
+        'void-spire',
       ],
     );
   });
@@ -91,6 +95,33 @@ void describe('enemy code in the bundles (E1)', () => {
     }
   });
 
+  void it('E5: all ten new enemy ids and names, and the two stage ids, are in the webview bundle and absent from the host bundle', () => {
+    const ids = [
+      'drake-whelp',
+      'kobold-sapper',
+      'gilded-crown',
+      'ash-wyvern',
+      'hoard-dragon',
+      'crescent-drifter',
+      'comet-tadpole',
+      'eye-strider',
+      'obelisk-sentinel',
+      'void-sovereign',
+    ];
+    assert.equal(ENEMIES.length, 50);
+    for (const id of ids) {
+      const found = ENEMIES.find((r) => r.id === id);
+      assert.ok(found, id);
+      assert.ok(webview.includes(`"${id}"`) || webview.includes(`'${id}'`), id);
+      assert.ok(webview.includes(found.name), found.name);
+      assert.ok(!host.includes(id), `${id} leaked into the host bundle`);
+    }
+    for (const id of ['dragons-lair', 'void-spire']) {
+      assert.ok(webview.includes(id), id);
+      assert.ok(!host.includes(id), `${id} leaked into the host bundle`);
+    }
+  });
+
   void it('E4: all ten new enemy ids and names, and the two stage ids, are in the webview bundle and absent from the host bundle', () => {
     const ids = [
       'rime-penguin',
@@ -104,7 +135,6 @@ void describe('enemy code in the bundles (E1)', () => {
       'gloom-stag',
       'eclipse-warden',
     ];
-    assert.equal(ENEMIES.length, 40);
     for (const id of ids) {
       const found = ENEMIES.find((r) => r.id === id);
       assert.ok(found, id);
@@ -118,7 +148,7 @@ void describe('enemy code in the bundles (E1)', () => {
     }
   });
 
-  void it('the production-style webview bundle (minified, in memory, no sourcemap) is measured against the R11 note (300 KB through E5; hard limit 400 KB); E4 size is printed', (t) => {
+  void it('the production-style webview bundle (minified, in memory, no sourcemap) is measured against the R11 note (300 KB assumption; 250 KB flag line; hard limit 400 KB); the E5 size is printed', (t) => {
     // esbuild cannot be bundled into the test file, so the measurement runs in a child process.
     const script = `
       import * as esbuild from 'esbuild';
@@ -137,7 +167,10 @@ void describe('enemy code in the bundles (E1)', () => {
     );
     const kb = bytes / 1024;
     t.diagnostic(`production webview bundle: ${kb.toFixed(1)} KB (R11 assumption under 300 KB)`);
+    if (kb > 250)
+      t.diagnostic(`FLAG: over the 250 KB flag line (M7 to M9 own a compact frame encoding)`);
     assert.ok(kb > 50 && kb < 400, `${kb} KB`);
+    assert.ok(kb < 300, `${kb} KB is over the 300 KB assumption of plan R11`);
   });
 
   void it('dist/webview.js contains no host persistence: no ProgressStore, no globalState, no progress key', () => {

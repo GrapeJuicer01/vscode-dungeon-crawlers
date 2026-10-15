@@ -256,3 +256,42 @@ void describe('migrateProgress: the runner with an injected chain', () => {
     assert.equal(outcome.progress.stageIndex, 9);
   });
 });
+
+void describe('New Game+ persistence (E5, ADR 0014): ten stages and any cycle, no schema change, no migration', () => {
+  void it('the schema is still version 1 with six numeric fields, the registry is empty, and the stage bound is the ten-stage loop point', () => {
+    assert.equal(PROGRESS_SCHEMA_VERSION, 1);
+    assert.equal(MIGRATIONS.length, 0);
+    assert.equal(MAX_STAGE_INDEX, 10);
+    assert.deepEqual(Object.keys(DEFAULT_PROGRESS), [
+      'schemaVersion',
+      'stageIndex',
+      'killsInStage',
+      'totalKills',
+      'bossesDefeated',
+      'cycle',
+    ]);
+  });
+
+  void it('every stored stage 1 to 10 at cycles 0, 1, 5, 8, 9, and 1e9 round-trips as stored, untouched (no migration step runs)', () => {
+    for (let stageIndex = 1; stageIndex <= MAX_STAGE_INDEX; stageIndex++) {
+      for (const cycle of [0, 1, 5, 8, 9, 1_000_000_000]) {
+        const stored: Progress = {
+          ...V1,
+          stageIndex,
+          cycle,
+          bossesDefeated: Math.min(10 * cycle, 1_000_000_000),
+        };
+        const outcome = migrateProgress(stored);
+        assert.equal(outcome.source, 'stored', `stage ${stageIndex} cycle ${cycle}`);
+        assert.deepEqual(outcome.progress, stored);
+      }
+    }
+  });
+
+  void it('a stored {stageIndex: 10, cycle: 5} loads as stored, and stage 11 or a cycle above the bound is invalid', () => {
+    const ng: Progress = { ...V1, stageIndex: 10, cycle: 5 };
+    assert.deepEqual(migrateProgress(ng), { progress: ng, source: 'stored' });
+    assert.equal(migrateProgress({ ...V1, stageIndex: 11 }).source, 'invalid');
+    assert.equal(migrateProgress({ ...V1, cycle: 1_000_000_001 }).source, 'invalid');
+  });
+});

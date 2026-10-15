@@ -35,21 +35,32 @@ const DECORATION = new Set([
   'src/game/sprites/glacierMammothTemplate.ts',
   'src/game/sprites/eclipseWardenTemplate.ts',
   'src/game/sprites/palettesE4.ts',
+  // E5 (plan section 7, note 7a): Stage 9 and 10 art. Absent files are simply not scanned.
+  'src/game/sprites/stage9Templates.ts',
+  'src/game/sprites/stage10Templates.ts',
+  'src/game/sprites/enemiesStage9.ts',
+  'src/game/sprites/enemiesStage10.ts',
+  'src/game/sprites/hoardDragonTemplate.ts',
+  'src/game/sprites/voidSovereignTemplate.ts',
+  'src/game/sprites/palettesE5.ts',
   'src/game/sprites/enemyTemplates.ts',
   'src/game/sprites/spriteTemplates.ts',
   'src/game/data/enemies.ts',
 ]);
 
 /**
- * Identifiers of the E3 and E4 decoration: lava, fireflies, stage embers, snow, murk, and the Stage
- * 5 to 8 prop names. The bare words frozen, shadow, mirror, and shard are deliberately absent: they
- * collide with Entity.frozen, the drawn flat shadow, and the host-state mirror in Game.ts.
+ * Identifiers of the E3 to E5 decoration: lava, fireflies, stage embers, snow, murk, heat shimmer,
+ * void rifts, and the Stage 5 to 10 prop names. The bare words frozen, shadow, mirror, and shard are
+ * deliberately absent: they collide with Entity.frozen, the drawn flat shadow, and the host-state
+ * mirror in Game.ts. For E5 the bare words void (the TypeScript operator), star, ring, spire, gold,
+ * dragon, hoard, and drift (SNOW_DRIFT, FIREFLY_DRIFT, hero drift) are absent for the same reason;
+ * \brifts?\b is safe because there is no word boundary inside "drift".
  */
 const DECORATION_WORDS =
-  /lava|firefl|\bembers\b|STAGE_EMBER|glowBloom|ruinedStatue|obsidianPillar|\banvil\b|slagHeap|toolRack|hangingRoots|brokenPillar|fernPatch|flowerBed|\bsnow\b|snowfall|\bmurk\b|SNOW_|MURK_|frozen-citadel|shadow-realm|icePillar|icicleCluster|frostBanner|iceLamp|iceSheet|iceThrone|snowDrift|duskPillar|floatingShard|mirrorFrame|wispTorch|duskAltar|shardPatch/i;
+  /lava|firefl|\bembers\b|STAGE_EMBER|glowBloom|ruinedStatue|obsidianPillar|\banvil\b|slagHeap|toolRack|hangingRoots|brokenPillar|fernPatch|flowerBed|\bsnow\b|snowfall|\bmurk\b|SNOW_|MURK_|frozen-citadel|shadow-realm|icePillar|icicleCluster|frostBanner|iceLamp|iceSheet|iceThrone|snowDrift|duskPillar|floatingShard|mirrorFrame|wispTorch|duskAltar|shardPatch|\bshimmer\b|SHIMMER_|\brifts?\b|RIFT_|dragons-lair|void-spire|scorchedPillar|drakeSkull|hoardBrazier|goldVein|scaleBanner|hoardPile|goldScatter|spirePillar|voidRift|starWindow|orbitRing|riftPedestal|crackedSlab/i;
 
 void describe('lava, embers, and fireflies are never game state (invariants 1 and 2)', () => {
-  void it('the hero side and the combat side name none of the E3 and E4 decoration identifiers', () => {
+  void it('the hero side and the combat side name none of the E3 to E5 decoration identifiers', () => {
     const scanned = gameFiles.filter((f) => !DECORATION.has(f));
     assert.ok(scanned.length > 20, `${scanned.length} files scanned`);
     for (const f of scanned) {
@@ -86,6 +97,15 @@ void describe('lava, embers, and fireflies are never game state (invariants 1 an
     assert.doesNotMatch(stripped, /\b(snow|murk|frost|ice|glacier)\b/i);
   });
 
+  void it('the enemy table names shimmer, rift, spire, and brazier scenery only inside the ten E5 rows', () => {
+    // hoard-dragon contains "hoard" and void-sovereign contains "void"; the rows are removed first.
+    // Until the E5 rows exist the strip is a no-op and the scenery scan still holds.
+    const E5_NAMES =
+      /hoard-dragon|Hoard Dragon|void-sovereign|Void Sovereign|drake-whelp|Drake Whelp|kobold-sapper|Kobold Sapper|gilded-crown|Gilded Crown|crescent-drifter|Crescent Drifter|comet-tadpole|Comet Tadpole|eye-strider|Eye Strider|ash-wyvern|Ash Wyvern|obelisk-sentinel|Obelisk Sentinel/g;
+    const stripped = code('src/game/data/enemies.ts').replace(E5_NAMES, '');
+    assert.doesNotMatch(stripped, /shimmer|\brifts?\b|spire|brazier/i);
+  });
+
   void it('nothing outside src/game and the webview boot reads ambient or particle kinds (host, monitor, shared, webview)', () => {
     for (const f of srcFiles().filter((x) => !x.startsWith('src/game/'))) {
       assert.doesNotMatch(code(f), /\b(fireflies|firefly|lava\w*|AmbientEffect)\b/, f);
@@ -114,6 +134,8 @@ void describe('lava, embers, and fireflies are never game state (invariants 1 an
       'firefly',
       'mote',
       'murk',
+      'rift',
+      'shimmer',
       'snow',
       'wisp',
     ]);

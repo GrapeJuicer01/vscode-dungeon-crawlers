@@ -1,6 +1,8 @@
 // Stage 4 boss "Tomb Lich" (batch E2, step A-E2-6). Owned by the pixel-artist.
 // `enemies/tomb-lich`, 48x48, LEFT-facing, foot anchor (24, 47). Animations: idle 2, walk 2,
-// attack 3, telegraph 2, intro 2 (11 frames), the same set as the other bosses. A robed skeleton
+// attack 3, telegraph 2, intro 2 (11 frames), the same set as the other bosses. Reworked in A-E5-0
+// (body leaning to the right, slim robe with ragged tatters, staff alone in the upper left) to clear
+// rat-king. A robed skeleton
 // with a tall spiked gold crown, glowing green eyes, and a staff topped by a floating gem. Colors
 // (11): 1 8 2 7 5 a k L N Y e. Phase 2 (BOSS_PHASE_PALETTES_E2 in palettesE2.ts) overrides
 // `L N 8 Y`: a white-hot gem and eyes and a hot magenta robe over the same silhouette.
@@ -13,6 +15,12 @@ import type { SpriteTemplate } from './spriteTypes';
 
 type Pt = readonly [number, number];
 const S = 48;
+/**
+ * The whole upper body leans back to the right (skull and crown over the right half, a slim robe
+ * skewing to the left hem) so the silhouette keeps clear of the big central bosses; the staff
+ * stands alone in the empty upper-left corner. `lean` in a pose is relative to this base.
+ */
+const LEAN_BASE = 4;
 
 interface LichPose {
   readonly bob?: number;
@@ -57,10 +65,10 @@ function gem(d: Draft, cx: number, cy: number, size: 0 | 1 | 2): void {
 function lichFrame(p: LichPose): string[] {
   const d = draft(S, S);
   const bob = p.bob ?? 0;
-  const lean = p.lean ?? 0;
+  const lean = (p.lean ?? 0) + LEAN_BASE;
   const sink = p.sink ?? 0;
-  const top = p.top ?? [7, 14];
-  const hand = p.hand ?? [11, 29];
+  const top = p.top ?? [5, 10];
+  const hand = p.hand ?? [9, 29];
   const hem = p.hem ?? 0;
   const by = bob + sink;
   // staff first (behind the robe)
@@ -87,12 +95,12 @@ function lichFrame(p: LichPose): string[] {
   poly(
     d,
     [
-      [15 + lean, 26 + by],
-      [33 + lean, 26 + by],
-      [36 + lean, 36 + by],
-      [41, 47],
-      [11, 47],
-      [14 + lean, 36 + by],
+      [19 + lean, 26 + by],
+      [35 + lean, 26 + by],
+      [30 + lean, 36 + by],
+      [32, 47],
+      [14, 47],
+      [16 + lean, 36 + by],
     ],
     '8',
   );
@@ -106,11 +114,11 @@ function lichFrame(p: LichPose): string[] {
   for (let x = 14; x <= 36; x++) {
     if (d.g.get(x, 35 + by) === '8' || d.g.get(x, 35 + by) === '2') d.g.set(x, 35 + by, 'a');
   }
-  for (let x = 8; x <= 44; x++) {
-    if (d.g.get(x, 44) === '8' || d.g.get(x, 44) === '2') d.g.set(x, 44, 'a');
-    if ((x + hem) % 6 < 2) {
-      d.g.set(x, 46, '.');
-      d.g.set(x, 45, d.g.get(x, 45) === '.' ? '.' : '2');
+  for (let x = 13; x <= 44; x++) {
+    if (d.g.get(x, 41) === '8' || d.g.get(x, 41) === '2') d.g.set(x, 41, 'a');
+    // ragged hem: pointed tatters that thin to single threads at the floor
+    for (let y = 42; y <= 46; y++) {
+      if ((x + hem) % 7 < y - 41) d.g.set(x, y, '.');
     }
   }
   d.g.rect(0, 47, S, 1, '.');
@@ -178,21 +186,21 @@ export const TOMB_LICH: SpriteTemplate = enemyTemplate(
   S,
   { x: 24, y: 47 },
   {
-    idle: [lichFrame({ ...IDLE }), lichFrame({ bob: 1, hem: 3, top: [7, 15], hand: [11, 30] })],
+    idle: [lichFrame({ ...IDLE }), lichFrame({ bob: 1, hem: 3, top: [5, 11], hand: [9, 30] })],
     walk: [
       lichFrame({ bob: 1, hem: 2, lean: -1 }),
-      lichFrame({ hem: 4, top: [8, 14], hand: [12, 29] }),
+      lichFrame({ hem: 4, top: [6, 10], hand: [10, 29] }),
     ],
     attack: [
-      lichFrame({ lean: 2, top: [14, 18], hand: [14, 30], gem: 1, bob: 1 }),
-      lichFrame({ lean: -3, top: [1, 24], hand: [6, 31], gem: 2, mouth: true, hem: 2 }),
-      lichFrame({ top: [6, 15], hand: [10, 30], gem: 1 }),
+      lichFrame({ lean: 1, top: [12, 14], hand: [12, 30], gem: 1, bob: 1 }),
+      lichFrame({ lean: -2, top: [1, 20], hand: [6, 31], gem: 2, mouth: true, hem: 2 }),
+      lichFrame({ top: [4, 11], hand: [8, 30], gem: 1 }),
     ],
     telegraph: [
-      lichFrame({ top: [7, 10], hand: [11, 24], gem: 1, glare: true, bob: -1 }),
+      lichFrame({ top: [5, 8], hand: [9, 24], gem: 1, glare: true, bob: -1 }),
       lichFrame({
-        top: [6, 10],
-        hand: [11, 22],
+        top: [4, 7],
+        hand: [9, 22],
         gem: 2,
         glare: true,
         mouth: true,
@@ -201,8 +209,8 @@ export const TOMB_LICH: SpriteTemplate = enemyTemplate(
       }),
     ],
     intro: [
-      lichFrame({ sink: 18, top: [7, 22], hand: [11, 34], gem: 0 }),
-      lichFrame({ sink: 6, top: [7, 12], hand: [11, 27], gem: 1, mouth: true, glare: true }),
+      lichFrame({ sink: 18, top: [5, 18], hand: [9, 34], gem: 0 }),
+      lichFrame({ sink: 6, top: [5, 9], hand: [9, 27], gem: 1, mouth: true, glare: true }),
     ],
   },
 );

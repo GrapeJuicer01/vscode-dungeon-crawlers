@@ -39,6 +39,18 @@ import {
   SNOW_LIFE_MIN_MS,
   SNOW_MAX_Y,
   SNOW_MIN_Y,
+  RIFT_DRIFT,
+  RIFT_LIFE_MAX_MS,
+  RIFT_LIFE_MIN_MS,
+  RIFT_MAX_Y,
+  RIFT_MIN_Y,
+  SHIMMER_DRIFT,
+  SHIMMER_LIFE_MAX_MS,
+  SHIMMER_LIFE_MIN_MS,
+  SHIMMER_MAX_Y,
+  SHIMMER_MIN_Y,
+  SHIMMER_RISE_MAX,
+  SHIMMER_RISE_MIN,
   STAGE_EMBER_LIFE_MAX_MS,
   STAGE_EMBER_LIFE_MIN_MS,
   STAGE_EMBER_MAX_Y,
@@ -64,6 +76,9 @@ export class Ambience {
   // And for the E4 ambients.
   #snowDebt = 0;
   #murkDebt = 0;
+  // And for the E5 ambients.
+  #shimmerDebt = 0;
+  #riftDebt = 0;
 
   update(dtMs: number, world: World, camera: Camera): void {
     const effect = world.stage.def.ambient;
@@ -92,6 +107,12 @@ export class Ambience {
       case 'murk':
         this.#murk(dtMs, effect.perSecond, world);
         return;
+      case 'shimmer':
+        this.#shimmer(dtMs, effect.perSecond, world);
+        return;
+      case 'rifts':
+        this.#rifts(dtMs, effect.perSecond, world);
+        return;
       default:
         assertNever(effect);
     }
@@ -114,6 +135,38 @@ export class Ambience {
         (world.rng() - 0.5) * 2 * SNOW_DRIFT,
         SNOW_FALL_MIN + world.rng() * (SNOW_FALL_MAX - SNOW_FALL_MIN),
         SNOW_LIFE_MIN_MS + world.rng() * (SNOW_LIFE_MAX_MS - SNOW_LIFE_MIN_MS),
+      );
+    }
+  }
+
+  /** Faint tall heat-haze streaks rise slowly from the floor band; not scrolled. */
+  #shimmer(dtMs: number, perSecond: number, world: World): void {
+    this.#shimmerDebt = Ambience.#accrue(this.#shimmerDebt, dtMs, perSecond);
+    while (this.#shimmerDebt >= 1) {
+      this.#shimmerDebt -= 1;
+      world.particles.emit(
+        'shimmer',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        SHIMMER_MIN_Y + world.rng() * (SHIMMER_MAX_Y - SHIMMER_MIN_Y),
+        (world.rng() - 0.5) * 2 * SHIMMER_DRIFT,
+        -(SHIMMER_RISE_MIN + world.rng() * (SHIMMER_RISE_MAX - SHIMMER_RISE_MIN)),
+        SHIMMER_LIFE_MIN_MS + world.rng() * (SHIMMER_LIFE_MAX_MS - SHIMMER_LIFE_MIN_MS),
+      );
+    }
+  }
+
+  /** Tiny nearly stationary slits in the mid band pulse once per life; not scrolled. */
+  #rifts(dtMs: number, perSecond: number, world: World): void {
+    this.#riftDebt = Ambience.#accrue(this.#riftDebt, dtMs, perSecond);
+    while (this.#riftDebt >= 1) {
+      this.#riftDebt -= 1;
+      world.particles.emit(
+        'rift',
+        CORRIDOR_X + world.rng() * (INTERNAL_WIDTH - CORRIDOR_X),
+        RIFT_MIN_Y + world.rng() * (RIFT_MAX_Y - RIFT_MIN_Y),
+        (world.rng() - 0.5) * 2 * RIFT_DRIFT,
+        (world.rng() - 0.5) * 2 * RIFT_DRIFT,
+        RIFT_LIFE_MIN_MS + world.rng() * (RIFT_LIFE_MAX_MS - RIFT_LIFE_MIN_MS),
       );
     }
   }

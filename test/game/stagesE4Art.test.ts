@@ -146,7 +146,7 @@ function frameDiffs(frames: readonly string[][]): number[] {
 const OLD_ENEMIES = ENEMIES.filter((r) => r.stage <= 6).map((r) => r.id);
 
 void describe('the shipped Stage 7 and Stage 8 environments', () => {
-  void it('validateStages and validateArtSet are empty and the eight stage ids are in order', () => {
+  void it('validateStages and validateArtSet are empty and the ten stage ids are in order (E5)', () => {
     assert.deepEqual(
       STAGES.map((s) => s.id),
       [
@@ -158,6 +158,8 @@ void describe('the shipped Stage 7 and Stage 8 environments', () => {
         'molten-core',
         CITADEL,
         REALM,
+        'dragons-lair',
+        'void-spire',
       ],
     );
     assert.deepEqual(validateStages(STAGES, SHIPPED_ART), []);
@@ -435,14 +437,14 @@ void describe('legibility (plan note 8): computed from the shipped palettes, pri
   const ids = STAGES.map((s) => s.id);
   const floor = new Map(ids.map((id) => [id, floorLuminance(id)]));
 
-  void it('prints the floor luminance table and the enemy-to-floor contrast for all eight stages', (t) => {
+  void it('prints the floor luminance table and the enemy-to-floor contrast for all ten stages', (t) => {
     const lines = ids.map((id, i) => {
       const f = floor.get(id)!;
       const e = enemyFillLuminance(i + 1);
       return `stage ${i + 1} ${id}: floor ${f.toFixed(4)}, enemy fill ${e.toFixed(4)}, ratio ${(e / f).toFixed(2)}`;
     });
     t.diagnostic(lines.join('\n'));
-    assert.equal(lines.length, 8);
+    assert.equal(lines.length, 10);
   });
 
   void it('Stage 8 floor luminance is at least 70 percent of the darkest of Stages 1 to 7', () => {
@@ -486,8 +488,8 @@ void describe('legibility (plan note 8): computed from the shipped palettes, pri
 });
 
 void describe('the ten new enemies', () => {
-  void it('one template per enemy row (forty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
-    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 40);
+  void it('one template per enemy row (fifty in all), tier sizes, animation sets, and validateEnemyArt empty', () => {
+    assert.equal(Object.keys(SHIPPED_ART.enemies).length, 50);
     assert.deepEqual(validateEnemyArt(SHIPPED_ART), []);
     const size = { minion: 16, elite: 24, boss: 48 } as const;
     for (const id of E4_ENEMIES) {
@@ -574,14 +576,14 @@ void describe('the ten new enemies', () => {
     }
   });
 
-  void it('the phase palette table holds exactly the eight boss ids; a five-override palette or a non-boss owner is rejected', () => {
+  void it('the phase palette table holds exactly the ten boss ids; a five-override palette or a non-boss owner is rejected', () => {
     assert.deepEqual(
       Object.keys(SHIPPED_ART.enemyPhasePalettes).sort(),
       ENEMIES.filter((r) => r.tier === 'boss')
         .map((r) => r.id)
         .sort(),
     );
-    assert.equal(Object.keys(SHIPPED_ART.enemyPhasePalettes).length, 8);
+    assert.equal(Object.keys(SHIPPED_ART.enemyPhasePalettes).length, 10);
     const many = cloneArt();
     many.enemyPhasePalettes['eclipse-warden'] = [
       { '1': '#000000', '2': '#000001', '3': '#000002', '4': '#000003', '5': '#000004' },

@@ -1,6 +1,7 @@
-// THE HERO-INVARIANT TEST, E3 and E4 extension (Core invariants 1, 2, and 4; E3 plan test note 7b,
-// E4 plan test note 7b): with the stage fixed at Stage 5 (fireflies, glow blooms), Stage 6 (embers,
-// lava lights), Stage 7 (snow, ice lamps), and Stage 8 (murk, wisp torches), a run with
+// THE HERO-INVARIANT TEST, E3 to E5 extension (Core invariants 1, 2, and 4; E3 plan test note 7b,
+// E4 plan test note 7b, E5 plan test note 7): with the stage fixed at Stage 5 (fireflies, glow blooms),
+// Stage 6 (embers, lava lights), Stage 7 (snow, ice lamps), Stage 8 (murk, wisp torches), Stage 9 (heat
+// shimmer, braziers, gold veins), and Stage 10 (void rifts, rift lights, rings), a run with
 // the ambients and lights at full density and a run with the ambient emitter silenced produce the
 // same heroSnapshot sequence. Decoration is cosmetic; only host agent-state events move a hero.
 import assert from 'node:assert/strict';
@@ -65,32 +66,42 @@ function drive(rig: GameRig, seed: number, n: number): string[] {
 }
 
 /**
- * Counts the square fills of one frame. Particles are the only 1x1 fills; Stage 8 murk motes are
- * 2x2 (E4), so that stage counts 2x2 fills (nothing else in Stage 8 emits them: the silenced run
- * is the control).
+ * Counts the particle-sized fills of one frame. Particles are the only 1x1 fills; Stage 8 murk motes
+ * are 2x2 (E4), Stage 9 shimmer streaks 1x3 and Stage 10 rift slits 3x1 (E5), so each stage counts its
+ * own size (the silenced run is the control).
  */
-function fills(rig: GameRig, side: number): number {
+function fills(rig: GameRig, w: number, h: number): number {
   rig.surface.reset();
   rig.game.frame(STEP_MS, rig.surface);
   return rig.surface.calls.filter(
-    (c) => c.method === 'fillRect' && c.args[3] === side && c.args[4] === side,
+    (c) => c.method === 'fillRect' && c.args[3] === w && c.args[4] === h,
   ).length;
 }
 
-void describe('Stages 5 to 8: ambients and lights never change a hero', () => {
-  for (const stage of [5, 6, 7, 8]) {
+/** The size of the stage's ambient particle, width by height. */
+const AMBIENT_SIZE: Readonly<Record<number, readonly [number, number]>> = {
+  5: [1, 1],
+  6: [1, 1],
+  7: [1, 1],
+  8: [2, 2],
+  9: [1, 3],
+  10: [3, 1],
+};
+
+void describe('Stages 5 to 10: ambients and lights never change a hero', () => {
+  for (const stage of [5, 6, 7, 8, 9, 10]) {
     for (const n of [1, 8, 32]) {
       void it(`stage ${stage}, ${n} heroes, enemies off: identical heroSnapshot every second with the ambient emitter live and silenced`, () => {
         assert.equal(STAGES[stage - 1]?.index, stage);
         const live = rigAt(stage, false);
         const seed = 500 + stage * 10 + n;
         const a = drive(live, seed, n);
-        const side = stage === 8 ? 2 : 1;
-        const liveParticles = fills(live, side);
+        const [pw, ph] = AMBIENT_SIZE[stage]!;
+        const liveParticles = fills(live, pw, ph);
         silenceAmbience();
         const quiet = rigAt(stage, false);
         const b = drive(quiet, seed, n);
-        const quietParticles = fills(quiet, side);
+        const quietParticles = fills(quiet, pw, ph);
         assert.deepEqual(a, b);
         assert.ok(
           liveParticles > quietParticles,

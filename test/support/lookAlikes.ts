@@ -55,28 +55,13 @@ export const BASELINE_IDS: readonly string[] = [
 ];
 
 /**
- * LEGACY DEBT, surfaced by generalizing the policy (all tiers, IoU, same-stage). These pairs among the
- * 20 E1/E2 enemies were never covered by the E2 test (it compared only new Stage 3/4 minions against
- * Stage 1/2 minions) and exceed the new rules today. There were 18 such pairs at generalization
- * time, pinned as a ratchet so the suite stays green without hiding the debt. The A-E3-0 art rework
- * cleared 7 of the 18 (together with the ten KNOWN_OVER pairs, 17 pins deleted in total), so 11
- * remain as art debt among E1/E2 enemies; they are reported to the human and the pixel-artist as art
- * findings. No pair involving an E3 enemy may ever be added here. Values are the measurements at
- * generalization time. Remove an entry when its pair is reworked (stale entries fail).
+ * LEGACY DEBT ratchet, now empty. Generalizing the policy (all tiers, IoU, same-stage) surfaced 18
+ * pairs among the 20 E1/E2 enemies that exceeded it; the A-E3-0 rework cleared 7 and the later
+ * pixel-artist rework of seven templates cleared the last 11, so every pin was removed (a pin that
+ * no longer exceeds is stale and fails). Kept as an empty record so the ratchet machinery and its
+ * tests stay for future use. No pair involving a post-baseline enemy may ever be added here.
  */
-export const LEGACY_OVER: Readonly<Record<string, PinnedPair>> = {
-  'cellar-rat vs cave-bat': { overlap: 0.856, iou: 0.686 },
-  'cellar-rat vs web-spider': { overlap: 0.83, iou: 0.564 },
-  'cellar-rat vs ore-beetle': { overlap: 0.862, iou: 0.718 },
-  'cave-bat vs web-spider': { overlap: 0.802, iou: 0.582 },
-  'cave-bat vs ore-beetle': { overlap: 0.856, iou: 0.723 },
-  'web-spider vs ore-beetle': { overlap: 0.896, iou: 0.674 },
-  'crate-mimic vs rock-golem': { overlap: 0.922, iou: 0.728 },
-  'crate-mimic vs crypt-mummy': { overlap: 0.897, iou: 0.623 },
-  'rat-king vs tomb-lich': { overlap: 0.873, iou: 0.605 },
-  'goblin-miner vs goblin-scout': { overlap: 0.874, iou: 0.671 },
-  'rock-golem vs crypt-mummy': { overlap: 0.869, iou: 0.692 },
-};
+export const LEGACY_OVER: Readonly<Record<string, PinnedPair>> = {};
 
 /** Every pin the evaluator applies by default. */
 export const ALL_PINS: Readonly<Record<string, PinnedPair>> = { ...KNOWN_OVER, ...LEGACY_OVER };

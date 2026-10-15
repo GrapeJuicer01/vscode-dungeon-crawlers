@@ -50,7 +50,11 @@ export type AmbientEffect =
   /** Slow falling snow in the corridor view (E4, Stage 7). */
   | { readonly kind: 'snow'; readonly perSecond: number }
   /** Dim indigo murk motes drifting upward and sideways (E4, Stage 8). */
-  | { readonly kind: 'murk'; readonly perSecond: number };
+  | { readonly kind: 'murk'; readonly perSecond: number }
+  /** Faint tall heat-haze streaks rising slowly from the floor band (E5, Stage 9). */
+  | { readonly kind: 'shimmer'; readonly perSecond: number }
+  /** Tiny stationary slits that pulse slowly in the mid band (E5, Stage 10). */
+  | { readonly kind: 'rifts'; readonly perSecond: number };
 
 export interface StageDef {
   /** Kebab-case; matches the StageSprites key. */
@@ -86,6 +90,16 @@ const ICE_LAMP_LIGHT: LightDef = { radius: 48, intensity: 0.8, colorChar: 'T', f
 const ICE_SHEET_LIGHT: LightDef = { radius: 44, intensity: 0.5, colorChar: 'T', flicker: false };
 const WISP_TORCH_LIGHT: LightDef = { radius: 48, intensity: 0.7, colorChar: 'T', flicker: false };
 const SHARD_LIGHT: LightDef = { radius: 40, intensity: 0.5, colorChar: 'T', flicker: false };
+
+/**
+ * Brazier, gold seam, void rift, and orbit ring (Stages 9 and 10): decoration light only, slow and
+ * steady, no flicker (E5 plan section 5.3). The animated props loop at 500 ms per frame because
+ * none is named torch or lantern.
+ */
+const BRAZIER_LIGHT: LightDef = { radius: 52, intensity: 0.8, colorChar: 'T', flicker: false };
+const GOLD_VEIN_LIGHT: LightDef = { radius: 40, intensity: 0.5, colorChar: 'T', flicker: false };
+const RIFT_LIGHT: LightDef = { radius: 48, intensity: 0.7, colorChar: 'T', flicker: false };
+const RING_LIGHT: LightDef = { radius: 40, intensity: 0.5, colorChar: 'T', flicker: false };
 
 function wall(
   prop: string,
@@ -357,5 +371,70 @@ export const STAGES: readonly StageDef[] = [
       floor('shardPatch', 'corridor', 300, 150),
     ],
     ambient: { kind: 'murk', perSecond: 4 },
+  },
+  /**
+   * Stage 9, "Dragon's Lair". Scorch marks, gold, and braziers are scenery only. Floor-layer props
+   * are just the hoard pile (solid, alcove, foot y 134), gold scatter. Braziers and gold seams
+   * light the stage softly; heat shimmer is the ambient (E5 plan sections 5.1 and 5.3).
+   */
+  {
+    id: 'dragons-lair',
+    index: 9,
+    name: "Dragon's Lair",
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('scorchedPillar', 'alcove', 0, 16),
+      wall('hoardBrazier', 'alcove', 28, 40, BRAZIER_LIGHT),
+      wall('hoardBrazier', 'alcove', 92, 40, BRAZIER_LIGHT),
+      wall('drakeSkull', 'alcove', 52, 28),
+      wall('goldVein', 'alcove', 52, 112, GOLD_VEIN_LIGHT),
+      wall('scaleBanner', 'alcove', 108, 52),
+      floor('hoardPile', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('goldScatter', 'alcove', 60, 152),
+      floor('goldScatter', 'alcove', 88, 148),
+      wall('hoardBrazier', 'corridor', 60, 40, BRAZIER_LIGHT),
+      wall('hoardBrazier', 'corridor', 252, 40, BRAZIER_LIGHT),
+      wall('scorchedPillar', 'corridor', 150, 16),
+      wall('scorchedPillar', 'corridor', 330, 16),
+      wall('drakeSkull', 'corridor', 190, 28),
+      wall('scaleBanner', 'corridor', 110, 52),
+      wall('goldVein', 'corridor', 300, 112, GOLD_VEIN_LIGHT),
+      floor('goldScatter', 'corridor', 100, 152),
+      floor('goldScatter', 'corridor', 200, 148),
+      floor('goldScatter', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'shimmer', perSecond: 8 },
+  },
+  /**
+   * Stage 10, "Void Spire". Rifts, stars, and rings are scenery only. Floor-layer props are just
+   * the rift pedestal (solid, alcove, foot y 134) and cracked slabs. Rifts and rings light the
+   * stage softly; slowly pulsing rift slits are the ambient (E5 plan sections 5.1 and 5.3).
+   */
+  {
+    id: 'void-spire',
+    index: 10,
+    name: 'Void Spire',
+    props: [
+      wall('doorFrame', 'door', 0, 0),
+      wall('spirePillar', 'alcove', 0, 16),
+      wall('voidRift', 'alcove', 28, 40, RIFT_LIGHT),
+      wall('voidRift', 'alcove', 92, 40, RIFT_LIGHT),
+      wall('orbitRing', 'alcove', 52, 76, RING_LIGHT),
+      wall('starWindow', 'alcove', 108, 52),
+      floor('riftPedestal', 'alcove', 6, 134, { w: 12, h: 5 }),
+      floor('crackedSlab', 'alcove', 60, 152),
+      floor('crackedSlab', 'alcove', 88, 148),
+      wall('voidRift', 'corridor', 60, 40, RIFT_LIGHT),
+      wall('voidRift', 'corridor', 252, 40, RIFT_LIGHT),
+      wall('spirePillar', 'corridor', 150, 16),
+      wall('spirePillar', 'corridor', 330, 16),
+      wall('orbitRing', 'corridor', 190, 72, RING_LIGHT),
+      wall('starWindow', 'corridor', 110, 52),
+      wall('starWindow', 'corridor', 300, 52),
+      floor('crackedSlab', 'corridor', 100, 152),
+      floor('crackedSlab', 'corridor', 200, 148),
+      floor('crackedSlab', 'corridor', 300, 150),
+    ],
+    ambient: { kind: 'rifts', perSecond: 3 },
   },
 ];

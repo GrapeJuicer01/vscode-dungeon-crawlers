@@ -125,7 +125,7 @@ Heroes are split into three batches of four classes, in style-guide table order,
 
 Each batch delivers two stages: per stage 4 regular enemies plus exactly 1 boss, the stage environment, drops, and scaling. Enemies come from a compact row table plus per-stage scaling formulas in `enemies.ts`, not hand-written objects. Stage environment art for Stage 1 already shipped in A0.
 
-**Incremental validation default (A3)**: the startup validator checks the stages delivered so far. For every stage present in `stages.ts`: exactly 5 enemies, exactly 1 boss, all ids globally unique, every enemy's stage exists, all required fields present, and the total equals 5 x delivered stages. In E5 the validator is pinned to the full contract (exactly 10 stages, exactly 50 enemies, 50 unique ids) and the incremental mode is removed. Stage progression is by cumulative work, not wall-clock time; after the last delivered stage progression wraps to Stage 1 until E5 introduces New Game+ after Stage 10.
+**Incremental validation default (A3)**: the startup validator checks the stages delivered so far. For every stage present in `stages.ts`: exactly 5 enemies, exactly 1 boss, all ids globally unique, every enemy's stage exists, all required fields present, and the total equals 5 x delivered stages. In E5 the validator was pinned to the full contract (exactly 10 stages, exactly 50 enemies, 50 unique ids, with constant counts) and the incremental mode was removed. Stage progression is by cumulative work, not wall-clock time; after the last delivered stage progression wraps to Stage 1, and since E5 that wrap after Stage 10 is New Game+ (`cycle + 1`, enemy health scaled by the existing cycle factor).
 
 #### E1. Stage 1 The Forgotten Cellar, Stage 2 Goblin Mine Shafts
 
@@ -169,12 +169,13 @@ Each batch delivers two stages: per stage 4 regular enemies plus exactly 1 boss,
 
 #### E5. Stage 9 Dragon's Lair, Stage 10 Void Spire
 
-- **Scope**: final two stages; New Game+ loop after Stage 10 with scaling; validator switched to the full contract.
-- **Files**: as E2, plus `enemies.ts` validator mode change and `stages.ts` New Game+ rule.
-- **Art (batch E5)**: Stage 9 and Stage 10 environments (heat shimmer; pulsing void rifts), four enemies and a boss per stage, large-boss 64x48 variants if used.
+- **Plan**: [E5 plan](../architecture/plans/e5-stages-9-10.md) (E4 assumptions audited, atomic art-then-data-then-validator switch, interfaces, health-curve options and recommendation, New Game+ and persistence, task list, test notes, look-alike policy and the 11 legacy pairs, art steps A-E5-0 to A-E5-6, decisions E5-1 to E5-14), [ADR 0014](../architecture/adr/0014-new-game-plus-is-the-ten-stage-loop.md) (New Game+ is the ten-stage loop with health-only scaling; full-contract validator; Accepted).
+- **Scope**: final two stages of rows (10 enemies, 50 of 50 delivered), per-stage palette overrides, two cosmetic ambients (`shimmer`, `rifts`) as new `AmbientEffect` kinds plus two new particle kinds (`shimmer`, `rift`); the enemy validator switched to the full contract (exactly 10 stages, 50 enemies, 50 unique ids, 5 per stage, one boss per stage; constant counts, no incremental mode); a flatter late health curve (`HEALTH_GROWTH_LATE` 1.05 from Stage 9, Stages 1 to 8 unchanged) so the last bosses do not drag; New Game+ is the existing wrap after Stage 10 with `cycle + 1` and the existing cycle health factor (cap 8, ceiling 3.0 times), no migration, schema v1 and protocol 2 unchanged. Fire, gold, shimmer, and the void are scenery and enemy art only; no new mechanic, no hero-side effect.
+- **Files**: `enemies.ts` (rows, late-growth constants, `healthOf`, validator rewrite), `stages.ts` (rows, `AmbientEffect`; no New Game+ rule there, it already lives in `enemies.ts` and `Progression`), `tuning.ts`, `Ambience.ts`, `Particles.ts`, `Renderer.ts` (colour map), `spriteValidator.ts` (`REQUIRED_PROPS`, `FLAME_PROPS`), comment updates in `Progression.ts` and `shared/progress.ts`, regenerated `docs/design/enemies-and-stages.md`; `Combat`, `Enemy`, `Boss`, `StageDirector` unchanged. Pixel-artist: per-stage template files, `palettesE5.ts`, art docs.
+- **Art (batch E5)**: A-E5-0 (rework of the seven legacy look-alike templates in two batches, before the E5 enemies; as built, the look-alike ratchet is empty), then six steps (A-E5-1 stage palettes, char tables, `shimmer` and `rift` ramps; A-E5-2 Stage 9 environment, heat shimmer; A-E5-3 Stage 10 environment, pulsing void rift props; A-E5-4 Stage 9 enemies; A-E5-5 Stage 10 enemies; A-E5-6 Hoard Dragon, Void Sovereign, then barrel wiring). The 64x48 large-boss tier is not used by default (decision E5-7). Zero new master characters by default (cap 40).
 - **Depends on**: E4.
-- **Done when**: G1-G7; startup validator enforces exactly 10 stages, 50 enemies, 50 unique ids, 5 per stage, exactly one boss per stage, and the incremental mode no longer exists; New Game+ looping covered by the hero-invariant test; 60fps with 8+ heroes and 30+ enemies on screen; generated enemy table lists all 50.
-- Status: todo
+- **Done when**: G1-G7; startup validator enforces exactly 10 stages, 50 enemies, 50 unique ids, 5 per stage, exactly one boss per stage, and the incremental mode no longer exists (crafted-table tests); New Game+ looping (Stage 10 to Stage 1 with `cycle + 1`, and across the cycle cap) covered by the hero-invariant test; look-alike policy holds for all new enemies; 60fps with 8 heroes and a full wave of 12 enemies plus a boss in Stages 9 and 10 (the original "30+ enemies on screen" is read as 30+ distinct enemy types, as in E3 and E4; the on-screen pool stays 12, decision E5-8); generated enemy table lists all 50.
+- Status: done
 
 ### M7. UI
 
@@ -248,7 +249,7 @@ Owner sequence key: Ar architect, Px pixel-artist, Dv developer, Te tester, Rv r
 | 9 | M6 enemies | E2 stages 3-4 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 10 | M6 enemies | E3 stages 5-6 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 11 | M6 enemies | E4 stages 7-8 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
-| 12 | M6 enemies | E5 stages 9-10 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
+| 12 | M6 enemies | E5 stages 9-10 | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | done |
 | 13 | M7 UI | U1 art | Ar, Px, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 14 | M8 audio | none | Ar, Dv, (Ar), Te, Rv, Dv commit | todo |
 | 15 | M9 docs | none | Ar, Dv, Te, Rv, Dv commit | todo |

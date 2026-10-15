@@ -33,7 +33,7 @@ import { Roster } from '../../src/game/Roster';
 import { StageDirector } from '../../src/game/StageDirector';
 import type { StageRuntime } from '../../src/game/Stage';
 import { SHIPPED_ART } from '../../src/game/sprites/artSet';
-import { DEFAULT_PROGRESS, MAX_PROGRESS_COUNT } from '../../src/shared/progress';
+import { DEFAULT_PROGRESS, MAX_PROGRESS_COUNT, MAX_STAGE_INDEX } from '../../src/shared/progress';
 import type { Progress } from '../../src/shared/progress';
 import { drawContext, info, lookFor, makeWorld } from '../support/classRig';
 import { RecordingSurface } from '../support/engineFakes';
@@ -411,31 +411,34 @@ void describe('Progression (stage progress by cumulative work)', () => {
     assert.equal(one.stageIndex, 1);
   });
 
-  void it('with the shipped eight stages: Stages 1 to 7 advance with no cycle, the Stage 8 boss wraps to Stage 1 with cycle + 1', () => {
+  void it('with the shipped ten stages: Stages 1 to 9 advance with no cycle, the Stage 10 boss wraps to Stage 1 with cycle + 1 (E5, New Game+)', () => {
     const p = new Progression(STAGES.length);
-    assert.equal(STAGES.length, 8);
-    for (let stage = 1; stage <= 7; stage++) {
+    assert.equal(STAGES.length, 10);
+    assert.equal(STAGES.length, MAX_STAGE_INDEX, 'the loop point equals the schema bound');
+    for (let stage = 1; stage <= 9; stage++) {
       assert.equal(p.stageIndex, stage);
       p.onBossDefeated();
       assert.equal(p.cycle, 0, `after the Stage ${stage} boss`);
+      assert.equal(p.stageIndex, stage + 1);
     }
-    assert.equal(p.stageIndex, 8);
+    assert.equal(p.stageIndex, 10);
     p.onBossDefeated();
     assert.equal(p.stageIndex, 1);
     assert.equal(p.cycle, 1);
-    assert.equal(p.snapshot().bossesDefeated, 8);
+    assert.equal(p.snapshot().bossesDefeated, 10);
+    assert.equal(p.snapshot().killsInStage, 0);
   });
 
-  void it('with eight stages a stored stageIndex 7 to 12 wraps by ((i - 1) % 8) + 1 (7 and 8 stay, 9 -> 1, 10 -> 2) and the counters are kept', () => {
-    const p = new Progression(8);
-    for (let i = 7; i <= 12; i++) {
+  void it('with ten stages a stored stageIndex 9 to 12 wraps by ((i - 1) % 10) + 1 (9 and 10 stay, 11 -> 1, 12 -> 2) and the counters are kept', () => {
+    const p = new Progression(10);
+    for (let i = 9; i <= 12; i++) {
       p.load(
         stored({ stageIndex: i, killsInStage: 3, totalKills: 40, bossesDefeated: 2, cycle: 1 }),
       );
-      assert.equal(p.stageIndex, ((i - 1) % 8) + 1, `stored ${i}`);
-      if (i === 7 || i === 8) assert.equal(p.stageIndex, i, 'in range: stays');
-      if (i === 9) assert.equal(p.stageIndex, 1);
-      if (i === 10) assert.equal(p.stageIndex, 2);
+      assert.equal(p.stageIndex, ((i - 1) % 10) + 1, `stored ${i}`);
+      if (i === 9 || i === 10) assert.equal(p.stageIndex, i, 'in range: stays');
+      if (i === 11) assert.equal(p.stageIndex, 1);
+      if (i === 12) assert.equal(p.stageIndex, 2);
       assert.deepEqual(
         [p.snapshot().killsInStage, p.snapshot().totalKills, p.snapshot().bossesDefeated, p.cycle],
         [3, 40, 2, 1],
@@ -615,16 +618,20 @@ void describe('StageDirector (the dark fade swap)', () => {
     d.show(8);
     assert.equal(d.runtime.def.id, 'shadow-realm');
     d.show(9);
-    assert.equal(d.runtime.def.id, 'forgotten-cellar', 'index 9 wraps to Stage 1 of 8');
+    assert.equal(d.runtime.def.id, 'dragons-lair');
     d.show(10);
+    assert.equal(d.runtime.def.id, 'void-spire');
+    d.show(11);
+    assert.equal(d.runtime.def.id, 'forgotten-cellar', 'index 11 wraps to Stage 1 of 10');
+    d.show(12);
     assert.equal(d.runtime.def.id, 'goblin-mine-shafts');
     d.show(0);
-    assert.equal(d.runtime.def.id, 'shadow-realm', 'index 0 wraps to the last stage');
+    assert.equal(d.runtime.def.id, 'void-spire', 'index 0 wraps to the last stage');
   });
 
-  void it('walks Stage 1 to 8 by fades and then wraps to Stage 1 by a fade (E4)', () => {
+  void it('walks Stage 1 to 10 by fades and then wraps to Stage 1 by a fade (E5)', () => {
     const { d, swaps } = director();
-    for (const next of [2, 3, 4, 5, 6, 7, 8, 1]) {
+    for (const next of [2, 3, 4, 5, 6, 7, 8, 9, 10, 1]) {
       d.begin(next);
       for (let t = 0; t < 2 * STAGE_FADE_MS + 40; t += STEP_MS) d.update(STEP_MS);
       assert.equal(d.transitioning, false);
@@ -637,6 +644,8 @@ void describe('StageDirector (the dark fade swap)', () => {
       'molten-core',
       'frozen-citadel',
       'shadow-realm',
+      'dragons-lair',
+      'void-spire',
       'forgotten-cellar',
     ]);
   });
@@ -662,7 +671,7 @@ void describe('StageDirector (the dark fade swap)', () => {
   void it('the director is handed no hero: its constructor takes builders and stages only', () => {
     assert.equal(StageDirector.length >= 2, true);
     assert.ok(
-      STAGES.length === 8 &&
+      STAGES.length === 10 &&
         STAGES.every((stage) => SHIPPED_ART.stageSprites[stage.id] !== undefined),
     );
   });

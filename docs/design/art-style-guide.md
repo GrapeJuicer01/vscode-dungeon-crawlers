@@ -73,7 +73,7 @@ Columns 0-7 are the alcove (campfire at x 64), column 8 is the door frame (16x12
 | Water particles | `q` light, `Q` mid (`8` is the dim end) |
 
 - 4 skin tones and 6 hair colors are **partial palette swaps**: a skin tone overrides only `s`; a hair color overrides only `h`. Index 0 of each equals the master color. Class palettes are partial swaps over `a c d b k m` only (never `o s h e w`), applied after the master and before skin and hair (see the class table in section 6).
-- **Particle ramps** (bright to dim): ember `Y O R D`, spark `w Y O`, drip `q Q 8`, splash `w q Q`, mote `a V W`, bubble `L N Q`, wisp `G g P`, and (E3) **firefly `Y N L N Y`**: the one ramp that alternates bright and dim, so a 1x1 firefly blinks slowly (each step is a fifth of its 3.5 to 6.5 s life, never faster than 0.5 s). The Stage 6 embers reuse the `ember` ramp. (E4) **snow `w q Q`** (white, pale water blue, mid water blue; Stage 7 falling snow, 1x1) and **murk `g b P`** (dim blue-gray, indigo, stone gray; Stage 8 drifting motes, 2x2): both master characters, neither contains `Y O R D` (so a flake or a mote is never mistaken for a hit spark or an ember), both step over at least 1 s per step (no flashing). No new master character was added in E3 or E4: the master palette stays at 37 of 48 (E4 hard cap was 40).
+- **Particle ramps** (bright to dim): ember `Y O R D`, spark `w Y O`, drip `q Q 8`, splash `w q Q`, mote `a V W`, bubble `L N Q`, wisp `G g P`, and (E3) **firefly `Y N L N Y`**: the one ramp that alternates bright and dim, so a 1x1 firefly blinks slowly (each step is a fifth of its 3.5 to 6.5 s life, never faster than 0.5 s). The Stage 6 embers reuse the `ember` ramp. (E4) **snow `w q Q`** (white, pale water blue, mid water blue; Stage 7 falling snow, 1x1) and **murk `g b P`** (dim blue-gray, indigo, stone gray; Stage 8 drifting motes, 2x2): both master characters, neither contains `Y O R D` (so a flake or a mote is never mistaken for a hit spark or an ember), both step over at least 1 s per step (no flashing). (E5) **shimmer `C V W`** (copper, light wood, dark wood; Stage 9 heat haze, a 1x3 streak that only dims over at least 3 s, so 1 s per step, no `Y O R D w`) and **rift `g G Q G g`** (indigo-gray, stone gray, pale water blue, stone gray, indigo-gray; Stage 10 slits, 3x1, one slow pulse per 4 to 7 s life, 800 ms or more per step, adjacent steps under 2x in luminance, no `Y O R D w`). No new master character was added in E3, E4, or E5: the master palette stays at 37 of 48 (E5 hard cap was 40).
 - Each biome has an **8-color tile palette**. Enemies in a stage share 2-3 of those colors plus their own accent.
 - Colorblind-safe variant: never rely on red versus green alone; pair color with a shape cue.
 
@@ -224,14 +224,14 @@ All templates are `enemies/<id>`, left-facing, foot anchor on the bottom outline
 
 | Stage | id | Tier, size, anchor | Frames | Colors | Silhouette cue |
 |---|---|---|---|---|---|
-| 1 | `cellar-rat` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 G P s w e R` | low and long, pink curled tail, big ear |
-| 1 | `cave-bat` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 b 2 P s Y e w R` | wide scalloped wings, pointed ears (flaps; the engine floats it) |
+| 1 | `cellar-rat` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 G P s w e R` | low and long, big pink ear, pink tail climbing the right edge and hooking over at the top (A-E5-0) |
+| 1 | `cave-bat` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 b 2 P s Y e w R` | wide wing fan with the tips in the top corners and a small belly (flaps; the engine floats it; A-E5-0) |
 | 1 | `web-spider` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 W V R w e 7` | round body, eight splayed loose legs, hanging thread |
-| 1 | `crate-mimic` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 10: `1 5 2 4 3 D w R Y e` | boxy crate, slanted jagged lid, teeth; `attack` opens the lid wide, snaps it shut, then sticks out a tongue |
+| 1 | `crate-mimic` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 9: `1 5 2 4 3 w R Y e` | crate on four stubby legs, lid hinged at the back and flung up like a jaw, see-through mouth gap with teeth; `attack` opens the lid wide, snaps it shut, then sticks out a tongue (A-E5-0) |
 | 1 | `rat-king` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 12: `1 G P m s w e a Y R d b` | huge hunched rat, bent gold crown, royal-blue cape (`d` main, `b` shade), heap of tiny pink tails |
 | 2 | `goblin-miner` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 10: `1 N L m 6 e w 5 2 k` | upright, helmet lamp, long ears, pickaxe over the shoulder |
-| 2 | `goblin-scout` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 N L 4 3 e w k m` | lean, forward-leaning sprint, two long ears streaming back |
-| 2 | `ore-beetle` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 11: `1 b d 2 8 7 Y e k P w` | low wide dome, teal ore crystals on an indigo shell |
+| 2 | `goblin-scout` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 N L 4 3 e w k m` | crouch right of centre with a long diagonal spear from the top-left corner, ears streaming back (A-E5-0) |
+| 2 | `ore-beetle` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 11: `1 b d 2 8 7 Y e k P w` | low long indigo shell, two horns, and a tall comb of teal ore crystals reaching the top centre (A-E5-0) |
 | 2 | `rock-golem` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 N G m P Y O` | compact stack of rock slabs, mossy head, glowing eyes, arm held low or back, never overhead |
 | 2 | `goblin-foreman` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 12: `1 N L 6 5 2 m k e w Y O` | big goblin, yellow hard hat with lamp, huge pickaxe, lantern in the far hand |
 
@@ -249,8 +249,8 @@ Same contract as above (left-facing, foot anchor, fill plus auto outline in the 
 | 4 | `bone-soldier` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 10: `1 7 5 G P Y R D k e` | leaning skeleton, dented iron helmet, amber eyes, round wooden shield in front, rusty red sword behind; thin loose bone legs |
 | 4 | `wailing-ghost` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 5: `1 w q Q e` | tall narrow white teardrop sheet with a round head, hollow eyes, an open mouth and a ragged hem; drawn two pixels right of the frame center so it clears the Bone Soldier (reworked in A-E3-0); `attack` raises an arm and wails (pale sound ticks to the front) |
 | 4 | `tomb-scarab` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 8: `1 a Y O k e 8 q` | flat golden beetle, short orange horn, segmented shell, violet gem, spread dark legs |
-| 4 | `crypt-mummy` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 7 5 2 e Y 8` | bandaged shuffler leaning forward, glowing eyes in a dark gap, arms reaching forward at chest height, one trailing wrap; `attack` pulls the arms back, then lunges them forward |
-| 4 | `tomb-lich` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 11: `1 8 2 7 5 a k L N Y e` | hooded skeleton in a violet robe with gold belt and hem, tall spiked gold crown, green eye glow, staff with a floating green gem |
+| 4 | `crypt-mummy` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 7: `1 7 5 2 e Y 8` | bandaged shuffler right of centre, glowing eyes in a dark gap, long arms reaching forward to the left edge at chest height, one trailing wrap (A-E5-0); `attack` pulls the arms back, then lunges them forward |
+| 4 | `tomb-lich` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 11: `1 8 2 7 5 a k L N Y e` | hooded skeleton leaning back to the right in a slim violet robe with gold belt and ragged tatters, tall spiked gold crown, green eye glow, staff with a floating green gem alone in the upper left (A-E5-0) |
 
 Silhouette separation: Bone Soldier differs from the Necromancer's skeleton summon (helmet, shield, rusty sword, amber eyes, lean, versus the summon's bare upright bones with green eyes); Wailing Ghost differs from Cave Bat (tall pale teardrop with a hem versus a dark wide-winged flyer); within Stage 3 the four read as dome, umbrella, wide low frog, and square block; within Stage 4 as a gear-laden skeleton, a tall sheet, a flat beetle, and a wide bandaged brute. Boss telegraphs: Ooze Queen swells wide with glowing eyes, then tips forward with a wide open mouth (her `attack` is a low lunge with a slime arm); Tomb Lich lifts the staff high while the gem swells and throws out rays (his `attack` winds the staff back, then thrusts it forward).
 
@@ -307,6 +307,29 @@ Silhouette separation inside Stage 7: a narrow oval with a crest, a V-eared hare
 Boss readability: Glacier Mammoth `telegraph` lowers the head while the tusks glint with white pixels; its `attack` raises, then sweeps the tusks up and forward as the head lunges; `intro` rises out of a snow drift. Eclipse Warden `telegraph` thickens and brightens the corona over two slow frames (a swell of one and then two rows, never a flash); its `attack` slams the two lower tendrils forward and down; `intro` rises from below the frame. The corona is the only large bright shape and never alternates between bright and dark: the idle loop only moves the lower tendrils and shifts a few glinting ring pixels (240 pixels of difference between the two idle frames, under the 466 of the largest shipped idle pair).
 
 Phase palettes (`BOSS_PHASE_PALETTES_E4` in `palettesE4.ts`, merged into `ENEMY_PHASE_PALETTES` at wiring; phase 2 is index 0): Glacier Mammoth overrides `5 #35c9b3`, `6 #a6f2e2`, `7 #ffffff`, `8 #2e8fe0` (aurora-teal coat and mint frost, white tusks, a deep sky-blue banner); Eclipse Warden overrides `5 #c84fd6`, `6 #ffc6ef`, `7 #fff0fa`, `8 #ff62c8` hot pink eyes (the corona moves to pale magenta-white, the disc stays dark). Same silhouettes. Phase colors switch once. No hero ever gets a phase, a frost look, or a shadow tint.
+
+### Delivered enemies (batch E5, steps A-E5-4 to A-E5-6)
+
+Same contract as above (left-facing, foot anchor, outline in the stage's `1`, 12 colors at most). Stage 9 enemies are teal, gold, ash gray, and ember orange over dark red-brown stone; Stage 10 enemies are pale lilac-white, cold cyan, and slate over dark slate-blue stone, so every enemy reads far lighter than its floor (measured: mean idle fill luminance is 18 times the Stage 9 floor and 19 times the Stage 10 floor, rule 5 needs 2). Ids and names match [the E5 plan](../architecture/plans/e5-stages-9-10.md#52-data-enemy-rows). All are `enemyBuilder.ts` primitives plus `enemyFrames.ts` helpers or builder pose parameters (`dragonFrame`, `sovereignFrame`). Dragon, fire, void, and star art is drawn on enemies only; nothing is ever drawn on or toward a hero.
+
+| Stage | id | Tier, size, anchor | Frames | Colors | Silhouette cue |
+|---|---|---|---|---|---|
+| 9 | `drake-whelp` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 10: `1 5 8 7 w e 6 O N Y` | upright teal hatchling, big round head, stubby wing nubs, S-curled tail, ember belly; `attack` snaps the head forward |
+| 9 | `kobold-sapper` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 9: `1 R 2 V W m 5 e w` | a thin lizard-folk body under a large round powder keg held overhead; `attack` lunges with the keg lowered (no blast is drawn) |
+| 9 | `gilded-crown` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 7 6 5 8 w e` | a floating gold crown, a wide band with a comb of spikes, two eyes under the rim; `attack` swoops the rim forward |
+| 9 | `ash-wyvern` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 8: `1 O P w G e R Y` | ash-gray winged biped, wings spread in a Y fan with ember-orange edges, horned head, long tail; `attack` sweeps one wing forward at chest height |
+| 9 | `hoard-dragon` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 11: `1 R 4 7 D Y e a 5 6 8` | a crimson dragon seated on a heap of gold, wings raised in an M, horned head lifted at the upper left, pale sand belly, tail curling up at the right |
+| 10 | `crescent-drifter` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 6: `1 7 6 5 8 e` | a floating pale crescent moon with an eye in the hollow (a C shape); `attack` tips the horns forward |
+| 10 | `comet-tadpole` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 7: `1 8 5 6 7 e w` | a round lilac head with big eyes and a long cyan tail streaking up and back (a diagonal); the walk is a hop; `attack` flicks the tail forward |
+| 10 | `eye-strider` | minion 16x16, `(8, 15)` | idle 2, walk 2, attack 3 | 6: `1 6 w 8 e 5` | one big white eye with a cyan iris on two long thin legs (a circle on stilts with an open gap below); `attack` leans the eye forward |
+| 10 | `obelisk-sentinel` | elite 24x24, `(12, 23)` | idle 2, walk 2, attack 3 | 6: `1 4 7 3 8 6` | a narrow pointed slate monolith with cyan runes and two detached fragments at its sides; `attack` tips forward |
+| 10 | `void-sovereign` | boss 48x48, `(24, 47)` | idle 2, walk 2, attack 3, telegraph 2, intro 2 | 8: `1 6 7 2 4 3 8 5` | a hovering cloaked figure, an inverted triangle: broad under a spread crown of five pale shards, tapering to a point, a star-filled cleft down the chest, two detached hands |
+
+Silhouette separation: inside Stage 9 a thin-bodied round head, a keg on a thin body, a spiked band, and (elite) a wide wing fan; inside Stage 10 a C, a diagonal streak, a circle on stilts, and (elite) a slim monolith. The Hoard Dragon is the only boss wide at the top with a raised-wing M over a mound; the Void Sovereign the only inverted triangle. The no-argument report over all 50 enemies prints `policy holds` (525 same-size pairs). Worst overlap and IoU per new enemy: drake-whelp 0.802 / 0.646 (vs web-spider, wailing-ghost), kobold-sapper 0.800 / 0.643, gilded-crown 0.792 / 0.586, ash-wyvern 0.815 / 0.547 (vs snow-yeti), hoard-dragon 0.827 / 0.616 (vs molten-colossus, rat-king), crescent-drifter 0.821 / 0.675, comet-tadpole 0.821 / 0.497, eye-strider 0.835 / 0.596 (vs toxic-toad; the tightest of the batch), obelisk-sentinel 0.825 / 0.529 (vs rock-golem), void-sovereign 0.808 / 0.621 (vs goblin-foreman, eclipse-warden); every overlap is under 0.85, every IoU is under 0.80 (largest 0.675), and every same-stage minion pair is under 0.75. No pin was needed (`LEGACY_OVER` and `KNOWN_OVER` stay empty).
+
+Boss readability: Hoard Dragon `telegraph` rears the head back and up over two slow frames while the throat changes from pale sand to warm gold to bright gold (never a flash, 817 pixels differ from the attack); its `attack` sweeps the tail low and then snaps the head forward (nothing is drawn leaving the boss); `intro` rises from behind the heap. Void Sovereign `telegraph` raises both hands high over two slow frames while the cleft widens (641 pixels differ from the attack); its `attack` pulls the hands in, thrusts both forward (left), then settles; `intro` rises from below the frame. Idle loops move only the crown, hands, and wings (258 pixels of difference for the dragon, 196 for the sovereign, both under the 466 of the largest shipped idle pair; the minions and elites are 20 to 102).
+
+Phase palettes (`BOSS_PHASE_PALETTES_E5` in `palettesE5.ts`, merged into `ENEMY_PHASE_PALETTES` at wiring; phase 2 is index 0): Hoard Dragon overrides `R #e8a62a`, `D #a8641a`, `a #ffe7a8`, `Y #fff6d0` (the scales turn bright gold and amber, the belly pale amber); Void Sovereign overrides `8 #f2b8ff`, `6 #d890e8`, `7 #fff0fa`, `5 #6a3a8c` (the cleft glow and eyes move from cyan to pale magenta-white while the cloak `2 3 4` stays dark). Same silhouettes, no large bright area, applied once. Phase 2 is a recolor, never a "wounded" look.
 
 ## 8. Stages
 
@@ -490,6 +513,45 @@ Tiles: `wallTop` 2, `wallMid` 5 (crystal slabs, 8 px wide panels with a lit left
 
 Ambient: drifting `murk` particles (ramp `g b P`), dim and slow.
 
+### Stage 9 characters and props (delivered, batch E5 step A-E5-2)
+
+Tile palette (`STAGE_TILE_CHARS['dragons-lair']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` soot-black and outline `#1a0a0c`, `2` dark red-brown stone, `3` mid stone, `4` lit stone, `5` bronze, `6` warm gold light, `7` pale gold highlight (sparse), `8` teal accent `#2cb5a6` (away from the Mage's blue). `g` is a warm sand-bronze `#8a7a68` (red 1.13 times the larger of green and blue, under the 1.3 limit), `T` warm gold `#ffd070`.
+
+Tiles: `wallTop` 2, `wallMid` 5 (scorched blocks; variant 4 is a high cave opening with transparent pixels), `wallBase` 2, `floorBack` 3 and `floorFront` 3 (mid-dark maroon flagstones: the floor is kept dark so every class cloth keeps contrast, the heat reads through the backdrop glow, gold accents, and lights), `foreground` 2. Backdrop 128x128, period 64: a vast cavern with distant gold heaps, a far dragon silhouette, and an ember glow on the horizon.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `scorchedPillar` | 16x112 | top-left | 1 | wall (a sooted column with claw scrapes) |
+| `drakeSkull` | 16x40 | top-left | 1 | wall decoration (a horned skull relief) |
+| `hoardBrazier` | 16x24 | top-left | 4 (slow loop) | wall, light source (`T` warm gold, flicker false) |
+| `goldVein` | 16x16 | top-left | 2 (slow glint) | wall base band, weak light source (flicker false) |
+| `scaleBanner` | 16x48 | top-left | 1 | wall decoration (a tattered scale-pattern banner) |
+| `hoardPile` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove (a gold and gem heap) |
+| `goldScatter` | 16x8 | `(8, 7)` | 1 | floor, decoration (loose coins and gems) |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (a scorched arch with claw gouges) |
+
+Ambient: rising `shimmer` streaks (ramp `C V W`, below). Floor-layer props are exactly `hoardPile goldScatter` here.
+
+### Stage 10 characters and props (delivered, batch E5 step A-E5-3)
+
+Tile palette (`STAGE_TILE_CHARS['void-spire']` = `12345678`, clear `n`, ambient `g`, light `T`): `1` near-black blue and outline `#06080f`, `2` dark slate stone, `3` mid slate stone, `4` lit stone, `5` deep teal-slate, `6` pale magenta-white rift light, `7` cold highlight, `8` cyan accent. `g` is a dark slate-blue `#4e5f86` (not the indigo of Stage 8), `T` pale magenta-white `#f0c8ff`.
+
+Tiles: `wallTop` 2, `wallMid` 5 (slate slabs; variant 4 is a window onto stars with transparent pixels), `wallBase` 2, `floorBack` 3 and `floorFront` 3 (dark slate-blue flagstones, never black), `foreground` 2. Backdrop 128x128, period 64: a black sky with stars, a distant tower, and a pale rift on the horizon.
+
+| Prop | Size | Anchor | Frames | Layer |
+|---|---|---|---|---|
+| `spirePillar` | 16x112 | top-left | 1 | wall (a dark column with a star inlay) |
+| `voidRift` | 16x48 | top-left | 4 (slow pulse) | wall, light source (`T` pale magenta-white, flicker false) |
+| `starWindow` | 16x48 | top-left | 1 (static, no twinkle) | wall decoration |
+| `orbitRing` | 16x24 | top-left | 2 (slow turn) | wall, dim light source (flicker false) |
+| `riftPedestal` | 16x16 | `(8, 14)` | 1 | floor, solid in the alcove (a squat black pedestal with a glowing seam) |
+| `crackedSlab` | 16x8 | `(8, 7)` | 1 | floor, decoration (a cracked slab with faint seams) |
+| `doorFrame` | 16x128 | top-left | 1 | wall, door column (a black arch with a pale rift glow in the gap) |
+
+Ambient: slow pulsing `rift` slits (ramp `g G Q G g`, below). Floor-layer props are exactly `riftPedestal crackedSlab`. No prop is named `torch`, `lantern`, or `puddle` in either stage, so the four animated props loop at `PROP_FRAME_MS` (500 ms per frame: brazier 2 s, vein 1 s, rift 2 s, ring 1 s).
+
+Legibility (measured with `node test/support/legibilityReport.mjs`; floor mean luminance after the `g` multiply): Stage 9 floor 0.0182 (rgb 63,23,14), Necromancer cloth contrast 2.42, all twelve classes at least 2.42; Stage 10 floor 0.0109 (rgb 16,25,50), Necromancer 2.71, all twelve at least 2.71. All four calibration rules hold (cloth at least 2.0; Stage 9 under 0.0421; Stage 10 over 0.0067; mean floor colour 21.3 from the nearest stage for Stage 9 and 21.6 for Stage 10, against the 13.7 minimum). Hero-side stage tints are `g` only and are never applied to a hero.
+
 **Campfire**: logs and seats, a 4-frame flame loop in two sizes (small, large from 3 resting heroes), ember sparks. It grows as more heroes rest and is drawn identically across stages with master characters only. Delivered: `logs` (a stone ring, two crossed logs, a flanking decorative log each side; anchor at the pit's front-edge center), `flameSmall`, `flameLarge`.
 
 ## Look-alike policy
@@ -506,8 +568,29 @@ Lessons from E4: with 40 enemies the free pixels are almost gone, so a solid new
 
 Stage 8 murk motes in the y 90 to 156 band can overlap a hero sprite on screen; they are scenery drawn behind, in the same pass as fireflies and embers, and are never hero state.
 
-### Legacy debt backlog (A-E4-0, report only; nothing was reworked in E4)
+### Legacy debt rework (A-E5-0a and A-E5-0b, done)
 
-The no-argument report prints 11 pinned legacy pairs (`LEGACY_OVER`), all among E1 and E2 enemies: crate-mimic vs rock-golem 0.922 and crypt-mummy 0.897; web-spider vs ore-beetle 0.896; goblin-miner vs goblin-scout 0.874 (same stage); rat-king vs tomb-lich 0.873; rock-golem vs crypt-mummy 0.869; cellar-rat vs ore-beetle 0.862; cellar-rat vs cave-bat 0.856 (same stage); cave-bat vs ore-beetle 0.856; cellar-rat vs web-spider 0.830 and cave-bat vs web-spider 0.802 (same stage, over the 0.75 limit). The policy still holds for the 40 shipped enemies because those pairs are pinned.
+The seven templates the A-E4-0 backlog listed were redrawn in place (same ids, sizes, anchors, animation sets, left-facing, stage-palette recoloring; all at most 12 colors), so all 11 `LEGACY_OVER` pairs now clear the policy and the no-argument report prints `policy holds` with those 11 pins listed as `stale pins` (the tester removes them). Rework per template:
 
-Estimate for the deferred rework (decision E4-8): seven templates, two art batches, the same size as A-E3-0 plus one. Batch one, the four early minions (about half a day each with the parameter-sweep method above): `cellar-rat` (raise the tail high and shrink the body so the top-right corner is used), `cave-bat` (open the wings wide into the top corners and leave the belly small), `ore-beetle` (a domed shell with splayed legs and two horns instead of a low blob), `goblin-scout` (a crouch with a long diagonal spear that crosses the empty corners; this also clears `goblin-miner`). Batch two, the larger sprites: `crate-mimic` (open the lid with a tongue and teeth so the top rows and a lower hollow are used; this clears `rock-golem` and `crypt-mummy`), `crypt-mummy` (arms stretched forward with trailing bandage; clears `rock-golem`), and one of `rat-king` or `tomb-lich` (the lich with a taller hood and a raised staff in the empty upper corner, keeping its phase palette). Rebuilt templates keep their ids, sizes, anchors, and animation sets, so no data change follows; the tester then prunes the cleared `LEGACY_OVER` pins. Three of the seven are Stage 1 enemies, the first thing a player sees, so pair the rework with the pre-release polish pass.
+- Batch one (`enemiesStage1.ts`, `enemiesStage2.ts`). `cellar-rat`: a low, long body in the lower left with the tail climbing the right edge to row 3 and hooking over. `cave-bat`: the idle pose is the wings-up fan, tips in both top corners, with a 7x8 belly. `ore-beetle`: a low, long shell with two curved horns and a tall comb of crystals standing up the top centre (the first dome and wide-leg versions all scored above 0.9 against `web-spider` and `tomb-scarab` because a wide solid shell contains the smaller sprite; the pixels had to move into the empty top rows). `goblin-scout`: a crouch moved two pixels right with a long diagonal spear from the top-left corner behind the body.
+- Batch two (`enemiesStage1.ts`, `enemiesStage4.ts`, `tombLichTemplate.ts`). `crate-mimic`: the lid is a rotated slab hinged at the back (angle per frame, 48 to 65 degrees; 0 for the snap), the mouth gap is transparent, and the base stands on four stubby legs, so the sprite is a tilted slab over a base instead of a solid block (a solid base alone scored 0.849 against `jelly-cube`; the legs bring it to 0.844). `crypt-mummy`: the body stands three columns right of center, the arms stretch to the left edge, the wrap trails on the right. `tomb-lich` was chosen over `rat-king` (a boss that stays out of Stage 1, and the lich only had to change shape, not palette): a parameter search over the robe polygon, the lean, and the staff position (the method from E4) found that leaning the whole upper body four columns right (`LEAN_BASE`), a slimmer skewed robe with ragged tatters, and the staff alone in the empty upper left corner give 0.777 against `rat-king` and 0.787 against `molten-colossus`. The phase palette is untouched (`L N 8 Y` overrides).
+
+Before and after (overlap / IoU; same-stage pairs must stay under 0.75 overlap):
+
+| Pair | Before | After |
+|---|---|---|
+| `cellar-rat` vs `cave-bat` (same stage) | 0.856 / 0.686 | 0.714 / 0.536 |
+| `cellar-rat` vs `web-spider` (same stage) | 0.830 / 0.564 | 0.651 / 0.408 |
+| `cave-bat` vs `web-spider` (same stage) | 0.802 / 0.582 | 0.660 / 0.432 |
+| `cellar-rat` vs `ore-beetle` | 0.862 / 0.718 | 0.780 / 0.585 |
+| `cave-bat` vs `ore-beetle` | 0.856 / 0.723 | 0.770 / 0.551 |
+| `web-spider` vs `ore-beetle` | 0.896 / 0.674 | 0.717 / 0.429 |
+| `goblin-miner` vs `goblin-scout` (same stage) | 0.874 / 0.671 | 0.732 / 0.482 |
+| `crate-mimic` vs `rock-golem` | 0.922 / 0.728 | 0.666 / 0.456 |
+| `crate-mimic` vs `crypt-mummy` | 0.897 / 0.623 | 0.772 / 0.598 |
+| `rock-golem` vs `crypt-mummy` | 0.869 / 0.692 | 0.782 / 0.613 |
+| `rat-king` vs `tomb-lich` | 0.873 / 0.605 | 0.777 / 0.458 |
+
+Side effects on pairs that were not pinned (all still under 0.85): `crate-mimic` vs `jelly-cube` 0.848 to 0.844, `crate-mimic` vs `gloom-stag` 0.836 to 0.609, `ore-beetle` vs `tomb-scarab` 0.819 to 0.828, `cellar-rat` vs `tomb-scarab` 0.802 to 0.828, `jelly-cube` vs `crypt-mummy` 0.766 to 0.809, `goblin-scout` vs `frost-hare` 0.756 to 0.813, `tomb-lich` vs `elder-dryad` 0.824 to 0.783, `tomb-lich` vs `molten-colossus` 0.848 to 0.787. The four tight E4 pairs are unchanged (`rime-penguin` vs `ember-imp` 0.847, `rime-penguin` vs `lantern-wraith` 0.840, `frost-hare` vs `snow-sentry` 0.737 same stage; `crate-mimic` vs `gloom-stag` improved).
+
+Lessons from A-E5-0: (1) overlap is shared over the smaller count, so a sprite that is bigger than its neighbours is judged by how much of them it covers; shrink the solid mass and spend the pixels in the top rows and corners. (2) A gap that is meant to be see-through (a mouth, the space between legs) must be transparent, not dark fill, or it still counts as a pixel. (3) A throwaway script that renders the idle frame 0 of each candidate and prints the worst pairs (a parameter search over a handful of geometry numbers, including the lean of a boss) finished each hard sprite in minutes; hand editing without it kept trading one pair for another. (4) Animation order matters: `cave-bat` idle frame 0 is the wings-up pose because the metric reads frame 0.

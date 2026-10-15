@@ -16,10 +16,13 @@ import { ENEMIES_STAGE5 } from './enemiesStage5';
 import { ENEMIES_STAGE6 } from './enemiesStage6';
 import { ENEMIES_STAGE7 } from './enemiesStage7';
 import { ENEMIES_STAGE8 } from './enemiesStage8';
+import { ENEMIES_STAGE9 } from './enemiesStage9';
+import { ENEMIES_STAGE10 } from './enemiesStage10';
 import { ECLIPSE_WARDEN } from './eclipseWardenTemplate';
 import { ELDER_DRYAD } from './elderDryadTemplate';
 import { GLACIER_MAMMOTH } from './glacierMammothTemplate';
 import { GOBLIN_FOREMAN } from './goblinForemanTemplate';
+import { HOARD_DRAGON } from './hoardDragonTemplate';
 import { MOLTEN_COLOSSUS } from './moltenColossusTemplate';
 import { OOZE_QUEEN } from './oozeQueenTemplate';
 import type { Palette } from './palettes';
@@ -27,9 +30,11 @@ import { BOSS_PHASE_PALETTES } from './palettesE1';
 import { BOSS_PHASE_PALETTES_E2 } from './palettesE2';
 import { BOSS_PHASE_PALETTES_E3 } from './palettesE3';
 import { BOSS_PHASE_PALETTES_E4 } from './palettesE4';
+import { BOSS_PHASE_PALETTES_E5 } from './palettesE5';
 import { RAT_KING } from './ratKingTemplate';
 import type { SpriteTemplate } from './spriteTypes';
 import { TOMB_LICH } from './tombLichTemplate';
+import { VOID_SOVEREIGN } from './voidSovereignTemplate';
 
 function frame(id: string, w: number, h: number): SpriteTemplate {
   const rows: string[] = [];
@@ -55,7 +60,7 @@ export const ENEMY_BAR: {
   backChar: 'P',
 };
 
-/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Stages 1 and 2 (E1), 3 and 4 (E2), 5 and 6 (E3), 7 and 8 (E4). */
+/** Enemy id -> template `enemies/<id>`, left-facing, foot anchor. Stages 1 and 2 (E1), 3 and 4 (E2), 5 and 6 (E3), 7 and 8 (E4), 9 and 10 (E5). */
 export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   ...ENEMIES_STAGE1,
   ...ENEMIES_STAGE2,
@@ -65,6 +70,8 @@ export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   ...ENEMIES_STAGE6,
   ...ENEMIES_STAGE7,
   ...ENEMIES_STAGE8,
+  ...ENEMIES_STAGE9,
+  ...ENEMIES_STAGE10,
   'rat-king': RAT_KING,
   'goblin-foreman': GOBLIN_FOREMAN,
   'ooze-queen': OOZE_QUEEN,
@@ -73,6 +80,8 @@ export const ENEMY_SPRITES: Readonly<Record<string, SpriteTemplate>> = {
   'molten-colossus': MOLTEN_COLOSSUS,
   'glacier-mammoth': GLACIER_MAMMOTH,
   'eclipse-warden': ECLIPSE_WARDEN,
+  'hoard-dragon': HOARD_DRAGON,
+  'void-sovereign': VOID_SOVEREIGN,
 };
 
 /**
@@ -84,4 +93,5 @@ export const ENEMY_PHASE_PALETTES: Readonly<Record<string, readonly Palette[]>> 
   ...BOSS_PHASE_PALETTES_E2,
   ...BOSS_PHASE_PALETTES_E3,
   ...BOSS_PHASE_PALETTES_E4,
+  ...BOSS_PHASE_PALETTES_E5,
 };

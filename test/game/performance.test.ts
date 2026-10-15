@@ -75,19 +75,19 @@ void describe('engine CPU cost (counting surface, node)', () => {
     assert.deepEqual(rig.errors, []);
   });
 
-  void it('E4: building all eight stage runtimes (boot cost) takes well under a second', (t) => {
+  void it('E5: building all ten stage runtimes (boot cost) takes well under a second', (t) => {
     const bitmaps = new FakeBitmaps();
     const cache = new SpriteCache(bitmaps, SHIPPED_ART);
     const start = process.hrtime.bigint();
     for (const def of STAGES) buildStage(def, SHIPPED_ART, cache, bitmaps);
     const ms = Number(process.hrtime.bigint() - start) / 1e6;
-    t.diagnostic(`eight stage runtimes built in ${ms.toFixed(1)} ms`);
-    assert.equal(STAGES.length, 8);
+    t.diagnostic(`ten stage runtimes built in ${ms.toFixed(1)} ms`);
+    assert.equal(STAGES.length, 10);
     assert.ok(ms < 1000, `${ms} ms`);
   });
 
-  for (const stage of [7, 8]) {
-    void it(`E4: the maximum configuration in Stage ${stage} (maxEnemies 12, eight fighters, boss on screen, six lights, ambient on) averages under 4 ms per frame (target 1 ms)`, (t) => {
+  for (const stage of [7, 8, 9, 10]) {
+    void it(`E5: the maximum configuration in Stage ${stage} (maxEnemies 12, eight fighters, boss on screen, six lights, ambient on) averages under 4 ms per frame (target 1 ms)`, (t) => {
       let bossFrames = 0;
       let maxEnemies = 0;
       // eslint-disable-next-line @typescript-eslint/unbound-method -- wrapped and applied with `this`

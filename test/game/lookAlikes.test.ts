@@ -1,7 +1,7 @@
 // Look-alike policy (E3 plan section 7, note 4; moved and generalized from stagesE2Art.test.ts).
 // Reads the template maps directly (ENEMY_SPRITES, SUMMON_SPRITES), so it needs no wiring. The
 // pixel-artist can run the same policy on unwired maps: `node test/support/lookAlikesReport.mjs`
-// (see docs/engineering/testing-strategy.md). Metrics and the KNOWN_OVER ratchet live in
+// (see docs/engineering/testing-strategy.md). Metrics and the (now empty) pin ratchets live in
 // test/support/lookAlikes.ts, the one source of truth.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -101,7 +101,8 @@ void describe('look-alike metrics', () => {
     assert.equal(IOU_LIMIT, 0.8);
     assert.equal(SAME_STAGE_LIMIT, 0.75);
     assert.deepEqual(Object.keys(KNOWN_OVER), [], 'the ten E2 pairs were all reworked away');
-    assert.equal(Object.keys(LEGACY_OVER).length, 11, 'the eleven remaining legacy pins');
+    assert.deepEqual(Object.keys(LEGACY_OVER), [], 'the legacy pins were all reworked away');
+    assert.deepEqual(Object.keys(ALL_PINS), [], 'the ratchet is empty');
     assert.equal(
       Object.keys(ALL_PINS).length,
       Object.keys(KNOWN_OVER).length + Object.keys(LEGACY_OVER).length,
@@ -151,7 +152,7 @@ void describe('look-alike policy on the wired enemy templates', () => {
     }
   });
 
-  void it('the remaining pinned pairs are recorded against their measured values and still exceed', () => {
+  void it('any pinned pairs (none today) are recorded against their measured values and still exceed', () => {
     for (const key of Object.keys(ALL_PINS)) {
       const [a, b] = key.split(' vs ') as [string, string];
       const m = get(a, b);
@@ -176,6 +177,30 @@ void describe('look-alike policy on the wired enemy templates', () => {
       assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
       assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
     }
+  });
+
+  void it('the post-rework tight pairs stay under the limits, by name (measured overlap in the label)', () => {
+    const tight: ReadonlyArray<readonly [string, string, number]> = [
+      ['ore-beetle', 'tomb-scarab', 0.828],
+      ['cellar-rat', 'tomb-scarab', 0.828],
+      ['goblin-scout', 'frost-hare', 0.813],
+      ['crate-mimic', 'jelly-cube', 0.844],
+      ['jelly-cube', 'crypt-mummy', 0.809],
+      ['rime-penguin', 'ember-imp', 0.847],
+      ['rime-penguin', 'lantern-wraith', 0.84],
+      ['frost-hare', 'snow-sentry', 0.737],
+    ];
+    for (const [a, b, measured] of tight) {
+      const m = get(a, b);
+      assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
+      assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
+      // Guard against drift toward the limit: no worse than the measurement plus rounding.
+      assert.ok(m.overlap <= measured + 0.0005, `${a} vs ${b} overlap ${m.overlap} > ${measured}`);
+      if (m.sameStage) {
+        assert.ok(m.overlap < SAME_STAGE_LIMIT, `${a} vs ${b} same-stage overlap ${m.overlap}`);
+      }
+    }
+    assert.equal(get('frost-hare', 'snow-sentry').sameStage, true);
   });
 
   void it('Bone Soldier vs the skeleton summon (16x20, aligned at the anchor) stays under the limits', () => {
@@ -278,10 +303,10 @@ void describe('E4 look-alike policy: every new enemy satisfies the full policy, 
     'eclipse-warden',
   ];
 
-  void it('the matrix covers 24 minions, 8 elites, and 8 bosses; BASELINE_IDS is still the 20 E1/E2 ids', () => {
-    assert.equal(byTier('minion').length, 24);
-    assert.equal(byTier('elite').length, 8);
-    assert.equal(byTier('boss').length, 8);
+  void it('after E5 the matrix covers 30 minions, 10 elites, and 10 bosses; BASELINE_IDS is still the 20 E1/E2 ids', () => {
+    assert.equal(byTier('minion').length, 30);
+    assert.equal(byTier('elite').length, 10);
+    assert.equal(byTier('boss').length, 10);
     assert.equal(BASELINE_IDS.length, 20);
     for (const id of E4_IDS) assert.ok(!BASELINE_IDS.includes(id), id);
   });
@@ -297,7 +322,7 @@ void describe('E4 look-alike policy: every new enemy satisfies the full policy, 
         `${id} must not be pinned`,
       );
     }
-    assert.equal(Object.keys(LEGACY_OVER).length, 11, 'the 11 legacy pins are unchanged by E4');
+    assert.deepEqual(Object.keys(LEGACY_OVER), [], 'the legacy ratchet stays empty');
   });
 
   void it('every pair that involves an E4 enemy is under 0.85 overlap and at most 0.80 IoU', () => {
@@ -372,6 +397,123 @@ void describe('E4 look-alike policy: every new enemy satisfies the full policy, 
         ['eclipse-warden', old],
       ]),
       ['glacier-mammoth', 'eclipse-warden'],
+    ];
+    for (const [a, b] of named) {
+      const m = get(a, b);
+      assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
+      assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
+    }
+  });
+});
+
+void describe('E5 look-alike policy (ten new enemies; the 50-enemy matrix)', () => {
+  const E5_IDS = [
+    'drake-whelp',
+    'kobold-sapper',
+    'gilded-crown',
+    'ash-wyvern',
+    'hoard-dragon',
+    'crescent-drifter',
+    'comet-tadpole',
+    'eye-strider',
+    'obelisk-sentinel',
+    'void-sovereign',
+  ];
+
+  void it('the matrix is 525 same-size pairs (30 choose 2 minions, 10 choose 2 elites, 10 choose 2 bosses) and no pin exists', () => {
+    assert.equal(entries.length, 50);
+    assert.equal(pairs.length, (30 * 29) / 2 + (10 * 9) / 2 + (10 * 9) / 2);
+    assert.equal(pairs.length, 525);
+    assert.deepEqual(Object.keys(ALL_PINS), [], 'zero pins');
+    for (const id of E5_IDS) {
+      assert.ok(
+        entries.some((e) => e.id === id),
+        id,
+      );
+      assert.ok(!BASELINE_IDS.includes(id), id);
+    }
+  });
+
+  void it('every pair that involves an E5 enemy is under 0.85 overlap and at most 0.80 IoU (the batch adds 193 pairs)', () => {
+    const involved = pairs.filter((p) => E5_IDS.includes(p.a) || E5_IDS.includes(p.b));
+    assert.equal(involved.length, 193, '159 minion + 17 elite + 17 boss pairs');
+    for (const p of involved) {
+      assert.ok(p.overlap < OVERLAP_LIMIT, `${p.a} vs ${p.b} overlap ${p.overlap}`);
+      assert.ok(p.iou <= IOU_LIMIT, `${p.a} vs ${p.b} iou ${p.iou}`);
+    }
+  });
+
+  void it('same-stage minions of Stage 9 and Stage 10 are under 0.75 overlap', () => {
+    for (const stage of [9, 10]) {
+      const same = pairs.filter(
+        (p) => p.stageA === stage && p.stageB === stage && minionIds.has(p.a) && minionIds.has(p.b),
+      );
+      assert.equal(same.length, 3, `stage ${stage}: three minions, three pairs`);
+      for (const p of same)
+        assert.ok(p.overlap < SAME_STAGE_LIMIT, `${p.a} vs ${p.b} ${p.overlap}`);
+    }
+  });
+
+  void it('the tightest E5 pairs, by name, stay under the limits (measured overlap is in the label and printed)', (t) => {
+    const tight: [string, string][] = [
+      ['eye-strider', 'toxic-toad'],
+      ['hoard-dragon', 'molten-colossus'],
+      ['crescent-drifter', 'spore-shroom'],
+      ['comet-tadpole', 'goblin-miner'],
+    ];
+    const lines: string[] = [];
+    for (const [a, b] of tight) {
+      const m = get(a, b);
+      lines.push(`${a} vs ${b}: overlap ${m.overlap.toFixed(3)}, iou ${m.iou.toFixed(3)}`);
+      assert.ok(m.overlap < OVERLAP_LIMIT, `${a} vs ${b} overlap ${m.overlap}`);
+      assert.ok(m.iou <= IOU_LIMIT, `${a} vs ${b} iou ${m.iou}`);
+    }
+    t.diagnostic(lines.join('\n'));
+  });
+
+  void it('the named E5 pairs of plan note 4 stay under the limits', () => {
+    const named: [string, string][] = [
+      ...['rime-penguin', 'ember-imp', 'wailing-ghost', 'spore-shroom'].map(
+        (o): [string, string] => ['drake-whelp', o],
+      ),
+      ...['goblin-miner', 'snow-sentry', 'bone-soldier'].map((o): [string, string] => [
+        'kobold-sapper',
+        o,
+      ]),
+      ...['shard-cluster', 'lantern-wraith', 'bramble-pixie'].map((o): [string, string] => [
+        'gilded-crown',
+        o,
+      ]),
+      ...['mirror-mimic', 'shard-cluster'].map((o): [string, string] => ['crescent-drifter', o]),
+      ...['frost-hare', 'cave-bat', 'toxic-toad'].map((o): [string, string] => [
+        'comet-tadpole',
+        o,
+      ]),
+      ...['mirror-mimic', 'tomb-scarab', 'web-spider'].map((o): [string, string] => [
+        'eye-strider',
+        o,
+      ]),
+      ...[
+        'gloom-stag',
+        'snow-yeti',
+        'furnace-guard',
+        'rock-golem',
+        'crypt-mummy',
+        'ancient-treant',
+      ].map((o): [string, string] => ['ash-wyvern', o]),
+      ...['rock-golem', 'crypt-mummy', 'ash-wyvern'].map((o): [string, string] => [
+        'obelisk-sentinel',
+        o,
+      ]),
+      ...['elder-dryad', 'molten-colossus', 'rat-king'].map((o): [string, string] => [
+        'hoard-dragon',
+        o,
+      ]),
+      ...['tomb-lich', 'eclipse-warden', 'ooze-queen'].map((o): [string, string] => [
+        'void-sovereign',
+        o,
+      ]),
+      ['hoard-dragon', 'void-sovereign'],
     ];
     for (const [a, b] of named) {
       const m = get(a, b);

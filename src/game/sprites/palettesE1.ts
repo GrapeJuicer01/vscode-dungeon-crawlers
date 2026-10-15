@@ -107,6 +107,38 @@ export const STAGE_PALETTES: Readonly<Record<string, Palette>> = {
     g: '#6a62a0', // ambient tint, dark indigo-violet
     T: '#c8a0ff', // soft violet light
   },
+  // Dragon's Lair (batch E5): dark red-brown cavern stone, bronze, warm gold light, pale gold
+  // highlights (sparse), teal accent (away from the Mage's cloth blue). The floor tiles stay
+  // mid-dark so every class cloth keeps contrast (the Necromancer's cloth caps the floor at about
+  // 0.0325 luminance after the ambient multiply); the heat reads through the backdrop glow, lights,
+  // and gold accents. The ambient tint is a warm sand-bronze (red at most 1.3 times green or blue).
+  'dragons-lair': {
+    '1': '#1a0a0c', // deepest shadow
+    '2': '#3e1a16', // dark red-brown stone
+    '3': '#6a281c', // mid stone
+    '4': '#94422c', // lit stone
+    '5': '#c8963e', // bronze
+    '6': '#ffd45c', // warm gold light
+    '7': '#fff1be', // pale gold highlight
+    '8': '#2cb5a6', // teal accent
+    g: '#8a7a68', // ambient tint, warm sand-bronze
+    T: '#ffd070', // warm gold light
+  },
+  // Void Spire (batch E5): very dark slate-blue stone, deep teal-slate, pale magenta-white rift
+  // light, cold highlight, cyan accent. Slate-blue, not the indigo of the Shadow Realm; floors stay
+  // legible (never black); enemies stay brighter and more saturated than the stone.
+  'void-spire': {
+    '1': '#06080f', // deepest shadow
+    '2': '#1c2538', // dark slate stone
+    '3': '#2c3a56', // mid slate stone
+    '4': '#44587c', // lit stone
+    '5': '#2f6f86', // deep teal-slate
+    '6': '#f2d2ff', // pale magenta-white rift light
+    '7': '#d8f4ff', // cold highlight
+    '8': '#3de0f0', // cyan accent
+    g: '#4e5f86', // ambient tint, dark slate-blue
+    T: '#f0c8ff', // pale magenta-white light
+  },
 };
 
 /**

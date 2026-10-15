@@ -100,6 +100,8 @@ export const STAGE_TILE_CHARS: Readonly<Record<string, string>> = {
   'molten-core': '12345678',
   'frozen-citadel': '12345678',
   'shadow-realm': '12345678',
+  'dragons-lair': '12345678',
+  'void-spire': '12345678',
 };
 
 /** Stage id -> the character that fills the background (near-black, luminance under 0.02). */
@@ -112,6 +114,8 @@ export const STAGE_CLEAR_CHAR: Readonly<Record<string, string>> = {
   'molten-core': 'n',
   'frozen-citadel': 'n',
   'shadow-realm': 'n',
+  'dragons-lair': 'n',
+  'void-spire': 'n',
 };
 
 /** Stage id -> the darkness tint multiplied over the environment (cool gray-blue, never black). */
@@ -124,6 +128,8 @@ export const STAGE_AMBIENT_CHAR: Readonly<Record<string, string>> = {
   'molten-core': 'g',
   'frozen-citadel': 'g',
   'shadow-realm': 'g',
+  'dragons-lair': 'g',
+  'void-spire': 'g',
 };
 
 /** Stage id -> partial palette over the master (characters 1 to 8, g, T). See palettesE1.ts. */
@@ -147,7 +153,9 @@ export const PARTICLE_PALETTE: Readonly<
     | 'wisp'
     | 'firefly'
     | 'snow'
-    | 'murk',
+    | 'murk'
+    | 'shimmer'
+    | 'rift',
     readonly string[]
   >
 > = {
@@ -169,6 +177,14 @@ export const PARTICLE_PALETTE: Readonly<
   snow: ['w', 'q', 'Q'],
   // drifting murk (stage 8 ambient, E4): dim blue-gray, indigo, stone gray; dim motes, no warm hues
   murk: ['g', 'b', 'P'],
+  // heat shimmer (stage 9 ambient, E5): faint warm streaks that only dim (copper, light wood, dark
+  // wood), three steps over at least 3 s (1 s per step); no Y O R D w, so a streak is never
+  // mistaken for an ember or a hit spark, and never brighter than an enemy fill
+  shimmer: ['C', 'V', 'W'],
+  // void rifts (stage 10 ambient, E5): one slow pulse per life, dim to pale and back (indigo-gray,
+  // stone gray, pale water blue, stone gray, indigo-gray); adjacent steps differ by under 2x in
+  // relative luminance; no Y O R D w, 800 ms or more per step at the shortest life
+  rift: ['g', 'G', 'Q', 'G', 'g'],
 };
 
 /**

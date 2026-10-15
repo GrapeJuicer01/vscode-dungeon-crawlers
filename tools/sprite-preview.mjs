@@ -151,6 +151,14 @@ const ENEMY_STAGE = {
     'gloom-stag',
     'eclipse-warden',
   ],
+  'dragons-lair': ['drake-whelp', 'kobold-sapper', 'gilded-crown', 'ash-wyvern', 'hoard-dragon'],
+  'void-spire': [
+    'crescent-drifter',
+    'comet-tadpole',
+    'eye-strider',
+    'obelisk-sentinel',
+    'void-sovereign',
+  ],
 };
 const palFor = (stageId, phase) => ({
   ...MASTER_PALETTE,
@@ -314,6 +322,31 @@ if (mode === 'enemies') {
     floorProp('urn', 84, 150);
     floorProp('boneRubble', 62, 150);
     floorProp('boneRubble', 256, 152);
+  } else if (stageArg === 'dragons-lair') {
+    wallProp('doorFrame', 128, 0);
+    wallProp('scorchedPillar', 150, 8);
+    wallProp('scorchedPillar', 230, 8);
+    wallProp('drakeSkull', 52, 40);
+    wallProp('scaleBanner', 220, 20);
+    wallProp('hoardBrazier', 28, 40, 0);
+    wallProp('hoardBrazier', 92, 40, 1);
+    wallProp('hoardBrazier', 252, 40, 2);
+    wallProp('goldVein', 60, 96);
+    wallProp('goldVein', 280, 96, 1);
+    floorProp('hoardPile', 14, 134);
+    floorProp('goldScatter', 66, 152);
+    floorProp('goldScatter', 220, 148);
+  } else if (stageArg === 'void-spire') {
+    wallProp('doorFrame', 128, 0);
+    wallProp('spirePillar', 150, 8);
+    wallProp('spirePillar', 4, 8);
+    wallProp('starWindow', 52, 40);
+    wallProp('voidRift', 28, 40, 0);
+    wallProp('voidRift', 92, 40, 2);
+    wallProp('orbitRing', 252, 40, 1);
+    floorProp('riftPedestal', 14, 134);
+    floorProp('crackedSlab', 66, 152);
+    floorProp('crackedSlab', 220, 148);
   } else {
     wallProp('doorFrame', 128, 0);
     wallProp('torch', 28, 40);

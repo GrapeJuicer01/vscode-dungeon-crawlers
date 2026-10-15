@@ -5,7 +5,18 @@ import type { Surface } from './ports';
 import { DRIP_GRAVITY_PX_PER_S2 } from './data/tuning';
 
 export type ParticleKind =
-  'ember' | 'spark' | 'drip' | 'splash' | 'mote' | 'bubble' | 'wisp' | 'firefly' | 'snow' | 'murk';
+  | 'ember'
+  | 'spark'
+  | 'drip'
+  | 'splash'
+  | 'mote'
+  | 'bubble'
+  | 'wisp'
+  | 'firefly'
+  | 'snow'
+  | 'murk'
+  | 'shimmer'
+  | 'rift';
 /** Kind -> CSS colour ramp, bright to dim by age. */
 export type ParticleColors = Readonly<Record<ParticleKind, readonly string[]>>;
 
@@ -20,6 +31,8 @@ const KIND_NAMES: readonly ParticleKind[] = [
   'firefly',
   'snow',
   'murk',
+  'shimmer',
+  'rift',
 ];
 const KIND_EMBER = 0;
 const KIND_DRIP = 2;
@@ -30,6 +43,8 @@ const KIND_WISP = 6;
 const KIND_FIREFLY = 7;
 const KIND_SNOW = 8;
 const KIND_MURK = 9;
+const KIND_SHIMMER = 10;
+const KIND_RIFT = 11;
 
 function kindIndex(kind: ParticleKind): number {
   return KIND_NAMES.indexOf(kind);
@@ -149,6 +164,13 @@ export class Particles {
         // Murk motes wander in both axes while rising as emitted (Stage 8 ambient).
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 16 * dt;
         this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 16 * dt;
+      } else if (kind === KIND_SHIMMER) {
+        // Heat shimmer sways a little sideways while rising as emitted (Stage 9 ambient).
+        this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 10 * dt;
+      } else if (kind === KIND_RIFT) {
+        // Rift slits are almost stationary; the pulse is the colour ramp (Stage 10 ambient).
+        this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 4 * dt;
+        this.#vy[i] = (this.#vy[i] ?? 0) + (this.#rng() - 0.5) * 4 * dt;
       } else if (kind === KIND_EMBER) {
         // Slow sideways wander so embers do not rise in straight lines.
         this.#vx[i] = (this.#vx[i] ?? 0) + (this.#rng() - 0.5) * 60 * dt;
@@ -184,8 +206,14 @@ export class Particles {
       if (color === undefined) {
         continue;
       }
-      const w = kind === 'bubble' || kind === 'murk' ? 2 : kind === 'wisp' ? 6 : 1;
-      const h = kind === 'drip' || kind === 'bubble' || kind === 'wisp' || kind === 'murk' ? 2 : 1;
+      const w =
+        kind === 'bubble' || kind === 'murk' ? 2 : kind === 'wisp' ? 6 : kind === 'rift' ? 3 : 1;
+      const h =
+        kind === 'shimmer'
+          ? 3
+          : kind === 'drip' || kind === 'bubble' || kind === 'wisp' || kind === 'murk'
+            ? 2
+            : 1;
       surface.fillRect(color, Math.floor(this.#x[i] ?? 0), Math.floor(this.#y[i] ?? 0), w, h);
     }
   }

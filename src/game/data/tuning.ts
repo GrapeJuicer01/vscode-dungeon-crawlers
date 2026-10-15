@@ -215,6 +215,22 @@ export const MURK_RISE_MAX = 8;
 export const MURK_LIFE_MIN_MS = 4000;
 export const MURK_LIFE_MAX_MS = 7000;
 
+// Stage 9 heat shimmer (E5). Cosmetic only; faint tall streaks rising slowly, first guesses.
+export const SHIMMER_MIN_Y = 100;
+export const SHIMMER_MAX_Y = 156;
+export const SHIMMER_DRIFT = 3;
+export const SHIMMER_RISE_MIN = 5;
+export const SHIMMER_RISE_MAX = 11;
+export const SHIMMER_LIFE_MIN_MS = 3000;
+export const SHIMMER_LIFE_MAX_MS = 5000;
+
+// Stage 10 rift slits (E5). Cosmetic only; tiny, nearly stationary, one slow pulse per life.
+export const RIFT_MIN_Y = 30;
+export const RIFT_MAX_Y = 140;
+export const RIFT_DRIFT = 2;
+export const RIFT_LIFE_MIN_MS = 4000;
+export const RIFT_LIFE_MAX_MS = 7000;
+
 // Stage 6 ambient embers (E3). Separate from the campfire EMBER_* constants.
 export const STAGE_EMBER_MIN_Y = 112;
 export const STAGE_EMBER_MAX_Y = 156;

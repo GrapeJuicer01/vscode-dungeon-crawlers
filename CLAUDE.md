@@ -63,7 +63,8 @@ src/game/entities/          (M4) Entity (guard), Hero, Campfire, Prop; ClassHero
                             12 classes are rows, subclass files only where code is needed), Summon.ts (H2, not a
                             hero, never in the roster), Enemy, Boss (E1, enemy side: only enemies have health)
 src/game/data/              (M4) stages, animations, tuning; classes, classMap (classFor(id)), effects (H1),
-                            summons.ts (H2, SUMMON_IDS); enemies.ts (compact table, scaling, validateEnemies),
+                            summons.ts (H2, SUMMON_IDS); enemies.ts (compact table, scaling incl. the E5 late-growth
+                            tail, validateEnemies full 10-stage 50-enemy contract),
                             drops.ts (E1, enemy side); achievements (M7)
 src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplates (aggregator), spriteTypes,
                             spriteBuilder (Grid, seeded, staticTemplate, loopTemplate), heroTemplates,
@@ -79,7 +80,9 @@ src/game/sprites/           (M4) art (pixel-artist, A0): palettes, spriteTemplat
                             stage5Templates, stage6Templates, enemiesStage5, enemiesStage6, elderDryadTemplate,
                             moltenColossusTemplate, enemyFrames (row helpers shared by the enemiesStage3 to 5 and
                             boss files); E4: palettesE4 (boss phase palettes), stage7Templates, stage8Templates,
-                            enemiesStage7, enemiesStage8, glacierMammothTemplate, eclipseWardenTemplate; engine (developer):
+                            enemiesStage7, enemiesStage8, glacierMammothTemplate, eclipseWardenTemplate; E5: palettesE5
+                            (boss phase palettes), stage9Templates, stage10Templates, enemiesStage9, enemiesStage10,
+                            hoardDragonTemplate, voidSovereignTemplate; engine (developer):
                             spriteFactory, spriteValidator, artSet (SHIPPED_ART glue)
 scripts/                    (H1) generate-doc-tables.ts (pure generator) + docs-tables.mjs (esbuild wrapper: bundles
                             the generator into out/scripts/ and runs it; behind `npm run docs:tables`)
@@ -87,8 +90,10 @@ test/                       node:test suites (*.test.ts) + run.mjs (esbuild-comp
                             incl. the hero-invariant test (M4);
                             support/ helpers and fakes (fakeVscode, fakeDom, color; monitor fakes from M3; engine fakes
                             M4; lookAlikes.ts, the silhouette look-alike policy and ratchet, with lookAlikesReport.ts
-                            and lookAlikesReport.mjs, the artist feedback command, E3);
-                            fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3)
+                            and lookAlikesReport.mjs, the artist feedback command, E3; legibility.ts, the floor and
+                            class-cloth contrast table, with legibilityReport.ts and legibilityReport.mjs, E5);
+                            fixtures/transcripts/ synthetic JSONL only, never real transcripts (M3);
+                            fixtures/legibility/ synthetic sprite candidate for the report CLI test (E5)
 test/integration/           extension-host suites (*.itest.ts) + run.mjs (@vscode/test-electron,
                             --disable-extensions); support/ in-host harness and providerSpy
 tools/                      sprite-preview.mjs (dev-only sprite preview, never shipped)
@@ -119,7 +124,7 @@ dist/, out/                 build and test output (git-ignored; only dist/*.js s
 | Agent | Writes | Never writes |
 |---|---|---|
 | architect | `docs/architecture/**` (incl. ADRs), `docs/index.md`, `docs/glossary.md`, `docs/engineering/{coding-standards,team-workflow,roadmap}.md`, and this file (except the Core invariants section) | source code, tests |
-| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts`, the E2 files `palettesE2.ts`, `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts`, the E3 files `palettesE3.ts`, `stage5Templates.ts`, `stage6Templates.ts`, `enemiesStage5.ts`, `enemiesStage6.ts`, `elderDryadTemplate.ts`, `moltenColossusTemplate.ts`, `enemyFrames.ts`, the E4 files `palettesE4.ts`, `stage7Templates.ts`, `stage8Templates.ts`, `enemiesStage7.ts`, `enemiesStage8.ts`, `glacierMammothTemplate.ts`, `eclipseWardenTemplate.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
+| pixel-artist | in `src/game/sprites/`: `palettes.ts`, `spriteTemplates.ts`, `spriteTypes.ts`, `spriteBuilder.ts`, `heroTemplates.ts`, `campfireTemplates.ts`, `stage1Templates.ts`, `classTemplates.ts`, `effectTemplates.ts`, the E1 files `palettesE1.ts`, `dropTemplates.ts`, `enemyTemplates.ts`, `enemyBuilder.ts`, `enemiesStage1.ts`, `enemiesStage2.ts`, `ratKingTemplate.ts`, `goblinForemanTemplate.ts`, `stage2Templates.ts`, the E2 files `palettesE2.ts`, `stage3Templates.ts`, `stage4Templates.ts`, `enemiesStage3.ts`, `enemiesStage4.ts`, `oozeQueenTemplate.ts`, `tombLichTemplate.ts`, the E3 files `palettesE3.ts`, `stage5Templates.ts`, `stage6Templates.ts`, `enemiesStage5.ts`, `enemiesStage6.ts`, `elderDryadTemplate.ts`, `moltenColossusTemplate.ts`, `enemyFrames.ts`, the E4 files `palettesE4.ts`, `stage7Templates.ts`, `stage8Templates.ts`, `enemiesStage7.ts`, `enemiesStage8.ts`, `glacierMammothTemplate.ts`, `eclipseWardenTemplate.ts`, the E5 files `palettesE5.ts`, `stage9Templates.ts`, `stage10Templates.ts`, `enemiesStage9.ts`, `enemiesStage10.ts`, `hoardDragonTemplate.ts`, `voidSovereignTemplate.ts` (and later per-subject template files), `docs/design/art-style-guide.md`, `docs/design/sprite-spec.md`, optional preview under `tools/` | engine code |
 | developer | all other `src/**`, `scripts/`, repo config, `.github/`, README, CONTRIBUTING, CHANGELOG, remaining docs, and **all git operations** | tests, architect- and artist-owned files |
 | tester | `test/**`, `docs/engineering/testing-strategy.md`, the `test` and `test:integration` scripts (runner is built-in `node:test`, ADR 0006, so no runner devDependency; `@vscode/test-electron` is a launcher whose pin the developer owns) | production code |
 | reviewer | nothing (read-only) | everything |

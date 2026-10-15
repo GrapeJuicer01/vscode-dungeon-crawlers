@@ -1,11 +1,13 @@
 // Stage 1 "The Forgotten Cellar" regular enemies (batch E1, step A-E1-2). Owned by the pixel-artist.
 // Ids match src/game/data/enemies.ts: cellar-rat, cave-bat, web-spider, crate-mimic. Every template
 // is `enemies/<id>`, authored LEFT-facing (the engine mirrors only while an enemy withdraws), foot
-// anchor on the bottom outline row, animations idle 2 / walk 2 / attack 3. There is no hit, death,
-// or hurt art: the engine makes the white flash and the dissolve from these frames.
+// anchor on the bottom outline row, animations idle 2 / walk 2 / attack 3. There is no hit or
+// dissolve art: the engine makes the white flash and the dissolve from these frames.
 // Characters: the stage's `1` (outline) plus master accents; at most 12 colors per sprite.
-// Silhouettes (solid black): rat low and long with a curled tail; bat wide and winged; spider
-// round with eight splayed legs and a thread; mimic a boxy crate with a slanted, jagged lid.
+// Silhouettes (solid black): rat low and long with a tail climbing the right edge; bat a wide
+// winged fan with the wing tips in the top corners and a small belly; spider round with eight
+// splayed legs and a thread; mimic a crate on stubby legs with its lid flung up like a jaw.
+// Reworked in A-E5-0 (rat, bat, mimic) to clear the look-alike policy against the older enemies.
 
 import {
   dots,
@@ -25,37 +27,45 @@ const H = 16;
 const ANCHOR = { x: 8, y: 15 };
 
 // ---------------------------------------------------------------- Cellar Rat (minion 16x16)
-// Gray rat with big pink ears, a white-and-black eye, a pink nose, and a pink curled tail.
+// Gray rat, low and long, with big pink ears, a white-and-black eye, a pink nose, and a pink tail
+// that climbs the right edge and hooks over at the top.
 // Colors: 1 G P s w e (+ R in the attack frame mouth) = 7.
 
 const RAT_BODY = [
-  '.....ss.........',
-  '....sPPs........',
-  '....sPPs........',
-  '...GGGGGG.......',
-  '...GGGGGGGG.....',
-  '...GewGGGGGGG...',
-  '..sGewGGGGGGG...',
-  '..sGGGGGGGGGG...',
-  '...GGGPPPPPPG...',
-  '....GGPPPPPPG...',
+  '...PP...........',
+  '..sPPs..........',
+  '..GGGGG.........',
+  '.GGGGGGGGGG.....',
+  '.GewGGGGGGGGG...',
+  '.GewGGGGGGGGGG..',
+  '.PGGGGPPPPPPG...',
 ];
+/** Row of the body's first line; the rat is low and long, the tail climbs the right edge. */
+const RAT_Y = 6;
 
 const RAT_TAIL_A: [number, number, string][] = [
-  [13, 10, 's'],
+  [13, 11, 's'],
   [14, 10, 's'],
   [14, 9, 's'],
   [14, 8, 's'],
   [14, 7, 's'],
-  [13, 6, 's'],
+  [14, 6, 's'],
+  [14, 5, 's'],
+  [14, 4, 's'],
+  [13, 3, 's'],
+  [12, 3, 's'],
 ];
 const RAT_TAIL_B: [number, number, string][] = [
-  [13, 10, 's'],
+  [13, 11, 's'],
   [14, 10, 's'],
   [14, 9, 's'],
   [14, 8, 's'],
-  [13, 7, 's'],
-  [12, 7, 's'],
+  [14, 7, 's'],
+  [14, 6, 's'],
+  [14, 5, 's'],
+  [13, 4, 's'],
+  [13, 3, 's'],
+  [13, 2, 's'],
 ];
 
 function ratFrame(
@@ -65,13 +75,9 @@ function ratFrame(
 ): string[] {
   const d = draft(W, H);
   const dx = opts.dx ?? 0;
-  put(d, RAT_BODY, 0, 3);
   // head and body slide together; the tail stays put and gains a bridge pixel when the body moves
-  if (dx !== 0) {
-    d.g.rect(0, 0, W, H, '.');
-    put(d, RAT_BODY, dx, 3);
-    dots(d, [[13, 10, 'G']]);
-  }
+  put(d, RAT_BODY, dx, RAT_Y);
+  if (dx !== 0) dots(d, [[12, 11, 'G']]);
   dots(d, tail);
   legs.forEach((x, i) => {
     const up = opts.lift !== undefined && i === opts.lift;
@@ -81,10 +87,8 @@ function ratFrame(
   if (opts.open) {
     // open mouth under the nose: red mouth, two white fangs
     dots(d, [
-      [3 + dx, 10, 'R'],
-      [4 + dx, 10, 'R'],
-      [3 + dx, 11, 'w'],
-      [5 + dx, 11, 'w'],
+      [2 + dx, 13, 'R'],
+      [3 + dx, 13, 'R'],
     ]);
   }
   return finish(d);
@@ -98,7 +102,7 @@ export const CELLAR_RAT: SpriteTemplate = enemyTemplate('cellar-rat', W, H, ANCH
   ],
   attack: [
     ratFrame([4, 6, 10, 12], RAT_TAIL_A, { dx: 1 }),
-    ratFrame([3, 5, 9, 11], RAT_TAIL_B, { dx: -1, open: true }),
+    ratFrame([3, 5, 9, 11], RAT_TAIL_B, { open: true }),
     ratFrame([4, 6, 10, 12], RAT_TAIL_A, { open: true }),
   ],
 });
@@ -115,32 +119,34 @@ interface WingPose {
   readonly edge: readonly Pt[];
 }
 const WING_UP: WingPose = {
-  s: [5, 10],
-  t: [1, 3],
+  s: [5, 8],
+  t: [0, 0],
   edge: [
-    [1, 8],
-    [2, 10],
-    [1, 12],
-    [5, 13],
+    [0, 5],
+    [2, 7],
+    [1, 9],
+    [3, 10],
+    [5, 10],
   ],
 };
 const WING_MID: WingPose = {
-  s: [5, 10],
-  t: [1, 8],
+  s: [5, 8],
+  t: [0, 4],
   edge: [
-    [1, 12],
-    [2, 11],
-    [3, 13],
-    [5, 13],
+    [0, 9],
+    [2, 9],
+    [1, 11],
+    [3, 11],
+    [5, 10],
   ],
 };
 const WING_DOWN: WingPose = {
-  s: [5, 10],
-  t: [1, 13],
+  s: [5, 8],
+  t: [0, 11],
   edge: [
     [2, 14],
-    [3, 13],
-    [5, 12],
+    [3, 12],
+    [5, 11],
   ],
 };
 
@@ -174,15 +180,12 @@ function wing(d: Draft, w: WingPose): void {
 }
 
 const BAT_BODY = [
-  '....b....b......',
-  '....bb..bb......',
-  '....bsbbbsb.....',
+  '....b.....b.....',
+  '....bb...bb.....',
   '....bbbbbbb.....',
   '....beYbeYb.....',
   '....bYYbYYb.....',
-  '....bbbbbbb.....',
   '.....bPPPb......',
-  '.....bbbbb......',
   '......bbb.......',
   '......s.s.......',
 ];
@@ -190,23 +193,23 @@ const BAT_BODY = [
 function batFrame(w: WingPose, opts: { dx?: number; dy?: number; mouth?: boolean } = {}): string[] {
   const d = draft(W, H);
   wing(d, w);
-  put(d, BAT_BODY, opts.dx ?? 0, 3 + (opts.dy ?? 0));
+  put(d, BAT_BODY, opts.dx ?? 0, 6 + (opts.dy ?? 0));
   if (opts.mouth) {
     const x = opts.dx ?? 0;
     const y = opts.dy ?? 0;
     dots(d, [
-      [6 + x, 10 + y, 'w'],
-      [7 + x, 10 + y, 'R'],
-      [8 + x, 10 + y, 'w'],
+      [6 + x, 11 + y, 'w'],
+      [7 + x, 11 + y, 'R'],
+      [8 + x, 11 + y, 'w'],
     ]);
-    dots(d, [[7 + x, 11 + y, 'R']]);
+    dots(d, [[7 + x, 12 + y, 'R']]);
   }
   // drop one row so the claws' outline sits on the bottom row (the foot anchor)
   return ['.'.repeat(W), ...finish(d).slice(0, H - 1)];
 }
 
 export const CAVE_BAT: SpriteTemplate = enemyTemplate('cave-bat', W, H, ANCHOR, {
-  idle: [batFrame(WING_MID), batFrame(WING_UP, { dy: -1 })],
+  idle: [batFrame(WING_UP), batFrame(WING_MID, { dy: -1 })],
   walk: [batFrame(WING_UP, { dy: -1 }), batFrame(WING_DOWN)],
   attack: [
     batFrame(WING_UP, { dy: -1, mouth: true }),
@@ -384,20 +387,23 @@ export const WEB_SPIDER: SpriteTemplate = enemyTemplate('web-spider', W, H, ANCH
 });
 
 // ---------------------------------------------------------------- Crate Mimic (elite 24x24)
-// A wooden crate that is secretly a monster: slanted jagged lid, yellow eyes on the lid, a dark
-// red mouth with white teeth, a pink tongue in `attack`. Colors: 1 5 2 4 3 D w R Y e = 10.
+// A wooden crate that is secretly a monster: the lid is hinged at the back and flung up and
+// forward like a jaw, yellow eyes on the lid, a see-through mouth gap with white teeth above and
+// below, a pink tongue in `attack`. The gap is transparent so the silhouette is a tilted slab over a
+// base, not a solid block. Colors: 1 5 2 4 3 w R Y e = 9.
 
 const MW = 24;
 const MH = 24;
 const BASE_TOP = 14;
-const BASE_BOT = 22;
+const BASE_BOT = 19;
 const X0 = 3;
 const X1 = 21;
+/** Hinge of the lid (top edge of the base, near the back), lid length and thickness in pixels. */
+const HINGE_X = 18;
+const LID_LEN = 14;
+const LID_THICK = 5;
 
-function mimicFrame(
-  open: number,
-  opts: { snap?: boolean; tongue?: boolean; sway?: number } = {},
-): string[] {
+function mimicFrame(degrees: number, opts: { tongue?: boolean; sway?: number } = {}): string[] {
   const d = draft(MW, MH);
   const sway = opts.sway ?? 0;
   // base: planks with iron corners
@@ -415,57 +421,65 @@ function mimicFrame(
     [X0 + 1, BASE_TOP + 2, '4'],
     [X1 - 1, BASE_TOP + 2, '4'],
   ]);
-  // mouth gap between base top and lid bottom: dark red inside
-  const lidBottom = (x: number): number =>
-    BASE_TOP - 1 - (opts.snap ? 0 : Math.round((open * (X1 - x)) / (X1 - X0)));
-  for (let x = X0; x <= X1; x++) {
-    for (let y = lidBottom(x); y < BASE_TOP; y++) d.g.set(x, y, 'D');
+  // four stubby legs: the crate stands clear of the floor with gaps between the feet
+  for (const lx of [X0, X0 + 6, X0 + 12, X1 - 1]) {
+    for (let y = BASE_BOT + 1; y <= BASE_BOT + 3; y++) {
+      for (let k = 0; k < 2; k++) d.g.set(lx + k, y, y === BASE_BOT + 3 ? '2' : '3');
+    }
   }
-  // lid: 6 rows thick, sheared by the opening
-  for (let x = X0; x <= X1; x++) {
-    const bottom = lidBottom(x) - 1;
-    for (let k = 0; k < 7; k++) {
-      const y = bottom - k;
+  // lid: a rotated slab. u runs from the hinge along the lid, n runs through its thickness.
+  const th = (degrees * Math.PI) / 180;
+  const ux = -Math.cos(th);
+  const uy = -Math.sin(th);
+  const nx = Math.sin(th);
+  const ny = -Math.cos(th);
+  const hx = HINGE_X + 0.5;
+  const hy = BASE_TOP - 0.5;
+  const lid = new Map<string, [number, number]>();
+  for (let y = 0; y < BASE_TOP; y++) {
+    for (let x = 0; x < MW; x++) {
+      const px = x + 0.5 - hx;
+      const py = y + 0.5 - hy;
+      const s = px * ux + py * uy;
+      const t = px * nx + py * ny;
+      if (s < 0 || s > LID_LEN || t < 0 || t > LID_THICK) continue;
+      lid.set(`${x},${y}`, [s, t]);
       let ch = '5';
-      if (k === 6) ch = '4';
-      else if (k === 0) ch = '2';
-      else if ((x - X0) % 6 === 5) ch = '2';
-      if (x <= X0 + 1 || x >= X1 - 1) ch = k === 6 ? '4' : '3';
+      if (t > LID_THICK - 1.2) ch = '4';
+      else if (t < 1.2) ch = '2';
+      else if (Math.floor(s) % 5 === 4) ch = '2';
+      if (s > LID_LEN - 1.2) ch = '3';
       d.g.set(x, y, ch);
     }
   }
-  // jagged top edge: splinters
-  for (const sx of [X0 + 4, X0 + 9, X0 + 14]) {
-    const top = lidBottom(sx) - 7;
-    dots(d, [[sx, top, '4']]);
-  }
-  // eyes on the lid: white-yellow with a pupil, looking left
-  const eyeY = (x: number): number => lidBottom(x) - 4;
-  for (const ex of [X0 + 4, X0 + 10]) {
-    const y = eyeY(ex);
+  // eyes on the lid face (two blocks along the lid), looking left
+  for (const along of [4, 9]) {
+    const cx = Math.round(hx + ux * along + nx * 2.4);
+    const cy = Math.round(hy + uy * along + ny * 2.4);
     dots(d, [
-      [ex, y, 'e'],
-      [ex + 1, y, 'Y'],
-      [ex + 2, y, 'Y'],
-      [ex, y + 1, 'Y'],
-      [ex + 1, y + 1, 'Y'],
-      [ex + 2, y + 1, 'Y'],
+      [cx, cy, 'e'],
+      [cx + 1, cy, 'Y'],
+      [cx, cy + 1, 'Y'],
+      [cx + 1, cy + 1, 'Y'],
     ]);
   }
-  // teeth: upper from the lid bottom, lower from the base top
-  const openRows = (x: number): number => BASE_TOP - lidBottom(x);
-  for (const tx of [X0 + 3, X0 + 8, X0 + 13]) {
-    const n = Math.min(3, Math.max(1, openRows(tx)));
-    for (let k = 0; k < n; k++) {
-      dots(d, [
-        [tx, lidBottom(tx) + k, 'w'],
-        [tx + 1, lidBottom(tx + 1) + Math.max(0, k - 1), 'w'],
-      ]);
-    }
+  // upper teeth hang from the underside of the lid, lower teeth rise from the base top
+  for (const along of [3, 6.5, 10]) {
+    const tx = Math.round(hx + ux * along);
+    const ty = Math.round(hy + uy * along);
+    if (!lid.has(`${tx},${ty}`)) continue;
+    dots(d, [
+      [tx, ty + 1, 'w'],
+      [tx, ty + 2, 'w'],
+      [tx + 1, ty + 1, 'w'],
+    ]);
   }
-  for (const tx of [X0 + 5, X0 + 10, X0 + 15]) {
-    const n = Math.min(2, Math.max(1, openRows(tx)));
-    for (let k = 0; k < n; k++) dots(d, [[tx, BASE_TOP - 1 - k, 'w']]);
+  for (const tx of [X0 + 3, X0 + 8, X0 + 13]) {
+    dots(d, [
+      [tx, BASE_TOP - 1, 'w'],
+      [tx, BASE_TOP - 2, 'w'],
+      [tx + 1, BASE_TOP - 1, 'w'],
+    ]);
   }
   if (opts.tongue) {
     dots(d, [
@@ -491,9 +505,9 @@ export const CRATE_MIMIC: SpriteTemplate = enemyTemplate(
   MH,
   { x: 12, y: 23 },
   {
-    idle: [mimicFrame(3), mimicFrame(4)],
-    walk: [mimicFrame(2), mimicFrame(5)],
-    attack: [mimicFrame(5), mimicFrame(0, { snap: true }), mimicFrame(2, { tongue: true })],
+    idle: [mimicFrame(55), mimicFrame(60)],
+    walk: [mimicFrame(48), mimicFrame(60)],
+    attack: [mimicFrame(62), mimicFrame(0), mimicFrame(50, { tongue: true })],
   },
 );
 

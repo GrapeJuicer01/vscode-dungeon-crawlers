@@ -177,12 +177,12 @@ void describe('the boot gate (awaitProgress)', () => {
     assert.ok(spy.updates() > 0);
   });
 
-  void it('a stored stage above the delivered count wraps instead of failing (E4: eight stages, ((i - 1) % 8) + 1; 7 and 8 stay, 9 -> 1, 10 -> 2; 3 to 6 stay)', () => {
+  void it('a stored stage above the delivered count wraps instead of failing (E5: ten stages, so every stored index 1..10 stays; ((i - 1) % 10) + 1 only matters for an index the schema already rejects)', () => {
     for (const [stored, expected] of [
       [7, 7],
       [8, 8],
-      [9, 1],
-      [10, 2],
+      [9, 9],
+      [10, 10],
       // 11 and 12 are outside the stored schema (MAX_STAGE_INDEX 10): rejected, so default Stage 1.
       [11, 1],
       [12, 1],
@@ -251,22 +251,22 @@ void describe('onProgress: numbers out, never a reference in', () => {
     assert.ok(before >= 5, 'at least the threshold of regular kills came first');
   });
 
-  void it('the Stage 8 boss defeat wraps to Stage 1 and reports cycle + 1 (New Game+ after eight stages)', () => {
+  void it('the Stage 10 boss defeat wraps to Stage 1 and reports cycle + 1 (New Game+ after ten stages)', () => {
     const reports: { progress: Progress; urgent: boolean }[] = [];
     const rig = gameRig({
       deps: { onProgress: (progress, urgent) => void reports.push({ progress, urgent }) },
     });
     rig.game.applyConfig({ enemiesEnabled: true, killsPerStage: 5, maxEnemies: 12 });
-    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: 8, bossesDefeated: 7, cycle: 0 });
+    rig.game.applyProgress({ ...DEFAULT_PROGRESS, stageIndex: 10, bossesDefeated: 9, cycle: 0 });
     party(rig, 8);
     for (let i = 0; i < 60 * 600 && !reports.some((r) => r.urgent); i++) {
       rig.game.step();
     }
     const urgent = reports.find((r) => r.urgent);
-    assert.ok(urgent, 'the Stage 8 boss fell');
+    assert.ok(urgent, 'the Stage 10 boss fell');
     assert.equal(urgent.progress.stageIndex, 1);
     assert.equal(urgent.progress.cycle, 1);
-    assert.equal(urgent.progress.bossesDefeated, 8);
+    assert.equal(urgent.progress.bossesDefeated, 10);
     assert.deepEqual(rig.errors, []);
     assert.equal(rig.game.heroSnapshot().length, 8, 'no hero is removed by the wrap');
   });
@@ -365,6 +365,21 @@ void describe('an invalid enemy table (decision: it never stops the game)', () =
     rig.surface.record = true;
     rig.game.frame(STEP_MS, rig.surface);
     assert.ok(rig.surface.bitmapDraws > 10, 'the scene renders');
+  });
+
+  void it('a table one row short (ENEMIES.slice(0, 49)) is equally invalid: one boot report, combat disabled, heroes unaffected', () => {
+    const spy = spyCombat();
+    const rig = gameRig({ deps: { enemies: ENEMIES.slice(0, 49) } });
+    assert.equal(rig.errors.length, 1);
+    assert.equal(rig.errors[0]?.scope, 'boot');
+    party(rig, 4);
+    rig.game.step();
+    const before = JSON.stringify(rig.game.heroSnapshot());
+    steps(rig, 20_000);
+    assert.equal(spy.combat()?.disabled, true);
+    assert.deepEqual(spy.combat()?.entities(), []);
+    assert.equal(JSON.stringify(rig.game.heroSnapshot()), before);
+    assert.equal(rig.errors.length, 1);
   });
 
   void it('a later applyConfig(enemies on) cannot revive combat on an invalid table', () => {

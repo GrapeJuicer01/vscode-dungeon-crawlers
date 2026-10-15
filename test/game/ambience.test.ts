@@ -23,6 +23,16 @@ import {
   SNOW_LIFE_MIN_MS,
   SNOW_MAX_Y,
   SNOW_MIN_Y,
+  RIFT_DRIFT,
+  RIFT_LIFE_MAX_MS,
+  RIFT_LIFE_MIN_MS,
+  RIFT_MAX_Y,
+  RIFT_MIN_Y,
+  SHIMMER_DRIFT,
+  SHIMMER_LIFE_MIN_MS,
+  SHIMMER_MAX_Y,
+  SHIMMER_MIN_Y,
+  SHIMMER_RISE_MAX,
   STAGE_EMBER_MAX_Y,
   STAGE_EMBER_MIN_Y,
   FOG_MAX_Y,
@@ -52,6 +62,8 @@ const COLORS: ParticleColors = {
   firefly: ['#f1'],
   snow: ['#n1'],
   murk: ['#k1'],
+  shimmer: ['#h1'],
+  rift: ['#r1'],
 };
 
 interface Rig {
@@ -287,6 +299,8 @@ void describe('Particles: the new kinds', () => {
     ['firefly', 1, 1],
     ['snow', 1, 1],
     ['murk', 2, 2],
+    ['shimmer', 1, 3],
+    ['rift', 3, 1],
   ];
 
   void it('every kind is drawn as exactly one fillRect with its documented size, in its own ramp', () => {
@@ -311,10 +325,10 @@ void describe('Particles: the new kinds', () => {
     const surface = new RecordingSurface();
     surface.record = true;
     pool.draw(surface, COLORS);
-    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 10);
+    assert.equal(new Set(surface.calls.map((c) => c.args[0])).size, 12);
   });
 
-  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp firefly snow murk', () => {
+  void it('the old kind indices are unchanged and the new ones are appended: ember spark drip splash mote bubble wisp firefly snow murk shimmer rift', () => {
     const src = readFileSync(repoPath('src/game/Particles.ts'), 'utf8');
     const list = /const KIND_NAMES[^=]*=\s*\[([^\]]*)\]/.exec(src)?.[1] ?? '';
     const names = [...list.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
@@ -329,6 +343,8 @@ void describe('Particles: the new kinds', () => {
       'firefly',
       'snow',
       'murk',
+      'shimmer',
+      'rift',
     ]);
     assert.match(src, /KIND_EMBER = 0;/);
     assert.match(src, /KIND_DRIP = 2;/);
@@ -336,6 +352,8 @@ void describe('Particles: the new kinds', () => {
     assert.match(src, /KIND_MOTE = 4;/);
     assert.match(src, /KIND_SNOW = 8;/);
     assert.match(src, /KIND_MURK = 9;/);
+    assert.match(src, /KIND_SHIMMER = 10;/);
+    assert.match(src, /KIND_RIFT = 11;/);
   });
 
   void it('a full pool refuses a bubble or a wisp without throwing', () => {
@@ -649,6 +667,204 @@ void describe('Ambience snow and murk (Stages 7 and 8, E4)', () => {
       assert.ok(life / 3 > 1000, `${kind}: plan floor`);
       for (const ch of ramp) {
         assert.ok(!'YORD'.includes(ch), `${kind}: ramp uses hit/ember character ${ch}`);
+        assert.ok(ch in MASTER_PALETTE, `${kind}: ${ch} is a master character`);
+      }
+    }
+  });
+});
+
+void describe('Ambience shimmer and rifts (Stages 9 and 10, E5)', () => {
+  const SHIMMER = { kind: 'shimmer', perSecond: 8 } as const;
+  const RIFTS = { kind: 'rifts', perSecond: 3 } as const;
+
+  void it('10 simulated seconds at 8 per second emit 80 shimmer streaks (+- 1), only shimmer, each one a 1x3 fillRect, inside the corridor view and the shimmer band', () => {
+    const r = rig(SHIMMER);
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 80) <= 1, `${out.length} streaks`);
+    assert.equal(r.particles.count, out.length, 'one fillRect per live particle');
+    for (const p of out) {
+      assert.equal(p.color, '#h1', 'only the shimmer ramp');
+      assert.deepEqual([p.w, p.h], [1, 3]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= SHIMMER_MIN_Y - 1 && p.y <= SHIMMER_MAX_Y, `y ${p.y}`);
+    }
+  });
+
+  void it('10 simulated seconds at 3 per second emit 30 rift slits (+- 1), only rift, each one a 3x1 fillRect, inside the corridor view and the rift band', () => {
+    const r = rig(RIFTS);
+    emitOnly(r, 10_000);
+    const out = drawn(r);
+    assert.ok(Math.abs(out.length - 30) <= 1, `${out.length} slits`);
+    assert.equal(r.particles.count, out.length, 'one fillRect per live particle');
+    for (const p of out) {
+      assert.equal(p.color, '#r1', 'only the rift ramp');
+      assert.deepEqual([p.w, p.h], [3, 1]);
+      assert.ok(p.x >= CORRIDOR_X && p.x < INTERNAL_WIDTH, `x ${p.x}`);
+      assert.ok(p.y >= RIFT_MIN_Y - 1 && p.y <= RIFT_MAX_Y, `y ${p.y}`);
+    }
+  });
+
+  void it('emission rate scales with perSecond (the rate bands follow the stage definitions, not a constant)', () => {
+    for (const kind of ['shimmer', 'rifts'] as const) {
+      const counts = [2, 6].map((perSecond) => {
+        const r = rig({ kind, perSecond });
+        emitOnly(r, 10_000);
+        return r.particles.count;
+      });
+      assert.ok(
+        Math.abs(counts[0]! - 20) <= 1 && Math.abs(counts[1]! - 60) <= 1,
+        `${kind}: ${counts.join(',')}`,
+      );
+    }
+  });
+
+  void it('the same seed gives the same field and the emission is spread across x', () => {
+    for (const effect of [SHIMMER, RIFTS]) {
+      const a = rig(effect);
+      const b = rig(effect);
+      emitOnly(a, 10_000);
+      emitOnly(b, 10_000);
+      assert.deepEqual(drawn(a), drawn(b), effect.kind);
+      assert.ok(new Set(drawn(a).map((p) => p.x)).size > 15, effect.kind);
+    }
+  });
+
+  void it('shimmer rises slowly: every streak moves up, never faster than the rise cap plus jitter, and sways only slightly', () => {
+    const r = rig(SHIMMER);
+    r.ambience.update(1000, r.world, new Camera());
+    const before = drawn(r);
+    assert.ok(before.length >= 6);
+    r.particles.update(500);
+    const after = drawn(r);
+    assert.equal(after.length, before.length);
+    for (let i = 0; i < before.length; i++) {
+      const rose = before[i]!.y - after[i]!.y;
+      assert.ok(rose >= 0, `streak ${i} did not sink`);
+      assert.ok(rose <= SHIMMER_RISE_MAX * 0.5 + 1, `streak ${i} rose ${rose} px in 0.5 s`);
+      assert.ok(
+        Math.abs(after[i]!.x - before[i]!.x) <= SHIMMER_DRIFT * 0.5 + 3,
+        `streak ${i} swayed`,
+      );
+    }
+    const mean = (xs: { y: number }[]): number => xs.reduce((a, p) => a + p.y, 0) / xs.length;
+    assert.ok(mean(after) < mean(before), 'the streaks rose on average');
+  });
+
+  void it('rift slits are near-stationary: over 1 s no slit moves more than a couple of pixels on either axis', () => {
+    const r = rig(RIFTS);
+    emitOnly(r, 2000);
+    const before = drawn(r);
+    assert.ok(before.length >= 4);
+    r.particles.update(1000);
+    const after = drawn(r);
+    assert.equal(after.length, before.length);
+    for (let i = 0; i < before.length; i++) {
+      assert.ok(Math.abs(after[i]!.x - before[i]!.x) <= RIFT_DRIFT + 2, `slit ${i} x`);
+      assert.ok(Math.abs(after[i]!.y - before[i]!.y) <= RIFT_DRIFT + 2, `slit ${i} y`);
+    }
+  });
+
+  void it('the shipped rift ramp pulses once per life: dim up to a peak and back down, and each slit lives 4 to 7 s', () => {
+    assert.equal(RIFT_LIFE_MIN_MS, 4000);
+    assert.equal(RIFT_LIFE_MAX_MS, 7000);
+    const ramp = PARTICLE_PALETTE.rift;
+    const mid = Math.floor(ramp.length / 2);
+    assert.ok(ramp.length >= 5 && ramp.length % 2 === 1, `${ramp.length} steps`);
+    for (let i = 0; i < mid; i++) {
+      assert.equal(
+        ramp[i],
+        ramp[ramp.length - 1 - i],
+        `step ${i} mirrors step ${ramp.length - 1 - i}`,
+      );
+    }
+    // Drawn through the pool, a single slit steps through the ramp in order, once, with no step under 500 ms.
+    const colors: ParticleColors = { ...COLORS, rift: [...ramp].map((c, i) => `#r${i}${c}`) };
+    const pool = new Particles(4, mulberry32(7));
+    pool.emit('rift', 50, 50, 0, 0, RIFT_LIFE_MIN_MS);
+    const seen: { color: string; at: number }[] = [];
+    for (let t = 0; t < RIFT_LIFE_MIN_MS - STEP_MS; t += STEP_MS) {
+      const surface = new RecordingSurface();
+      surface.record = true;
+      pool.draw(surface, colors);
+      const color = String(surface.calls[0]?.args[0]);
+      if (seen.length === 0 || seen[seen.length - 1]!.color !== color) seen.push({ color, at: t });
+      pool.update(STEP_MS);
+    }
+    assert.equal(seen.length, ramp.length, 'every step is shown exactly once, in order');
+    for (let i = 1; i < seen.length; i++) {
+      assert.ok(seen[i]!.at - seen[i - 1]!.at >= 500, `step ${i - 1} lasted under 500 ms`);
+    }
+  });
+
+  void it('neither ambient is scrolled by the camera', () => {
+    for (const effect of [SHIMMER, RIFTS]) {
+      const still = rig(effect);
+      const moved = rig(effect);
+      const cam = new Camera();
+      for (let t = 0; t < 4000; t += STEP_MS) {
+        still.ambience.update(STEP_MS, still.world, cam);
+        moved.ambience.update(STEP_MS, moved.world, cam);
+      }
+      assert.deepEqual(drawn(still), drawn(moved), effect.kind);
+    }
+  });
+
+  void it('the steady-state live count is about rate times life and far below the pool', () => {
+    for (const [effect, lo, hi] of [
+      [SHIMMER, 20, 45],
+      [RIFTS, 8, 25],
+    ] as const) {
+      const r = rig(effect);
+      const camera = new Camera();
+      let peak = 0;
+      for (let t = 0; t < 30_000; t += STEP_MS) {
+        r.ambience.update(STEP_MS, r.world, camera);
+        r.particles.update(STEP_MS);
+        peak = Math.max(peak, r.particles.count);
+      }
+      assert.ok(
+        r.particles.count >= lo && r.particles.count <= hi,
+        `${effect.kind}: ${r.particles.count} live`,
+      );
+      assert.ok(peak < PARTICLE_CAPACITY / 4, `${effect.kind}: peak ${peak}`);
+    }
+  });
+
+  void it('a hidden-tab step and a mid-run stage switch carry no runaway debt (each kind has its own)', () => {
+    const camera = new Camera();
+    const r = rig(SHIMMER);
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 8, `${r.particles.count} shimmer after a hidden-tab step`);
+    r.particles.clear();
+    r.effect = RIFTS;
+    r.ambience.update(600_000, r.world, camera);
+    assert.ok(r.particles.count <= 3, `${r.particles.count} after the switch to rifts`);
+    r.particles.clear();
+    r.effect = SHIMMER;
+    r.ambience.update(STEP_MS, r.world, camera);
+    assert.ok(r.particles.count <= 1, `${r.particles.count} after one step back`);
+  });
+
+  void it('emitting into a full pool never throws and never grows the pool', () => {
+    for (const effect of [SHIMMER, RIFTS]) {
+      const r = rig(effect, 8);
+      for (let i = 0; i < 8; i++) r.particles.emit('spark', 0, 0, 0, 0, 60_000);
+      assert.doesNotThrow(() => emitOnly(r, 10_000));
+      assert.equal(r.particles.count, 8);
+    }
+  });
+
+  void it('the shimmer ramp is monotone dimming with at least 3 steps, no step under 500 ms, and no hit or ember colour', () => {
+    for (const [kind, life] of [
+      ['shimmer', SHIMMER_LIFE_MIN_MS],
+      ['rift', RIFT_LIFE_MIN_MS],
+    ] as const) {
+      const ramp = PARTICLE_PALETTE[kind];
+      assert.ok(ramp.length >= 3, `${kind}: ${ramp.length} steps`);
+      assert.ok(life / ramp.length >= 500, `${kind}: ${life / ramp.length} ms per step`);
+      for (const ch of ramp) {
+        assert.ok(!'YORDw'.includes(ch), `${kind}: ramp uses hit/ember/white character ${ch}`);
         assert.ok(ch in MASTER_PALETTE, `${kind}: ${ch} is a master character`);
       }
     }

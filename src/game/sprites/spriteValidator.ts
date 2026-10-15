@@ -124,6 +124,25 @@ const REQUIRED_PROPS: Readonly<Record<string, readonly string[]>> = {
     'shardPatch',
     'doorFrame',
   ],
+  'dragons-lair': [
+    'scorchedPillar',
+    'drakeSkull',
+    'hoardBrazier',
+    'goldVein',
+    'scaleBanner',
+    'hoardPile',
+    'goldScatter',
+    'doorFrame',
+  ],
+  'void-spire': [
+    'spirePillar',
+    'voidRift',
+    'starWindow',
+    'orbitRing',
+    'riftPedestal',
+    'crackedSlab',
+    'doorFrame',
+  ],
 };
 /** Animated light props: prop name -> minimum idle frames of the flame loop. */
 const FLAME_PROPS: Readonly<Record<string, number>> = {
@@ -138,6 +157,10 @@ const FLAME_PROPS: Readonly<Record<string, number>> = {
   iceSheet: 2,
   floatingShard: 2,
   wispTorch: 4,
+  hoardBrazier: 4,
+  goldVein: 2,
+  voidRift: 4,
+  orbitRing: 2,
 };
 const ENEMY_MAX_SIZE: Readonly<Record<EnemyTier, number>> = { minion: 16, elite: 24, boss: 48 };
 const ENEMY_ANIMATIONS: Readonly<Record<string, number>> = { idle: 2, walk: 2, attack: 3 };

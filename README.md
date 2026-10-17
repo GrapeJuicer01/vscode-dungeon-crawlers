@@ -1,11 +1,11 @@
-# Pixel Agents
+# VSCode Dungeon Crawler
 
-Purpose: what the Pixel Agents VS Code extension does, the promises it makes about your agents, and how to build and run it from source.
+Purpose: what the VSCode Dungeon Crawler VS Code extension does, the promises it makes about your agents, and how to build and run it from source.
 Related: [docs index](docs/index.md), [contributing](CONTRIBUTING.md), [changelog](CHANGELOG.md), [CLAUDE.md](CLAUDE.md).
 
 ## What it does
 
-Pixel Agents adds a "Pixel Agents" tab to the VS Code bottom panel. The tab renders an animated 2D pixel-art dungeon crawler. Each active Claude Code agent session appears as a hero who fights through dungeon biomes while the agent works and rests at a campfire while the agent is idle. When the session ends, the hero warps out.
+Pixel Agents adds a "VSCode Dungeon Crawler" tab to the VS Code bottom panel. The tab renders an animated 2D pixel-art dungeon crawler. Each active Claude Code agent session appears as a hero who fights through dungeon biomes while the agent works and rests at a campfire while the agent is idle. When the session ends, the hero warps out.
 
 Current state (0.0.1, scaffold): the panel tab opens and shows a blank, crisp, integer-scaled dark canvas. Agent detection, the game, and audio arrive in later milestones (see the [roadmap](docs/engineering/roadmap.md)).
 
